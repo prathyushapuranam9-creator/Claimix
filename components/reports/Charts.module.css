@@ -99,7 +99,7 @@
 }
 
 .slot:hover,
-.slot:focus-visible { background: color-mix(in srgb, var(--c-primary) 60%, transparent); }
+.slot:focus-visible { background: var(--c-accent); }
 
 .column {
   position: relative;

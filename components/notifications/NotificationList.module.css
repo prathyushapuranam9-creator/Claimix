@@ -31,7 +31,7 @@
 
 .item:last-child { border-bottom: 0; }
 
-.item[data-unread="true"] { background: var(--c-primary); }
+.item[data-unread="true"] { background: var(--c-accent); }
 
 .dot {
   width: 8px;

@@ -16,8 +16,8 @@
   width: min(var(--sidebar-w), 85vw);
   display: flex;
   flex-direction: column;
-  background: var(--c-surface);
-  border-right: 1px solid var(--c-border);
+  background: var(--c-sidebar);
+  border-right: 1px solid var(--c-sidebar-border);
   color: var(--c-text);
   transform: translateX(-100%);
   transition: transform 180ms ease;
@@ -74,7 +74,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--c-text-subtle);
+  color: var(--c-sidebar-muted);
 }
 
 .link {
@@ -90,12 +90,12 @@
   text-decoration: none;
 }
 
-.link:hover { background: var(--c-bg); }
+.link:hover { background: var(--c-sidebar-hover); }
 
 .link[aria-current="page"] {
-  /* Selected: primary tint, bolder label and a text-coloured marker (not colour alone). */
-  background: var(--c-primary);
-  color: var(--c-on-primary);
+  /* Selected: deeper sidebar blue, bolder label and a text-coloured marker (not colour alone). */
+  background: var(--c-sidebar-selected);
+  color: var(--c-text);
   font-weight: 650;
   box-shadow: inset 3px 0 0 var(--c-text);
 }
@@ -108,7 +108,7 @@
 
 .user {
   padding: var(--sp-4) var(--sp-5);
-  border-top: 1px solid var(--c-border);
+  border-top: 1px solid var(--c-sidebar-border);
   font-size: var(--fs-sm);
 }
 
@@ -121,7 +121,7 @@
 }
 
 .userMeta {
-  color: var(--c-text-muted);
+  color: var(--c-sidebar-muted);
   font-size: var(--fs-xs);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -133,13 +133,13 @@
   width: 100%;
   min-height: 40px;
   background: transparent;
-  border: 1px solid var(--c-border-strong);
+  border: 1px solid var(--c-sidebar-muted);
   border-radius: var(--radius-sm);
   color: var(--c-text);
   cursor: pointer;
 }
 
-.logout:hover { background: var(--c-primary); }
+.logout:hover { background: var(--c-sidebar-hover); }
 
 .column {
   display: flex;
@@ -156,7 +156,7 @@
   gap: var(--sp-3);
   height: var(--topbar-h);
   padding: 0 var(--sp-4);
-  background: color-mix(in srgb, var(--c-bg) 88%, transparent);
+  background: var(--c-topbar);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--c-border);
 }
@@ -207,7 +207,7 @@
   color: var(--c-text-muted);
 }
 
-.bell:hover { background: var(--c-surface-2); color: var(--c-text); }
+.bell:hover { background: var(--c-accent); color: var(--c-text); }
 
 .count {
   position: absolute;

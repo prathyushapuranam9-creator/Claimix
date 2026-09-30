@@ -13,7 +13,7 @@
 .progress {
   flex: 1 1 160px;
   height: 10px;
-  accent-color: var(--c-text);
+  accent-color: var(--c-primary);
 }
 
 .list {

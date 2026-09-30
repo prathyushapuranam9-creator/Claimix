@@ -12,9 +12,9 @@
   display: none;
   position: relative;
   padding: var(--sp-7);
-  background: var(--c-primary);
-  border-right: 1px solid var(--c-primary-edge);
-  color: var(--c-on-primary);
+  background: var(--c-sidebar);
+  border-right: 1px solid var(--c-sidebar-border);
+  color: var(--c-text);
   overflow: hidden;
 }
 
@@ -27,7 +27,7 @@
 }
 
 .aside h2 {
-  color: var(--c-on-primary);
+  color: var(--c-text);
   font-size: var(--fs-3xl);
   max-width: 14ch;
 }
@@ -38,19 +38,19 @@
   margin: var(--sp-6) 0 0;
   padding: 0;
   list-style: none;
-  color: var(--c-on-primary);
+  color: var(--c-text);
 }
 
 .aside li::before {
   content: "✓";
   margin-right: var(--sp-2);
-  color: var(--c-on-primary);
+  color: var(--c-text);
   font-weight: 700;
 }
 
 .fine {
   font-size: var(--fs-xs);
-  color: var(--c-text-muted);
+  color: var(--c-sidebar-muted);
   max-width: 52ch;
 }
 

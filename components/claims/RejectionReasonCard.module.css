@@ -23,7 +23,7 @@
 
 .remarks {
   padding: var(--sp-2) var(--sp-3);
-  border-left: 3px solid var(--c-primary-edge);
+  border-left: 3px solid var(--c-accent-edge);
   background: var(--c-surface-2);
   font-size: var(--fs-sm);
   font-style: italic;

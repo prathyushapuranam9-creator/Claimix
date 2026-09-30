@@ -31,7 +31,8 @@
 }
 
 .table tbody tr:last-child td { border-bottom: 0; }
-.table tbody tr:hover td { background: color-mix(in srgb, var(--c-surface-2) 60%, transparent); }
+.table tbody tr:nth-child(even) td { background: var(--c-row-alt); }
+.table tbody tr:hover td { background: var(--c-accent); }
 
 .right { text-align: right !important; font-variant-numeric: tabular-nums; }
 .nowrap { white-space: nowrap; }

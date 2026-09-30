@@ -24,8 +24,8 @@
 .tab:hover { color: var(--c-text); }
 
 .tab[aria-current="page"] {
-  background: var(--c-primary);
-  color: var(--c-on-primary);
+  background: var(--c-accent);
+  color: var(--c-on-accent);
   border-bottom-color: var(--c-text);
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }

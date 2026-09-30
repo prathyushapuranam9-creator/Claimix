@@ -151,7 +151,7 @@ export function FilterBar({
         </details>
       )}
       <div className={styles.filterActions}>
-        <Button type="submit" variant="secondary">Apply</Button>
+        <Button type="submit">Apply</Button>
         <ButtonLink href={basePath} variant="ghost">Clear</ButtonLink>
       </div>
     </form>

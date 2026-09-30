@@ -22,7 +22,7 @@
   opacity: 0.55;
 }
 
-/* Primary: the light primary with dark text; the edge keeps it defined on light backgrounds. */
+/* Primary: navy fill with white text (sky blue with dark text in dark mode). */
 .primary {
   background: var(--c-primary);
   color: var(--c-on-primary);
@@ -33,19 +33,19 @@
 .primary:active:not(:disabled) { background: var(--c-primary-active); }
 
 .secondary {
-  background: var(--c-surface);
+  background: var(--c-input);
   color: var(--c-text);
   border-color: var(--c-border-strong);
 }
 .secondary:hover:not(:disabled) { background: var(--c-bg); border-color: var(--c-text-subtle); }
-.secondary:active:not(:disabled) { background: var(--c-primary); }
+.secondary:active:not(:disabled) { background: var(--c-accent); }
 
 .ghost {
   background: transparent;
-  color: var(--c-text);
+  color: var(--c-link);
 }
-.ghost:hover:not(:disabled) { background: var(--c-primary); }
-.ghost:active:not(:disabled) { background: var(--c-primary-hover); }
+.ghost:hover:not(:disabled) { background: var(--c-accent); }
+.ghost:active:not(:disabled) { background: var(--c-accent-hover); }
 
 /* Destructive actions keep a clear red so they're never mistaken for the primary. */
 .danger {

@@ -20,7 +20,7 @@
   cursor: pointer;
 }
 
-.chip:hover:not(:disabled) { background: var(--c-primary); border-color: var(--c-primary-edge); }
+.chip:hover:not(:disabled) { background: var(--c-accent); border-color: var(--c-accent-edge); }
 .chip:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .ask {
