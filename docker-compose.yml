@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: claimix
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-claimix_dev_password}
+      POSTGRES_DB: claimix
+    ports:
+      # Local access only (Docker port publishing bypasses host firewalls).
+      - "127.0.0.1:5442:5432"
+    volumes:
+      - claimix_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U claimix -d claimix"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Production-style stack (opt-in): docker compose --profile app up -d
+  # Configuration comes from .env.production (never committed). Inside the stack
+  # DATABASE_URL must point at the "db" service, e.g. postgres://claimix:<pw>@db:5432/claimix
+  migrate:
+    profiles: ["app"]
+    build: .
+    image: claimix:local
+    env_file:
+      - path: .env.production
+        required: false
+    command: ["npm", "run", "db:migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+  app:
+    profiles: ["app"]
+    image: claimix:local
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: false
+    ports:
+      - "3000:3000"
+    volumes:
+      - claimix_storage:/app/.storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  worker:
+    profiles: ["app"]
+    image: claimix:local
+    restart: unless-stopped
+    env_file:
+      - path: .env.production
+        required: false
+    command: ["npm", "run", "worker"]
+    volumes:
+      - claimix_storage:/app/.storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+volumes:
+  claimix_pgdata:
+  claimix_storage:

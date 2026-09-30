@@ -1,0 +1,35 @@
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: var(--sp-3);
+  align-items: end;
+  padding: var(--sp-4);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.change > summary {
+  cursor: pointer;
+  color: var(--c-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: var(--fs-sm);
+}
+
+.change pre {
+  max-width: 420px;
+  max-height: 260px;
+  overflow: auto;
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-2);
+  background: var(--c-surface-2);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

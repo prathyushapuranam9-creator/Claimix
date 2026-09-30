@@ -1,0 +1,25 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: var(--sp-4);
+}
+
+.title {
+  font-size: var(--fs-lg);
+  font-weight: 650;
+  color: var(--c-text);
+  text-decoration: none;
+}
+
+.title:hover { text-decoration: underline; }
+
+.authority {
+  margin-top: var(--sp-1);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.desc {
+  margin-top: var(--sp-3);
+  font-size: var(--fs-sm);
+}

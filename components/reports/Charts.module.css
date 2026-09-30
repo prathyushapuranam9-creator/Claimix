@@ -1,0 +1,181 @@
+/* Bar list: one hue, 4px rounded data-end, square at the baseline, value at the tip. */
+.barList {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.barRow {
+  display: grid;
+  grid-template-columns: minmax(0, min(11rem, 40%)) minmax(0, 1fr);
+  gap: var(--sp-3);
+  align-items: center;
+  font-size: var(--fs-sm);
+}
+
+.barLabel {
+  color: var(--c-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.barTrack {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.bar {
+  display: block;
+  flex: none;
+  /* Length is proportional within the space left after the value label. */
+  width: max(2px, calc((100% - 5rem) * var(--w, 0)));
+  height: 14px;
+  border-radius: 0 4px 4px 0;
+  background: var(--c-chart-1);
+}
+
+.barValue {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Column chart */
+.figure {
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
+}
+
+.plot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-2);
+  height: 220px;
+  padding-bottom: 1.5rem;
+}
+
+.axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin-bottom: -0.5em;
+  margin-top: -0.5em;
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.columns {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  border-bottom: 1px solid var(--c-border-strong);
+}
+
+.grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--c-chart-grid);
+}
+
+.slot {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  justify-content: center;
+  align-items: flex-end;
+  height: 100%;
+  min-width: 0;
+  border-radius: var(--radius-sm);
+  outline-offset: 2px;
+}
+
+.slot:hover,
+.slot:focus-visible { background: color-mix(in srgb, var(--c-primary) 60%, transparent); }
+
+.column {
+  position: relative;
+  display: block;
+  width: min(24px, 70%);
+  min-height: 0;
+  border-radius: 4px 4px 0 0;
+  background: var(--c-chart-1);
+}
+
+.peak {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.xLabel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+
+/* Show every other month label when space is tight. */
+@media (max-width: 640px) {
+  .slot:nth-child(even of .slot) .xLabel { visibility: hidden; }
+}
+
+.tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  z-index: 2;
+  display: none;
+  transform: translateX(-50%);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tip strong { color: var(--c-text); font-size: var(--fs-sm); }
+
+.slot:hover .tip,
+.slot:focus-visible .tip { display: block; }
+
+.slot:first-of-type .tip { left: 0; transform: none; }
+.slot:last-of-type .tip { left: auto; right: 0; transform: none; }
+
+.tableView summary {
+  cursor: pointer;
+  font-size: var(--fs-sm);
+}
+
+.tableView table {
+  margin-top: var(--sp-2);
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.tableView th,
+.tableView td {
+  padding: var(--sp-1) var(--sp-4) var(--sp-1) 0;
+  border-bottom: 1px solid var(--c-border);
+  text-align: left;
+}

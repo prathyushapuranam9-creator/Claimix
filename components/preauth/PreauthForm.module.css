@@ -1,0 +1,44 @@
+.steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 40px;
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--c-surface);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.step span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--c-surface-2);
+  font-size: var(--fs-xs);
+}
+
+.step[aria-current="step"] {
+  border-color: var(--c-text);
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+
+.step[aria-current="step"] span {
+  background: var(--c-text);
+  color: var(--c-surface);
+}

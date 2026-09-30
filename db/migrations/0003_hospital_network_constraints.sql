@@ -1,0 +1,4 @@
+CREATE UNIQUE INDEX "hospital_networks_insurer_uq" ON "hospital_networks" USING btree ("hospital_id","insurer_id") WHERE "hospital_networks"."insurer_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "hospital_networks_tpa_uq" ON "hospital_networks" USING btree ("hospital_id","tpa_id") WHERE "hospital_networks"."tpa_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "hospital_networks_scheme_uq" ON "hospital_networks" USING btree ("hospital_id","scheme_id") WHERE "hospital_networks"."scheme_id" IS NOT NULL;--> statement-breakpoint
+ALTER TABLE "hospital_networks" ADD CONSTRAINT "hospital_networks_one_payer_chk" CHECK (num_nonnulls("hospital_networks"."insurer_id", "hospital_networks"."tpa_id", "hospital_networks"."scheme_id") = 1);

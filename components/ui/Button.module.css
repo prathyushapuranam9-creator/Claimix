@@ -1,0 +1,79 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: var(--tap);
+  padding: 0 var(--sp-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Primary: the light primary with dark text; the edge keeps it defined on light backgrounds. */
+.primary {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  border-color: var(--c-primary-edge);
+  box-shadow: var(--shadow-sm);
+}
+.primary:hover:not(:disabled) { background: var(--c-primary-hover); }
+.primary:active:not(:disabled) { background: var(--c-primary-active); }
+
+.secondary {
+  background: var(--c-surface);
+  color: var(--c-text);
+  border-color: var(--c-border-strong);
+}
+.secondary:hover:not(:disabled) { background: var(--c-bg); border-color: var(--c-text-subtle); }
+.secondary:active:not(:disabled) { background: var(--c-primary); }
+
+.ghost {
+  background: transparent;
+  color: var(--c-text);
+}
+.ghost:hover:not(:disabled) { background: var(--c-primary); }
+.ghost:active:not(:disabled) { background: var(--c-primary-hover); }
+
+/* Destructive actions keep a clear red so they're never mistaken for the primary. */
+.danger {
+  background: var(--c-danger);
+  color: #ffffff;
+}
+.danger:hover:not(:disabled) { filter: brightness(0.92); }
+
+@media (prefers-color-scheme: dark) {
+  .danger { color: var(--c-bg); }
+}
+
+.sm {
+  min-height: 36px;
+  padding: 0 var(--sp-3);
+}
+
+.block { width: 100%; }
+
+.spinner {
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

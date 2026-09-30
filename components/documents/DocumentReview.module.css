@@ -1,0 +1,25 @@
+.box {
+  display: grid;
+  gap: var(--sp-2);
+  min-width: 220px;
+}
+
+.control {
+  min-height: 36px;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  font-size: var(--fs-sm);
+}
+
+.actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.error {
+  color: var(--c-danger);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}

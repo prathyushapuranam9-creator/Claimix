@@ -1,0 +1,107 @@
+.form {
+  display: grid;
+  gap: var(--sp-5);
+}
+
+.section {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: grid;
+  gap: var(--sp-4);
+}
+
+.sectionTitle {
+  padding: 0;
+  margin-bottom: var(--sp-3);
+  font-size: var(--fs-md);
+  font-weight: 650;
+}
+
+.sectionHint {
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+}
+
+@media (min-width: 640px) {
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .full { grid-column: 1 / -1; }
+}
+
+/* Actions stick to the bottom of the viewport on small screens so they stay reachable. */
+.actions {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  margin: 0 calc(-1 * var(--sp-5)) calc(-1 * var(--sp-5));
+  padding: var(--sp-3) var(--sp-5);
+  background: color-mix(in srgb, var(--c-surface) 94%, transparent);
+  border-top: 1px solid var(--c-border);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+@media (max-width: 639px) {
+  .actions > * { flex: 1 1 auto; }
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--tap);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.check input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--c-text);
+}
+
+/* Description list */
+.dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-3) var(--sp-5);
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .dl.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.dl div { min-width: 0; }
+
+.dl dt {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.dl dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.actionsInline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}

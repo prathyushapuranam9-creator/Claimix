@@ -1,0 +1,16 @@
+.body {
+  display: grid;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+}
+
+.meta {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+.response {
+  padding: var(--sp-3);
+  border-left: 3px solid var(--c-primary-edge);
+  background: var(--c-surface-2);
+}

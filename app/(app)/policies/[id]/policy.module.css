@@ -1,0 +1,20 @@
+.summary {
+  margin-top: var(--sp-4);
+  color: var(--c-text-muted);
+}
+
+.info + .info {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--c-border);
+}
+
+.info h3 {
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-sm);
+}
+
+.info p {
+  color: var(--c-text-muted);
+  white-space: pre-line;
+}

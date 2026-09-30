@@ -1,0 +1,218 @@
+/* Claimix design tokens + base. Components style themselves with CSS Modules using these tokens. */
+
+/*
+ * Burgundy + Stone palette
+ *   Background #FAF9F7 · Primary #F4E7EA · Text #292524 · Card #FFFFFF · Border #E7E5E4
+ * Only derived shades needed for usable states are added: hover/pressed tints of
+ * the primary, one muted text tone, a stronger stone outline for controls, and
+ * the semantic status colours (success / warning / danger / info).
+ */
+:root {
+  color-scheme: light;
+
+  /* Palette */
+  --c-bg: #faf9f7;
+  --c-surface: #ffffff;
+  --c-surface-2: #faf9f7; /* table headers, subtle panels */
+  --c-border: #e7e5e4;
+  --c-border-strong: #d6d3d1; /* secondary-button and hover outlines */
+  --c-text: #292524;
+  --c-text-muted: #57534e;
+  --c-text-subtle: #686159; /* 4.6:1+ on every surface incl. primary tints */
+
+  /* Primary: filled buttons, selected states, highlights. Text on it is the text colour. */
+  --c-primary: #f4e7ea;
+  --c-primary-hover: #eedce1;
+  --c-primary-active: #e7d0d6;
+  --c-primary-edge: #e1c7ce;
+  --c-on-primary: #292524;
+
+  /* Focus uses the text colour so it is clearly visible on every surface (≥ 3:1). */
+  --c-focus: #292524;
+
+  /* Status (text on tinted background passes WCAG AA) */
+  --c-success: #17663a;
+  --c-success-bg: #e3f3e8;
+  --c-warning: #7a5200;
+  --c-warning-bg: #faf0dc;
+  --c-danger: #b42318;
+  --c-danger-bg: #fdeceb;
+  --c-info: #1d4f91;
+  --c-info-bg: #e3edfa;
+  --c-neutral: #57534e;
+  --c-neutral-bg: #efedeb;
+
+  --font-sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-md: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+  --fs-2xl: 1.75rem;
+  --fs-3xl: 2.25rem;
+  --fs-4xl: clamp(2.25rem, 4vw + 1rem, 3.5rem);
+
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+  --sp-8: 4rem;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgb(41 37 36 / 0.05);
+  --shadow-md: 0 2px 6px rgb(41 37 36 / 0.05), 0 8px 24px rgb(41 37 36 / 0.05);
+  --shadow-lg: 0 12px 40px rgb(41 37 36 / 0.12);
+  --scrim: rgb(41 37 36 / 0.45);
+  /* Single data hue for charts (validated: 3:1+ on the surface, CVD-safe). */
+  --c-chart-1: #8f1d3f;
+  --c-chart-grid: #e7e5e4;
+
+  --sidebar-w: 256px;
+  --topbar-h: 60px;
+  --content-max: 1280px;
+  --tap: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    /* Dark mode inverts the stone palette: text #292524 becomes the card, background #FAF9F7 the text. */
+    --c-bg: #1c1917;
+    --c-surface: #292524;
+    --c-surface-2: #231f1d;
+    --c-border: #44403c;
+    --c-border-strong: #57534e;
+    --c-text: #faf9f7;
+    --c-text-muted: #d6d3d1;
+    --c-text-subtle: #b5afab;
+    /* Primary becomes a deep burgundy tint with the light primary as its text. */
+    --c-primary: #3f2e34;
+    --c-primary-hover: #4a363d;
+    --c-primary-active: #553f46;
+    --c-primary-edge: #634a52;
+    --c-on-primary: #f4e7ea;
+    --c-focus: #f4e7ea;
+    --c-success: #7fd6a0;
+    --c-success-bg: #133222;
+    --c-warning: #f3c969;
+    --c-warning-bg: #3a2c0c;
+    --c-danger: #f59a92;
+    --c-danger-bg: #3d1614;
+    --c-info: #9cc2f5;
+    --c-info-bg: #142a47;
+    --c-neutral: #d6d3d1;
+    --c-neutral-bg: #38332f;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 16px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 12px 40px rgb(0 0 0 / 0.45);
+    --scrim: rgb(0 0 0 / 0.55);
+    --c-chart-1: #cf5c7c;
+    --c-chart-grid: #44403c;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--c-bg);
+  color: var(--c-text);
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--c-text);
+}
+
+h1 { font-size: var(--fs-2xl); font-weight: 650; }
+h2 { font-size: var(--fs-xl); font-weight: 650; }
+h3 { font-size: var(--fs-lg); font-weight: 600; }
+
+p { margin: 0; }
+
+/* Links: text colour, always underlined, so they are identifiable without a separate hue. */
+a {
+  color: var(--c-text);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover { text-decoration-thickness: 2px; }
+
+img,
+svg { display: block; max-width: 100%; }
+
+button,
+input,
+select,
+textarea { font: inherit; color: inherit; }
+
+:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection { background: var(--c-primary-active); color: var(--c-text); }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--sp-4);
+  top: -100px;
+  z-index: 100;
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--c-surface);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+.skip-link:focus { top: var(--sp-3); }
+
+.mono { font-family: var(--font-mono); font-size: 0.92em; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
