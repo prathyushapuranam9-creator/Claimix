@@ -10,7 +10,7 @@ import { DashboardService, type DashboardData } from "@/modules/dashboard/dashbo
 import { STATUS_LABEL, STATUS_TONE, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
 import { formatHours } from "@/modules/reports/format";
 import r from "@/components/reports/Reports.module.css";
-import { ButtonLink } from "@/components/ui/Button";
+import { ActionLink, BarMetric, Card as GlassCard, Col, Donut, HospitalPage, Icons, KV, Layout, Metric, Panel, Perf, Queues, RingMetric, Rings, TrendChart, WelcomeCard } from "@/components/dashboard/HospitalDashboard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { Badge, Card, EmptyState, PageHeader, Stack, Stat } from "@/components/ui/Surface";
 
@@ -61,13 +61,13 @@ function Group({ title, metrics, size }: { title: string; metrics: Metric[]; siz
   );
 }
 
-function Money({ d }: { d: DashboardData }) {
+function Money({ d, settle = true }: { d: DashboardData; settle?: boolean }) {
   const t = d.financials.reduce((a, f) => ({ approved: a.approved + f.approved, settled: a.settled + f.settled, claimed: a.claimed + f.claimed }), { approved: 0, settled: 0, claimed: 0 });
   return (
     <>
       <Stat label="Claimed" value={formatINR(t.claimed)} hint="Submitted claims" />
       <Stat label="Approved" value={formatINR(t.approved)} hint="By payer decision" />
-      <Stat label="Settled (paid)" value={formatINR(t.settled)} />
+      {settle && <Stat label="Settled (paid)" value={formatINR(t.settled)} />}
     </>
   );
 }
@@ -85,34 +85,60 @@ export default async function DashboardPage() {
   if (d.variant === "hospital") {
     const queries = (ps.query ?? 0) + (cs.query ?? 0);
     const drafts = (ps.draft ?? 0) + (cs.draft ?? 0);
+    const preauthTotal = Object.values(ps).reduce((a, n) => a + n, 0);
+    const caseTotal = preauthTotal + Object.values(cs).reduce((a, n) => a + n, 0);
+    const preauthApproved = sum(ps, ["approved", "partially_approved", "final_approved"]);
+    const t = d.financials.reduce((a, f) => ({ approved: a.approved + f.approved, settled: a.settled + f.settled, claimed: a.claimed + f.claimed }), { approved: 0, settled: 0, claimed: 0 });
+    const clock = new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" });
+    const trend = d.awaitingTrend.map((p) => ({ label: clock.format(p.at), n: p.n }));
     return (
-      <>
-        {header}
-        <Stack>
-          <div className={r.filters}>
-            {can(ctx.principal, "eligibility:check") && <ButtonLink href="/eligibility">Check eligibility</ButtonLink>}
-            {can(ctx.principal, "preauth:create") && <ButtonLink href="/pre-authorizations/new" variant="secondary">New pre-authorization</ButtonLink>}
-            {can(ctx.principal, "claim:create") && <ButtonLink href="/claims/new" variant="secondary">New claim</ButtonLink>}
-          </div>
-          <div className={r.stats}>
-            <Stat label="Queries to answer" value={queries} hint="Pre-auths and claims" />
-            <Stat label="Drafts" value={drafts} hint="Not yet submitted" />
-            <Stat label="Awaiting payer" value={sum(ps, ["submitted", "pending"]) + sum(cs, ["submitted", "pending"])} />
-            <Stat label="Pre-auths approved" value={sum(ps, ["approved", "partially_approved", "final_approved"])} />
-            <Money d={d} />
-            {d.openReviews !== null && <Stat label="Assistant reviews" value={d.openReviews} hint="Open questions" />}
-          </div>
-          <div className={r.split}>
-            <Card title="Pre-authorizations needing action" actions={<Link href="/pre-authorizations">All</Link>}>
-              <CaseList rows={d.actionPreauths} kind="preauth" empty="Nothing waiting on you" />
-            </Card>
-            <Card title="Claims needing action" actions={<Link href="/claims">All</Link>}>
-              <CaseList rows={d.actionClaims} kind="claim" empty="Nothing waiting on you" />
-            </Card>
-          </div>
-          <Disclaimer compact />
-        </Stack>
-      </>
+      <HospitalPage>
+        <Layout>
+          <Col>
+            <WelcomeCard title={`Welcome, ${first}`} subtitle={`${ctx.user.roleName} · ${ctx.user.orgName}`}>
+              {can(ctx.principal, "eligibility:check") && <ActionLink href="/eligibility" icon={Icons.search} primary>Check eligibility</ActionLink>}
+              {can(ctx.principal, "preauth:create") && <ActionLink href="/pre-authorizations/new" icon={Icons.shield}>New pre-authorization</ActionLink>}
+              {can(ctx.principal, "claim:create") && <ActionLink href="/claims/new" icon={Icons.doc}>New claim</ActionLink>}
+            </WelcomeCard>
+            <Rings>
+              <RingMetric label="Queries to answer" value={queries} of={caseTotal} hint="Pre-auths and claims" />
+              <RingMetric label="Drafts" value={drafts} of={caseTotal} hint="Not yet submitted" />
+              {d.openReviews !== null && <RingMetric label="Assistant reviews" value={d.openReviews} of={d.openReviews} hint="Open questions" />}
+            </Rings>
+            <Rings>
+              <Metric icon={Icons.clock} label="Awaiting payer" value={sum(ps, ["submitted", "pending"]) + sum(cs, ["submitted", "pending"])} />
+              <BarMetric icon={Icons.check} label="Pre-auths approved" value={preauthApproved} display={preauthApproved} of={preauthTotal} />
+              <BarMetric icon={Icons.wallet} label="Settled (paid)" value={t.settled} display={formatINR(t.settled)} of={t.approved} />
+            </Rings>
+          </Col>
+          <Col side>
+            <GlassCard title="Awaiting payer over time" updated={formatDateTime(new Date())}>
+              <TrendChart points={trend} />
+            </GlassCard>
+            <GlassCard title="Claimed and approved">
+              <Donut share={t.claimed > 0 ? (t.approved / t.claimed) * 100 : 0}>
+                <KV value={formatINR(t.claimed)} label="Claimed · Submitted claims" />
+                <KV value={formatINR(t.approved)} label="Approved · By payer decision" />
+              </Donut>
+            </GlassCard>
+            <GlassCard title="Average Processing Time">
+              <Perf>
+                <KV value={formatHours(d.preauthTat?.avgHours ?? null)} label="Pre-authorizations" />
+                <KV value={formatHours(d.claimTat?.avgHours ?? null)} label="Claims" />
+              </Perf>
+            </GlassCard>
+          </Col>
+        </Layout>
+        <Queues>
+          <Panel icon={Icons.doc} title="Pre-authorizations needing action" href="/pre-authorizations">
+            <CaseList rows={d.actionPreauths} kind="preauth" empty="Nothing waiting on you" />
+          </Panel>
+          <Panel icon={Icons.doc} title="Claims needing action" href="/claims">
+            <CaseList rows={d.actionClaims} kind="claim" empty="Nothing waiting on you" />
+          </Panel>
+        </Queues>
+        <Disclaimer compact />
+      </HospitalPage>
     );
   }
 
@@ -127,7 +153,7 @@ export default async function DashboardPage() {
             <Stat label="Queries with hospitals" value={(ps.query ?? 0) + (cs.query ?? 0)} />
             <Stat label="Pre-auth turnaround" value={formatHours(d.preauthTat?.medianHours ?? null)} hint="Median" />
             <Stat label="Claim turnaround" value={formatHours(d.claimTat?.medianHours ?? null)} hint="Median" />
-            <Money d={d} />
+            <Money d={d} settle={can(ctx.principal, "claim:settle")} />
             {d.openReviews !== null && <Stat label="Assistant reviews" value={d.openReviews} hint="Open questions" />}
           </div>
           <div className={r.split}>

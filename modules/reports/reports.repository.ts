@@ -87,6 +87,27 @@ export const ReportRepository = {
   },
 
   /**
+   * How many in-scope cases were awaiting the payer (submitted or pending) at each 4-hour mark of
+   * today (India time), up to now, reconstructed from the status history.
+   */
+  async awaitingToday(db: DbOrTx, kind: CaseKind, principal: Principal, scope: Scope) {
+    const t = T[kind].table;
+    const where = caseWhere(kind, principal, scope, {}) ?? sql`true`;
+    const dayStart = sql`(date_trunc('day', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata')`;
+    const rows = await db.execute<{ at: Date; n: number }>(sql`
+      select gs.at as at, count(*) filter (where (
+        select h.to_status from status_history h
+        where h.subject_type = ${kind} and h.subject_id = ${t.id} and h.created_at <= gs.at
+        order by h.created_at desc limit 1
+      ) in ('submitted', 'pending'))::int as n
+      from generate_series(${dayStart}, now(), interval '4 hours') as gs(at)
+      left join ${t} on ${where}
+      group by gs.at
+      order by gs.at`);
+    return Array.from(rows, (r) => ({ at: new Date(r.at), n: Number(r.n) }));
+  },
+
+  /**
    * Hours from submission to the payer's first final decision (approved,
    * partially approved or rejected). Queries in between count as elapsed time.
    */

@@ -3,6 +3,7 @@ import type { ServiceContext } from "@/lib/auth/context";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
 import type { ListQuery } from "@/lib/pagination";
 import { requirePermission } from "@/lib/permissions/principal";
+import { roleFitsOrg } from "@/lib/permissions/catalog";
 import { hashPassword, randomToken } from "@/lib/security/crypto";
 import { parseOrThrow, requireId } from "@/lib/validation";
 import { actorOf, AuditService } from "@/modules/audit/audit.service";
@@ -44,7 +45,7 @@ export const UserService = {
     const [role, org] = await Promise.all([UserRepository.role(ctx.db, d.roleId), OrganizationRepository.get(ctx.db, d.organizationId)]);
     if (!role || NON_ASSIGNABLE_ROLES.has(role.key)) throw new ValidationError("Select a valid role.", { roleId: ["Select a valid role."] });
     if (!org) throw new ValidationError("Select a valid organization.", { organizationId: ["Select a valid organization."] });
-    if (role.orgType !== org.type) {
+    if (!roleFitsOrg(role, org.type)) {
       throw new ValidationError(`The ${role.name} role can only be given to users of a ${role.orgType} organization.`, {
         roleId: [`This role requires a ${role.orgType} organization.`],
       });
@@ -78,7 +79,7 @@ export const UserService = {
       if (roleChanged && (NON_ASSIGNABLE_ROLES.has(role.key) || NON_ASSIGNABLE_ROLES.has(before.roleKey))) {
         throw new ValidationError("Patient portal roles can't be changed here.", { roleId: ["Patient roles are managed from the patient record."] });
       }
-      if (role.orgType !== before.orgType) {
+      if (!roleFitsOrg(role, before.orgType)) {
         throw new ValidationError(`The ${role.name} role requires a ${role.orgType} organization.`, { roleId: ["This role doesn't match the user's organization."] });
       }
       // Prevent admins locking themselves (and possibly everyone) out.

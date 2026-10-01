@@ -1,0 +1,270 @@
+/* Hospital-staff dashboard: fixed lobby backdrop with frosted cards. Colours come from the theme tokens. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-color: var(--c-bg);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* Readability overlay: enough to keep text legible while the scene stays visible. */
+.backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--c-bg) 30%, transparent);
+}
+
+.page {
+  display: grid;
+  gap: var(--sp-4);
+  width: 100%;
+}
+
+.glass {
+  background: color-mix(in srgb, var(--c-surface) 80%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  border: 1px solid color-mix(in srgb, var(--c-border) 80%, transparent);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.welcome {
+  display: grid;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+}
+
+@media (min-width: 1024px) {
+  .welcome { max-width: 46rem; }
+}
+
+.welcome h1 { font-size: var(--fs-3xl); line-height: 1.1; }
+.welcome p { color: var(--c-text-muted); margin-top: var(--sp-1); }
+
+.actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--sp-3);
+}
+
+.action {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-height: var(--tap);
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--c-surface) 85%, transparent);
+  color: var(--c-text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.action:hover { background: var(--c-accent); }
+.actionPrimary { background: var(--c-accent); border-color: var(--c-accent-edge); }
+.actionPrimary:hover { background: var(--c-accent-hover); }
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+
+@media (min-width: 720px) {
+  .metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1100px) {
+  .metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+
+.metric {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--sp-3);
+  align-content: start;
+  padding: var(--sp-4);
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  grid-row: span 3;
+  border-radius: var(--radius-md);
+  background: var(--c-accent);
+  color: var(--c-text);
+}
+
+.label { color: var(--c-text-muted); font-size: var(--fs-sm); }
+
+.value {
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.hint { color: var(--c-text-muted); font-size: var(--fs-sm); }
+
+.queues {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+}
+
+@media (min-width: 1024px) {
+  .queues { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.panelHead h2 { flex: 1; font-size: var(--fs-md); }
+.panelBody { min-height: 0; padding: var(--sp-3) var(--sp-5); display: grid; align-content: center; overflow: auto; }
+
+/* Composition: main column + side column on wide screens */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+}
+
+@media (min-width: 1100px) {
+  .layout { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; }
+}
+
+.col { display: grid; gap: var(--sp-4); min-width: 0; }
+
+.welcome .welcomeTop { display: flex; align-items: center; gap: var(--sp-4); }
+.welcome { max-width: none; }
+
+.avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+  color: var(--c-text-subtle);
+}
+
+.rings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--sp-3);
+}
+
+.ringCard { display: grid; justify-items: center; gap: var(--sp-2); padding: var(--sp-4); text-align: center; }
+
+.ring {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: conic-gradient(var(--c-chart-1) calc(var(--p) * 1%), var(--c-border-strong) 0);
+}
+
+.ring > span {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--c-surface) 92%, transparent);
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar {
+  grid-column: 1 / -1;
+  height: 6px;
+  margin-top: var(--sp-2);
+  border-radius: var(--radius-pill);
+  background: var(--c-chart-grid);
+  overflow: hidden;
+}
+
+.bar > span { display: block; height: 100%; width: calc(var(--p) * 1%); background: var(--c-chart-1); }
+
+.cardTitle { font-size: var(--fs-sm); color: var(--c-text-muted); font-weight: 600; }
+.cardPad { padding: var(--sp-4) var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-3); min-height: 0; }
+.updated { color: var(--c-text-muted); font-size: var(--fs-xs); }
+
+.chart { width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--c-text-muted); font-size: 10px; }
+.chart .grid { stroke: var(--c-chart-grid); stroke-width: 1; }
+.chart .line { fill: none; stroke: var(--c-chart-1); stroke-width: 2; stroke-linejoin: round; }
+.chart .dot { fill: var(--c-chart-1); }
+
+.donutRow { display: flex; flex-direction: row-reverse; align-items: center; gap: var(--sp-4); }
+.donut {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: conic-gradient(var(--c-chart-1) calc(var(--p) * 1%), var(--c-border-strong) 0);
+  -webkit-mask: radial-gradient(circle, transparent 54%, #000 55%);
+  mask: radial-gradient(circle, transparent 54%, #000 55%);
+}
+
+.kv { display: grid; gap: 2px; align-content: start; }
+.kvGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); flex: 1; min-width: 0; }
+.kv strong { font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
+.kv span { color: var(--c-text-muted); font-size: var(--fs-sm); }
+
+.perf { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
+
+/*
+ * Desktop: the dashboard is exactly one screen tall (no page scroll). It fills the space under the top
+ * bar and the section bar (pagebar), absorbing the shell's content padding; the work queues take whatever
+ * height is left and scroll inside their panels if a list is long.
+ */
+@media (min-width: 1100px) and (min-height: 720px) {
+  .page {
+    --chrome: calc(var(--topbar-h) + var(--tap) + var(--sp-4) + var(--sp-6));
+    height: calc(100dvh - var(--chrome));
+    margin-top: calc(-1 * var(--sp-3));
+    margin-bottom: calc(var(--sp-3) - var(--sp-8));
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: var(--sp-3);
+  }
+  .layout { align-items: stretch; gap: var(--sp-3); }
+  .col { gap: var(--sp-3); }
+  .colMain { grid-template-rows: auto minmax(0, 1fr) auto; }
+  .colSide { grid-template-rows: minmax(0, 1fr) auto auto; }
+  .queues { min-height: 0; gap: var(--sp-3); }
+  .queues > section { display: flex; flex-direction: column; min-height: 0; }
+  .queues .panelBody { flex: 1; }
+  .panelBody > div { padding: var(--sp-2) var(--sp-4); gap: var(--sp-1); }
+  .panelBody > div > span { width: 36px; height: 36px; margin-bottom: 0; font-size: 16px; }
+
+  .welcome { padding: var(--sp-4); gap: var(--sp-3); }
+  .welcome h1 { font-size: var(--fs-2xl); }
+  .avatar { width: 52px; height: 52px; }
+  .metric { padding: var(--sp-3) var(--sp-4); }
+  .ringCard { padding: var(--sp-3); gap: var(--sp-1); align-content: center; }
+  .ring { width: 64px; height: 64px; }
+  .ring > span { width: 48px; height: 48px; font-size: var(--fs-lg); }
+  .cardPad { padding: var(--sp-3) var(--sp-4); gap: var(--sp-2); }
+  .donut { width: 68px; height: 68px; }
+  .panelHead { padding: var(--sp-2) var(--sp-4); }
+  .page > [role="status"] { padding: var(--sp-2) var(--sp-4); font-size: var(--fs-xs); }
+}

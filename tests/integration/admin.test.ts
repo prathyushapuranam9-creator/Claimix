@@ -94,7 +94,7 @@ describe("UserService (privilege management)", () => {
       UserService.create(as("admin"), { email: `m-${uniq()}@test.claimix.invalid`, fullName: "Mismatch User", roleId: roleId.admin!, organizationId: DEMO.org.hospitalA }, APP),
     ).rejects.toBeInstanceOf(ValidationError);
     await expect(
-      UserService.create(as("admin"), { email: `m-${uniq()}@test.claimix.invalid`, fullName: "Mismatch User", roleId: roleId.insurer_reviewer!, organizationId: DEMO.org.tpaA }, APP),
+      UserService.create(as("admin"), { email: `m-${uniq()}@test.claimix.invalid`, fullName: "Mismatch User", roleId: roleId.payer_reviewer!, organizationId: DEMO.org.hospitalA }, APP),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 

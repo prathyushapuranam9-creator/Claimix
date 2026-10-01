@@ -92,7 +92,7 @@ test.describe("administration", () => {
     await signIn(page, "admin@demo.claimix.invalid");
     await page.goto("/admin/users/new");
     await expect(page.getByLabel("Organization")).toBeDisabled();
-    await page.getByLabel("Role").selectOption({ label: "Insurer Reviewer" });
+    await page.getByLabel("Role").selectOption({ label: "Payer Reviewer" });
     const orgOptions = await page.getByLabel("Organization").locator("option").allTextContents();
     expect(orgOptions.some((o) => o.includes("Suraksha"))).toBe(true);
     expect(orgOptions.some((o) => o.includes("Sunrise"))).toBe(false);

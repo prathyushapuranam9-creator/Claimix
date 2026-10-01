@@ -190,7 +190,7 @@ export const ClaimService = {
         cancel: side === "hospital" && allowedClaimTransitions(status, "hospital").includes("cancelled"),
         decide: pSide ? allowedClaimTransitions(status, pSide).filter((t) => t !== "settled") : [],
         // Insurers pay (claim:settle); TPAs assess but don't settle; scheme desks record scheme payments.
-        settle: !!pSide && (pSide === "scheme_desk" || !!scopeFor(ctx.principal, "claim:settle")) && allowedClaimTransitions(status, pSide).includes("settled"),
+        settle: !!pSide && (pSide === "scheme_desk" || (ctx.principal.orgType === "insurer" && !!scopeFor(ctx.principal, "claim:settle"))) && allowedClaimTransitions(status, pSide).includes("settled"),
         recordsSchemeDecision: pSide === "scheme_desk",
       },
     };
@@ -438,7 +438,11 @@ export const ClaimService = {
     return ctx.db.transaction(async (tx) => {
       const row = await load(ctx, id, { forUpdate: true, db: tx });
       const side = payerSide(ctx, row);
-      if (side === "payer") requirePermission(ctx.principal, "claim:settle");
+      if (side === "payer") {
+        // TPAs assess but never pay, whatever their role grants.
+        if (ctx.principal.orgType !== "insurer") throw new ForbiddenError("Only the insurer records settlements.");
+        requirePermission(ctx.principal, "claim:settle");
+      }
       if (!canTransitionClaim(row.claim.status as ClaimStatus, "settled", side)) throw new InvalidTransitionError("Only approved claims can be settled.");
       const approved = Number(row.claim.approvedAmount ?? 0);
       if (d.amount > approved) throw new ValidationError(`The settlement can't exceed the approved amount (₹${approved.toLocaleString("en-IN")}).`, { amount: ["Exceeds the approved amount."] });

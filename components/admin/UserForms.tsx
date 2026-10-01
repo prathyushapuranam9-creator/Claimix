@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ActionResult } from "@/lib/action-result";
+import { roleFitsOrg, type OrgType } from "@/lib/permissions/catalog";
 import { useServerResult } from "@/lib/use-action-form";
 import { userCreateSchema, userUpdateSchema, type UserCreateInput, type UserUpdateInput } from "@/modules/users/users.validation";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -11,16 +12,17 @@ import { SelectField, TextField } from "@/components/ui/Field";
 import { Checkbox, FormActions, FormGrid, formStyles } from "@/components/ui/Form";
 import { Alert } from "@/components/ui/Surface";
 
-type Role = { id: string; name: string; orgType: string | null };
-type Org = { id: string; name: string; type: string };
+type Role = { id: string; key: string; name: string; orgType: OrgType | null };
+type Org = { id: string; name: string; type: OrgType };
 
 export function CreateUserForm({ action, roles, orgs }: { action: (i: UserCreateInput) => Promise<ActionResult>; roles: Role[]; orgs: Org[] }) {
   const { register, handleSubmit, setError, control, formState } = useForm<UserCreateInput>({ resolver: zodResolver(userCreateSchema) });
   const { formError, apply } = useServerResult(setError);
   const roleId = useWatch({ control, name: "roleId" });
-  const orgType = roles.find((r) => r.id === roleId)?.orgType;
+  const role = roles.find((r) => r.id === roleId);
+  const orgType = role?.orgType;
   // Only organizations matching the chosen role's type are offered (the server enforces this too).
-  const orgOptions = orgType ? orgs.filter((o) => o.type === orgType) : [];
+  const orgOptions = role ? orgs.filter((o) => roleFitsOrg(role, o.type)) : [];
   const e = formState.errors;
 
   return (

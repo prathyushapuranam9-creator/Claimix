@@ -80,34 +80,11 @@ export const ROLES: RoleDef[] = [
     },
   },
   {
-    key: "insurer_reviewer",
-    name: "Insurer Reviewer",
+    key: "payer_reviewer",
+    name: "Payer Reviewer",
+    // Stored against the insurer type; see roleFitsOrg for the TPA organizations that may also hold it.
     orgType: "insurer",
-    description: "Reviews pre-auths and claims assigned to their insurer.",
-    grants: {
-      "dashboard:view": "organization",
-      "patient:read": "organization",
-      "hospital:read": "all",
-      "insurer:read": "all",
-      "policy:read": "organization",
-      "preauth:read": "organization",
-      "preauth:review": "organization",
-      "claim:read": "organization",
-      "claim:review": "organization",
-      "claim:settle": "organization",
-      "document:read": "organization",
-      "document:verify": "organization",
-      "notification:read": "own",
-      "assistant:use": "organization",
-      "assistant:review": "organization",
-      "report:view": "organization",
-    },
-  },
-  {
-    key: "tpa_reviewer",
-    name: "TPA Reviewer",
-    orgType: "tpa",
-    description: "Reviews pre-auths and claims assigned to their TPA.",
+    description: "Reviews pre-auths and claims assigned to their insurer or TPA, and verifies documents. Settlement is recorded by insurers only.",
     grants: {
       "dashboard:view": "organization",
       "patient:read": "organization",
@@ -118,6 +95,7 @@ export const ROLES: RoleDef[] = [
       "preauth:review": "organization",
       "claim:read": "organization",
       "claim:review": "organization",
+      "claim:settle": "organization",
       "document:read": "organization",
       "document:verify": "organization",
       "notification:read": "own",
@@ -155,3 +133,12 @@ export const ROLES: RoleDef[] = [
     },
   },
 ];
+
+/** Legacy role keys that were merged into `payer_reviewer`; setup moves their users across. */
+export const MERGED_PAYER_ROLE_KEYS = ["insurer_reviewer", "tpa_reviewer"] as const;
+
+/** Whether a role may be given to users of an organization type. Payer reviewers work in insurers and TPAs. */
+export function roleFitsOrg(role: { key: string; orgType: OrgType | null }, orgType: OrgType): boolean {
+  if (role.key === "payer_reviewer") return orgType === "insurer" || orgType === "tpa";
+  return role.orgType === orgType;
+}

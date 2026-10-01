@@ -20,7 +20,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "▦", permission: "dashboard:view", section: "Workspace" },
   { href: "/patients", label: "Patients", icon: "☺", permission: "patient:read", section: "Workspace" },
-  { href: "/eligibility", label: "Eligibility checker", icon: "✓", permission: "eligibility:check", section: "Workspace" },
+  { href: "/eligibility", label: "Eligibility checker", icon: "✓", permission: "eligibility:check", section: "Workspace", hidden: true },
   { href: "/pre-authorizations", label: "Pre-authorizations", title: "Pre-Authorization", icon: "⎘", permission: "preauth:read", section: "Workspace", hidden: true },
   { href: "/claims", label: "Claims", icon: "₹", permission: "claim:read", section: "Workspace", hidden: true },
   { href: "/documents", label: "Documents", icon: "❐", permission: "document:read", section: "Workspace" },

@@ -165,7 +165,7 @@ describe("portal-based sign-in", () => {
     const ok = await auth.login({ email: insurer, password: demoPassword, portal: "insurance" }, { ...META, ipAddress: uniqueIp() });
     const user = await auth.resolve(ok.token);
     expect(user?.principal.orgType).toBe("insurer");
-    expect(user?.principal.roleKey).toBe("insurer_reviewer");
+    expect(user?.principal.roleKey).toBe("payer_reviewer");
     // Choosing "admin" can never make an insurer an admin.
     await expect(auth.login({ email: insurer, password: demoPassword, portal: "admin" }, { ...META, ipAddress: uniqueIp() })).rejects.toThrow(/Insurance Reviewer/);
   });

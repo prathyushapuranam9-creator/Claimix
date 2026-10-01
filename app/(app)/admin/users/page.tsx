@@ -21,7 +21,7 @@ export default async function UsersPage({ searchParams }: { searchParams: SP }) 
   const roleParam = param(sp, "role");
   const f = {
     organizationId: opts.orgs.some((o) => o.id === orgParam) ? orgParam : undefined,
-    roleKey: ["admin", "hospital_staff", "insurer_reviewer", "tpa_reviewer", "patient", "read_only"].includes(roleParam ?? "") ? roleParam : undefined,
+    roleKey: ["admin", "hospital_staff", "payer_reviewer", "patient", "read_only"].includes(roleParam ?? "") ? roleParam : undefined,
   };
   const data = await UserService.list(ctx, q, f);
 
@@ -38,8 +38,7 @@ export default async function UsersPage({ searchParams }: { searchParams: SP }) 
             <option value="">All roles</option>
             <option value="admin">Administrator</option>
             <option value="hospital_staff">Hospital Staff</option>
-            <option value="insurer_reviewer">Insurer Reviewer</option>
-            <option value="tpa_reviewer">TPA Reviewer</option>
+            <option value="payer_reviewer">Payer Reviewer</option>
             <option value="patient">Patient</option>
             <option value="read_only">Read-only</option>
           </SelectField>

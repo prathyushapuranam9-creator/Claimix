@@ -1,7 +1,7 @@
-import { inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
-import { permissions, rolePermissions, roles } from "@/db/schema";
-import { PERMISSIONS, ROLES, type PermissionKey } from "@/lib/permissions/catalog";
+import { permissions, rolePermissions, roles, users } from "@/db/schema";
+import { MERGED_PAYER_ROLE_KEYS, PERMISSIONS, ROLES, type PermissionKey } from "@/lib/permissions/catalog";
 
 /** Syncs the permission catalog and default role grants into the database (idempotent). */
 export async function seedRbac(db: DbOrTx) {
@@ -27,6 +27,14 @@ export async function seedRbac(db: DbOrTx) {
         .values(grants.map(([k, scope]) => ({ roleId: role!.id, permissionId: permId.get(k)!, scope })))
         .onConflictDoNothing();
     }
+  }
+
+  // Insurer and TPA reviewers were merged into one role: move existing users across, then drop the old roles.
+  const legacy = await db.select({ id: roles.id }).from(roles).where(inArray(roles.key, [...MERGED_PAYER_ROLE_KEYS]));
+  if (legacy.length) {
+    const [payer] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, "payer_reviewer"));
+    await db.update(users).set({ roleId: payer!.id }).where(inArray(users.roleId, legacy.map((l) => l.id)));
+    await db.delete(roles).where(inArray(roles.id, legacy.map((l) => l.id)));
   }
 
   const roleRows = await db.select({ id: roles.id, key: roles.key }).from(roles).where(inArray(roles.key, ROLES.map((r) => r.key)));

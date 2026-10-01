@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { orNotFound, pageContext } from "@/lib/auth/context";
 import { formatDateTime } from "@/lib/india";
+import { roleFitsOrg } from "@/lib/permissions/catalog";
 import { UserService } from "@/modules/users/users.service";
 import { EditUserForm } from "@/components/admin/UserForms";
 import { UserSecurityActions } from "@/components/admin/UserSecurityActions";
@@ -17,7 +18,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
   const [u, opts] = await Promise.all([orNotFound(UserService.get(ctx, id)), UserService.formOptions(ctx)]);
   const isSelf = u.id === ctx.principal.userId;
   // Only roles that fit this user's organization type can be chosen.
-  const roles = u.roleKey === "patient" ? [{ id: u.roleId, name: u.roleName, orgType: u.orgType }] : opts.roles.filter((r) => r.orgType === u.orgType);
+  const roles = u.roleKey === "patient" ? [{ id: u.roleId, key: u.roleKey, name: u.roleName, orgType: u.orgType }] : opts.roles.filter((r) => roleFitsOrg(r, u.orgType));
 
   return (
     <>
