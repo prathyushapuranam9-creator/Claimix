@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { pageContext } from "@/lib/auth/context";
 import { formatDateTime, formatINR } from "@/lib/india";
+import { hasDashboard, landingPath } from "@/lib/navigation";
 import { can } from "@/lib/permissions/principal";
 import { CLAIM_STATUS_LABEL, CLAIM_STATUS_TONE, type ClaimStatus } from "@/modules/claims/claims.workflow";
 import { DashboardService, type DashboardData } from "@/modules/dashboard/dashboard.service";
@@ -16,7 +18,6 @@ export const metadata: Metadata = { title: "Dashboard · Claimix" };
 
 type Row = { id: string; reference: string; status: string; updatedAt: Date };
 type Counts = Record<string, number>;
-type CaseData = Exclude<DashboardData, { variant: "patient" } | { variant: "reference" }>;
 
 const sum = (c: Counts, keys: string[]) => keys.reduce((a, k) => a + (c[k] ?? 0), 0);
 
@@ -60,7 +61,7 @@ function Group({ title, metrics, size }: { title: string; metrics: Metric[]; siz
   );
 }
 
-function Money({ d }: { d: CaseData }) {
+function Money({ d }: { d: DashboardData }) {
   const t = d.financials.reduce((a, f) => ({ approved: a.approved + f.approved, settled: a.settled + f.settled, claimed: a.claimed + f.claimed }), { approved: 0, settled: 0, claimed: 0 });
   return (
     <>
@@ -73,52 +74,10 @@ function Money({ d }: { d: CaseData }) {
 
 export default async function DashboardPage() {
   const ctx = await pageContext("dashboard:view");
+  if (!hasDashboard(ctx.principal)) redirect(landingPath(ctx.principal));
   const d = await DashboardService.forCaller(ctx);
   const first = ctx.user.fullName.split(" ")[0];
   const header = <PageHeader title={`Welcome, ${first}`} description={`${ctx.user.roleName} · ${ctx.user.orgName}`} />;
-
-  if (d.variant === "patient") {
-    return (
-      <>
-        {header}
-        <Stack>
-          <div className={r.split}>
-            <Card title="Your pre-authorizations"><CaseList rows={d.preauths} kind="preauth" empty="No pre-authorizations yet" /></Card>
-            <Card title="Your claims"><CaseList rows={d.claims} kind="claim" empty="No claims yet" /></Card>
-          </div>
-          <Card title="Understand your cover">
-            <p>
-              <Link href="/knowledge/how-cashless-works">How cashless works</Link> · <Link href="/cashless-vs-reimbursement">Cashless vs reimbursement</Link> · <Link href="/glossary">Glossary</Link>
-            </p>
-          </Card>
-          <Disclaimer compact />
-        </Stack>
-      </>
-    );
-  }
-
-  if (d.variant === "reference") {
-    const x = d.reference;
-    return (
-      <>
-        {header}
-        <Stack>
-          <div className={r.stats}>
-            <Stat label="Hospitals" value={x.hospitals} />
-            <Stat label="Insurance companies" value={x.insurers} />
-            <Stat label="TPAs" value={x.tpas} />
-            <Stat label="Government schemes" value={x.schemes} />
-            <Stat label="Policies" value={x.policies} />
-          </div>
-          <Card title="Browse">
-            <p>
-              <Link href="/hospitals">Hospitals &amp; network</Link> · <Link href="/policies">Policies</Link> · <Link href="/insurers">Insurance companies</Link> · <Link href="/knowledge">Knowledge Center</Link>
-            </p>
-          </Card>
-        </Stack>
-      </>
-    );
-  }
 
   const ps = d.preauthStatus as Counts;
   const cs = d.claimStatus as Counts;

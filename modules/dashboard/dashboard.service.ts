@@ -1,5 +1,7 @@
 import "server-only";
 import type { ServiceContext } from "@/lib/auth/context";
+import { ForbiddenError } from "@/lib/errors";
+import { hasDashboard } from "@/lib/navigation";
 import { can, requirePermission, scopeFor } from "@/lib/permissions/principal";
 import { ReportRepository } from "@/modules/reports/reports.repository";
 import { DashboardRepository } from "./dashboard.repository";
@@ -16,20 +18,9 @@ export const DashboardService = {
   async forCaller(ctx: ServiceContext) {
     requirePermission(ctx.principal, "dashboard:view");
     const p = ctx.principal;
+    if (!hasDashboard(p)) throw new ForbiddenError();
     const preauthScope = scopeFor(p, "preauth:read");
     const claimScope = scopeFor(p, "claim:read");
-
-    if (p.patientId) {
-      const [preauths, claims] = await Promise.all([
-        preauthScope ? ReportRepository.recent(ctx.db, "preauth", p, preauthScope, 10) : [],
-        claimScope ? ReportRepository.recent(ctx.db, "claim", p, claimScope, 10) : [],
-      ]);
-      return { variant: "patient" as const, preauths, claims };
-    }
-
-    if (!preauthScope && !claimScope) {
-      return { variant: "reference" as const, reference: await DashboardRepository.referenceCounts(ctx.db) };
-    }
 
     const waiting = p.orgType === "hospital" ? HOSPITAL_ACTION : PAYER_WAITING;
     const [preauthStatus, claimStatus, financials, preauthTat, claimTat, actionPreauths, actionClaims, openReviews] = await Promise.all([

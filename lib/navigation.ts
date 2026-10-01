@@ -1,4 +1,5 @@
 import type { PermissionKey } from "@/lib/permissions/catalog";
+import { can, type Principal } from "@/lib/permissions/principal";
 
 export interface NavItem {
   href: string;
@@ -39,6 +40,17 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/audit", label: "Audit log", icon: "☰", permission: "audit:read", section: "Administration" },
 ];
 
-export function visibleNav(perms: ReadonlyMap<PermissionKey, unknown>): NavItem[] {
-  return NAV_ITEMS.filter((i) => perms.has(i.permission));
+/** Admins, hospital staff and payers have a dashboard; patient and read-only users do not. */
+export function hasDashboard(p: Principal): boolean {
+  return !p.patientId && (can(p, "preauth:read") || can(p, "claim:read"));
+}
+
+/** Where users without a dashboard land after signing in. */
+export function landingPath(p: Principal): string {
+  if (hasDashboard(p)) return "/dashboard";
+  return p.patientId ? "/patients" : "/hospitals";
+}
+
+export function visibleNav(p: Principal): NavItem[] {
+  return NAV_ITEMS.filter((i) => p.permissions.has(i.permission) && (i.href !== "/dashboard" || hasDashboard(p)));
 }

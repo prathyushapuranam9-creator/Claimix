@@ -127,14 +127,16 @@ test.describe("dashboards and reports", () => {
     await expect(page.getByText("Pre-auths awaiting decision")).toBeVisible();
     await expect(page.getByText("Queries to answer")).toHaveCount(0);
 
+    // Patient and read-only users have no dashboard: /dashboard sends them to their landing page.
     await page.context().clearCookies();
     await signIn(page, "patient.a1@demo.claimix.invalid");
-    await expect(page.getByRole("heading", { name: "Your claims" })).toBeVisible();
-    await expect(page.getByText("Claimed", { exact: true })).toHaveCount(0);
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/patients/);
 
     await page.context().clearCookies();
     await signIn(page, "readonly@demo.claimix.invalid");
-    await expect(page.getByText("Insurance companies", { exact: true }).last()).toBeVisible();
+    await page.goto("/dashboard");
+    await expect(page).toHaveURL(/\/hospitals/);
 
     await page.context().clearCookies();
     await signIn(page, "admin@demo.claimix.invalid");
