@@ -128,23 +128,23 @@
   white-space: nowrap;
 }
 
+/* Icon-only collapse control (the accessible name and tooltip say what it does). */
 .collapse {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
+  display: inline-grid;
+  place-items: center;
   margin-top: var(--sp-3);
-  width: 100%;
-  min-height: 40px;
-  padding: 0 var(--sp-3);
+  width: var(--tap);
+  height: 40px;
+  padding: 0;
   background: transparent;
-  border: 1px solid var(--c-sidebar-muted);
+  border: 0;
   border-radius: var(--radius-sm);
   color: var(--c-text);
-  font: inherit;
   cursor: pointer;
 }
 
 .collapse:hover { background: var(--c-sidebar-hover); }
+.collapse:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
 .chevron { flex: none; transition: transform 180ms ease; }
 
 /* Collapsed rail: desktop only, the mobile drawer always shows full labels. */
@@ -157,10 +157,16 @@
   .shell[data-collapsed="true"] .userMeta { display: none; }
   .shell[data-collapsed="true"] .brand { justify-content: center; padding: 0; }
   .shell[data-collapsed="true"] .link,
-  .shell[data-collapsed="true"] .collapse { justify-content: center; padding: 0; }
+  .shell[data-collapsed="true"] .collapse { justify-content: center; padding: 0; margin-inline: auto; display: grid; }
   .shell[data-collapsed="true"] .user { padding: var(--sp-3); }
   .shell[data-collapsed="true"] .chevron { transform: rotate(180deg); }
+
 }
+
+/* Insurer Reviewer portal: the content always fills the space beside the sidebar (no fixed,
+   centred cap), so expanding or collapsing the sidebar resizes it along with the sidebar's
+   own animation. Padding keeps it aligned with the section bar. */
+.shell[data-portal="insurance"] .content { max-width: none; }
 
 .profile { position: relative; }
 

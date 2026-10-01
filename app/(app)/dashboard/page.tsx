@@ -9,6 +9,7 @@ import { CLAIM_STATUS_LABEL, CLAIM_STATUS_TONE, type ClaimStatus } from "@/modul
 import { DashboardService, type DashboardData } from "@/modules/dashboard/dashboard.service";
 import { STATUS_LABEL, STATUS_TONE, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
 import { formatHours } from "@/modules/reports/format";
+import { CardGrid, KpiCard, ListCard, ListPair, PipelinePill, SectionHeader, WorkflowCard, type CaseRowData } from "@/components/dashboard/DashboardCards";
 import r from "@/components/reports/Reports.module.css";
 import { ActionLink, BarMetric, Card as GlassCard, Col, Donut, HospitalPage, Icons, KV, Layout, Metric, Panel, Perf, Queues, RingMetric, Rings, TrendChart, WelcomeCard } from "@/components/dashboard/HospitalDashboard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
@@ -40,6 +41,22 @@ function CaseList({ rows, kind, empty }: { rows: Row[]; kind: "preauth" | "claim
       ))}
     </ul>
   );
+}
+
+/** Case rows for the dashboard list cards (same reference, status and timestamp as CaseList). */
+function caseRows(rows: Row[], kind: "preauth" | "claim"): CaseRowData[] {
+  return rows.map((x) => ({
+    id: x.id,
+    href: kind === "preauth" ? `/pre-authorizations/${x.id}` : `/claims/${x.id}`,
+    reference: x.reference,
+    status:
+      kind === "preauth" ? (
+        <Badge tone={STATUS_TONE[x.status as PreauthStatus]}>{STATUS_LABEL[x.status as PreauthStatus]}</Badge>
+      ) : (
+        <Badge tone={CLAIM_STATUS_TONE[x.status as ClaimStatus]}>{CLAIM_STATUS_LABEL[x.status as ClaimStatus]}</Badge>
+      ),
+    time: formatDateTime(x.updatedAt),
+  }));
 }
 
 type Metric = { label: string; value: React.ReactNode; hint?: string };
@@ -143,27 +160,83 @@ export default async function DashboardPage() {
   }
 
   if (d.variant === "payer") {
+    const money = d.financials.reduce((a, f) => ({ approved: a.approved + f.approved, settled: a.settled + f.settled, claimed: a.claimed + f.claimed }), { approved: 0, settled: 0, claimed: 0 });
+    const preauthsWaiting = sum(ps, ["submitted", "pending"]);
+    const claimsWaiting = sum(cs, ["submitted", "pending"]);
+    const queries = (ps.query ?? 0) + (cs.query ?? 0);
+    const reviews = d.openReviews;
+    const pending = preauthsWaiting + claimsWaiting;
     return (
       <>
-        {header}
+        <PageHeader
+          title={`Welcome, ${first}`}
+          description={`${ctx.user.roleName} · ${ctx.user.orgName}`}
+          actions={<PipelinePill label="Decision pipeline" when={`as of ${formatDateTime(new Date())}`} />}
+        />
         <Stack>
-          <div className={r.stats}>
-            <Stat label="Pre-auths awaiting decision" value={sum(ps, ["submitted", "pending"])} />
-            <Stat label="Claims awaiting decision" value={sum(cs, ["submitted", "pending"])} />
-            <Stat label="Queries with hospitals" value={(ps.query ?? 0) + (cs.query ?? 0)} />
-            <Stat label="Pre-auth turnaround" value={formatHours(d.preauthTat?.medianHours ?? null)} hint="Median" />
-            <Stat label="Claim turnaround" value={formatHours(d.claimTat?.medianHours ?? null)} hint="Median" />
-            <Money d={d} settle={can(ctx.principal, "claim:settle")} />
-            {d.openReviews !== null && <Stat label="Assistant reviews" value={d.openReviews} hint="Open questions" />}
-          </div>
-          <div className={r.split}>
-            <Card title="Pre-authorizations awaiting decision" actions={<Link href="/pre-authorizations">All</Link>}>
-              <CaseList rows={d.actionPreauths} kind="preauth" empty="Nothing awaiting a decision" />
-            </Card>
-            <Card title="Claims awaiting decision" actions={<Link href="/claims">All</Link>}>
-              <CaseList rows={d.actionClaims} kind="claim" empty="Nothing awaiting a decision" />
-            </Card>
-          </div>
+          <SectionHeader id="workflows" title="Actionable workflows" chip={`${pending} Pending`} caption="Counts as of page load" />
+          <CardGrid columns={4} labelledBy="workflows">
+            <WorkflowCard
+              label="Pre-auths awaiting decision"
+              value={preauthsWaiting}
+              accent="blue"
+              dot={preauthsWaiting ? "warning" : "muted"}
+              caption={preauthsWaiting ? "Immediate review required" : "Nothing waiting"}
+              action={preauthsWaiting ? { href: "/pre-authorizations?view=review", text: "View" } : { state: "Zero backlog" }}
+            />
+            <WorkflowCard
+              label="Claims awaiting decision"
+              value={claimsWaiting}
+              accent="navy"
+              dot={claimsWaiting ? "blue" : "muted"}
+              caption={claimsWaiting ? "Ready for evaluation" : "Nothing waiting"}
+              action={claimsWaiting ? { href: "/claims?view=review", text: "View" } : { state: "Zero backlog" }}
+            />
+            <WorkflowCard
+              label="Queries with hospitals"
+              value={queries}
+              dot={queries ? "warning" : "muted"}
+              caption={queries ? "Waiting on hospital replies" : "All conversations cleared"}
+              action={queries ? { href: "/pre-authorizations?view=action", text: "View" } : { state: "Optimal" }}
+            />
+            {reviews !== null && (
+              <WorkflowCard
+                label="Assistant reviews"
+                value={reviews}
+                dot={reviews ? "warning" : "muted"}
+                caption="Open questions"
+                action={reviews ? { href: "/assistant/reviews", text: "View" } : { state: "Zero backlog" }}
+              />
+            )}
+          </CardGrid>
+
+          <SectionHeader id="performance" title="Performance & financial metrics" chip="All time" chipTone="success" dot="success" caption="INR cumulative" />
+          <CardGrid columns={5} labelledBy="performance">
+            <KpiCard label="Pre-auth turnaround" value={formatHours(d.preauthTat?.medianHours ?? null)} caption="Median" />
+            <KpiCard label="Claim turnaround" value={formatHours(d.claimTat?.medianHours ?? null)} caption="Median" />
+            <KpiCard label="Claimed" value={formatINR(money.claimed)} caption="Submitted claims" />
+            <KpiCard label="Approved" value={formatINR(money.approved)} caption="By payer decision" />
+            <KpiCard label="Settled (paid)" value={formatINR(money.settled)} caption="Completed transfers" />
+          </CardGrid>
+
+          <ListPair>
+            <ListCard
+              title="Pre-authorizations awaiting decision"
+              count={preauthsWaiting}
+              dot="blue"
+              href="/pre-authorizations"
+              rows={caseRows(d.actionPreauths, "preauth")}
+              empty={<EmptyState title="Nothing awaiting a decision" />}
+            />
+            <ListCard
+              title="Claims awaiting decision"
+              count={claimsWaiting}
+              dot="navy"
+              href="/claims"
+              rows={caseRows(d.actionClaims, "claim")}
+              empty={<EmptyState title="Nothing awaiting a decision" />}
+            />
+          </ListPair>
         </Stack>
       </>
     );

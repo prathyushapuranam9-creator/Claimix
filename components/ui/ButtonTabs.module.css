@@ -1,0 +1,52 @@
+.wrap {
+  display: grid;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+/* Segmented control, matching the existing Segmented links. */
+.list {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+}
+
+/* On narrow screens the buttons stack instead of squeezing. */
+@media (max-width: 560px) {
+  .list { grid-auto-flow: row; }
+}
+
+.tab {
+  min-height: 40px;
+  padding: var(--sp-1) var(--sp-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.tab:hover { color: var(--c-text); }
+
+.tab[aria-selected="true"] {
+  background: var(--c-surface);
+  color: var(--c-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+
+.panel { min-width: 0; }
+.panel[hidden] { display: none; }

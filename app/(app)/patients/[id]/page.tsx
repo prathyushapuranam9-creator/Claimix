@@ -6,9 +6,11 @@ import { todayIso } from "@/lib/validation";
 import { CoverageService } from "@/modules/patients/coverage.service";
 import { RELATIONSHIP_LABEL } from "@/modules/patients/coverage.validation";
 import { PatientService } from "@/modules/patients/patients.service";
+import { PolicyCheckService } from "@/modules/patients/policy-check.service";
 import { GENDER_LABEL } from "@/modules/patients/patients.validation";
 import { PolicyService } from "@/modules/policies/policies.service";
 import { CoverageForm } from "@/components/patients/CoverageForm";
+import { PolicyCheck } from "@/components/patients/PolicyCheck";
 import { ButtonLink } from "@/components/ui/Button";
 import { CellText, DataTable } from "@/components/ui/DataTable";
 import { Details } from "@/components/ui/Form";
@@ -23,7 +25,11 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const { patient: p, hospitalName } = await orNotFound(PatientService.get(ctx, id));
   const canWrite = can(ctx.principal, "patient:write");
   const canCheck = can(ctx.principal, "eligibility:check");
-  const [coverage, policyOptions] = await Promise.all([CoverageService.forPatient(ctx, p.id), canWrite ? PolicyService.options(ctx) : Promise.resolve([])]);
+  const [coverage, policyOptions, policyCheck] = await Promise.all([
+    CoverageService.forPatient(ctx, p.id),
+    canWrite ? PolicyService.options(ctx) : Promise.resolve([]),
+    PolicyCheckService.forPatient(ctx, p.id),
+  ]);
   // Contact details are shown to the registering hospital and the patient only.
   const showContact = ctx.principal.orgType === "hospital" || ctx.principal.orgType === "platform";
   const today = todayIso();
@@ -76,6 +82,12 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             ]}
           />
         </Card>
+        <PolicyCheck
+          patient={{ fullName: p.fullName, patientNo: p.patientNo, dob: p.dob, gender: p.gender, hospitalName }}
+          coverage={coverage}
+          data={policyCheck}
+          today={today}
+        />
         {canWrite && (
           <Card title="Add coverage">
             <CoverageForm action={addCoverageAction.bind(null, p.id)} policies={policyOptions} />

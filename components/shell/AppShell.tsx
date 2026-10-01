@@ -16,6 +16,8 @@ interface Props {
   nav: NavItem[];
   /** Portal name for the taskbar, derived from the signed-in account (e.g. "Hospital Staff"). */
   portal: string;
+  /** Portal key ("hospital" | "insurance" | "admin"), for portal-specific layout behaviour. */
+  portalKey: string;
   user: { fullName: string; email: string; roleName: string; orgName: string };
   logout: () => Promise<void>;
   /** Unread notifications for the signed-in user (null when the role has no inbox). */
@@ -23,7 +25,7 @@ interface Props {
   children: ReactNode;
 }
 
-export function AppShell({ nav, portal, user, logout, unread, children }: Props) {
+export function AppShell({ nav, portal, portalKey, user, logout, unread, children }: Props) {
   const pathname = usePathname();
   // The drawer remembers the path it was opened on, so navigating closes it.
   const [openedAt, setOpenedAt] = useState<string | null>(null);
@@ -82,7 +84,7 @@ export function AppShell({ nav, portal, user, logout, unread, children }: Props)
   const backFallback = pathname.slice(0, pathname.lastIndexOf("/")) || "/dashboard";
 
   return (
-    <div className={styles.shell} data-collapsed={collapsed}>
+    <div className={styles.shell} data-collapsed={collapsed} data-portal={portalKey}>
       <a href="#main" className="skip-link">Skip to content</a>
       {open && <button className={styles.scrim} aria-label="Close menu" onClick={() => setOpen(false)} />}
       <aside id="app-sidebar" className={styles.sidebar} data-open={open} aria-label="Main navigation">
@@ -117,12 +119,12 @@ export function AppShell({ nav, portal, user, logout, unread, children }: Props)
             className={styles.collapse}
             aria-expanded={!collapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             onClick={() => setCollapsed((v) => !v)}
           >
             <svg className={styles.chevron} width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m15 18-6-6 6-6" />
             </svg>
-            <span className={styles.label}>Collapse Sidebar</span>
           </button>
         </div>
       </aside>

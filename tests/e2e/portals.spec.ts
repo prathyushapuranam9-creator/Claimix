@@ -90,3 +90,56 @@ test("keyboard users can choose the role with the arrow keys", async ({ page }) 
   await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("radio", { name: "Insurance Reviewer" })).toBeChecked();
 });
+
+test.describe("collapsing the sidebar", () => {
+  test.skip(({ isMobile }) => isMobile, "the collapsible rail is a desktop feature; phones use the drawer");
+  test.use({ viewport: { width: 1920, height: 1000 } });
+
+  const contentBox = async (page: Page) => (await page.locator("#main").boundingBox())!;
+  const settle = (page: Page) => page.waitForTimeout(400); // let the 180 ms transition finish
+
+  test("Insurer Reviewer: the content fills the space beside the sidebar in both states", async ({ page }) => {
+    await signIn(page, "insurer.a@demo.claimix.invalid");
+    const rail = () => page.getByRole("complementary", { name: "Main navigation" }).boundingBox();
+
+    // Expanded: content spans the whole area beside the sidebar (not a fixed, centred block).
+    const open = (await rail())!;
+    const before = await contentBox(page);
+    expect(before.x).toBeLessThan(open.x + open.width + 2);
+    expect(Math.abs(before.x + before.width - 1920)).toBeLessThan(2);
+
+    // Collapsed: it grows into exactly the space the sidebar gave up.
+    await page.getByRole("button", { name: "Collapse sidebar" }).click();
+    await settle(page);
+    const slim = (await rail())!;
+    const collapsed = await contentBox(page);
+    expect(collapsed.x).toBeLessThan(slim.x + slim.width + 2);
+    expect(Math.abs(collapsed.width - before.width - (open.width - slim.width))).toBeLessThan(3);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+
+    // Expanded again: back to the original size and position.
+    await page.getByRole("button", { name: "Expand sidebar" }).click();
+    await settle(page);
+    const expanded = await contentBox(page);
+    expect(Math.abs(expanded.width - before.width)).toBeLessThan(2);
+    expect(Math.abs(expanded.x - before.x)).toBeLessThan(2);
+  });
+
+  test("the collapse control shows only its icon (named for assistive tech)", async ({ page }) => {
+    await signIn(page, "insurer.a@demo.claimix.invalid");
+    const btn = page.getByRole("button", { name: "Collapse sidebar" });
+    await expect(btn).toHaveText("");
+    await expect(btn.locator("svg")).toBeVisible();
+    await expect(btn).toHaveAttribute("title", "Collapse sidebar");
+  });
+
+  test("Hospital Staff: unchanged (content keeps its usual width when collapsed)", async ({ page }) => {
+    await signIn(page, "staff.a@demo.claimix.invalid");
+    const before = await contentBox(page);
+    await page.getByRole("button", { name: "Collapse sidebar" }).click();
+    await settle(page);
+    const after = await contentBox(page);
+    expect(Math.abs(after.width - before.width)).toBeLessThan(2);
+  });
+});

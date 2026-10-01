@@ -1,0 +1,105 @@
+/* Collapsible block that matches the existing cards. */
+.block {
+  min-width: 0;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  min-height: var(--tap);
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-md);
+  font-weight: 650;
+  cursor: pointer;
+  list-style: none;
+}
+
+.summary::-webkit-details-marker { display: none; }
+.summary:hover { background: color-mix(in srgb, var(--c-accent) 45%, transparent); }
+.summary:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
+
+.chev {
+  flex: none;
+  color: var(--c-text-muted);
+  transition: transform 150ms ease;
+}
+
+.block[open] > .summary .chev { transform: rotate(180deg); }
+.block[open] > .summary { border-bottom: 1px solid var(--c-border); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+
+.body { padding: var(--sp-4) var(--sp-5) var(--sp-5); }
+
+.stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-5);
+}
+
+.section {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.sectionTitle {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: var(--sp-3);
+}
+
+.cover,
+.money {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-bg);
+}
+
+.coverHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.moneyValue {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+}
+
+.moneyLabel {
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.note {
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.download {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chev { transition: none; }
+}

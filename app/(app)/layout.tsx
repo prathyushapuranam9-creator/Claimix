@@ -17,6 +17,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     <AppShell
       nav={visibleNav(user.principal)}
       portal={PORTALS[portalFor(user.principal.orgType)].label}
+      portalKey={portalFor(user.principal.orgType)}
       user={{ fullName: user.fullName, email: user.email, roleName: user.roleName, orgName: user.orgName }}
       logout={logoutAction}
       unread={unread}

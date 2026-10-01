@@ -1,0 +1,279 @@
+/* Case reports: light slate/blue report cards on the existing card language. */
+
+.card {
+  min-width: 0;
+  overflow: hidden;
+  background: var(--c-surface);
+  border: 1px solid color-mix(in srgb, var(--c-border) 80%, transparent);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+
+.cardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  background: color-mix(in srgb, var(--c-accent) 70%, var(--c-surface));
+  border-bottom: 1px solid color-mix(in srgb, var(--c-border) 80%, transparent);
+}
+
+.cardTitle {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.big {
+  font-size: var(--fs-xl);
+  letter-spacing: -0.01em;
+}
+
+.cardNote {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+.scroller {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.table th,
+.table td {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid color-mix(in srgb, var(--c-border) 65%, transparent);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.table thead th {
+  background: var(--c-surface-2);
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.table tbody tr:last-child > * { border-bottom: 0; }
+.table tbody tr:hover > * { background: color-mix(in srgb, var(--c-accent) 45%, transparent); }
+
+.right { text-align: right !important; font-variant-numeric: tabular-nums; }
+.center { text-align: center !important; }
+
+.sortLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.sortLink:hover { color: var(--c-text); }
+.sortLink[data-active] { color: var(--c-text); }
+
+.sortIcon {
+  font-size: 0.7em;
+  opacity: 0.55;
+}
+
+.sortLink[data-active] .sortIcon { opacity: 1; }
+
+.caseNo {
+  color: var(--c-link);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.caseNo:hover { text-decoration: underline; }
+
+.patient { font-weight: 650; color: var(--c-text); }
+.insurer { color: var(--c-text); white-space: normal !important; min-width: 12rem; }
+.muted { color: var(--c-text-subtle); }
+.good { color: var(--c-success); font-weight: 600; }
+.bad { color: var(--c-danger); font-weight: 600; }
+.strong { font-weight: 700; }
+
+/* TAT pill and bucket colours come from --c (set inline). */
+.pill {
+  display: inline-block;
+  min-width: 2.25rem;
+  padding: 1px var(--sp-2);
+  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--c) 16%, transparent);
+  color: var(--c-text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.open {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+
+.neutralPill {
+  display: inline-block;
+  min-width: 2.25rem;
+  padding: 1px var(--sp-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-pill);
+  color: var(--c-text-subtle);
+}
+
+.bucketRow > * { background: color-mix(in srgb, var(--c) 7%, transparent); }
+
+.bucket {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--c-text);
+  font-weight: 600;
+  text-align: left;
+}
+
+.dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--c);
+}
+
+/* ---- TAT bar chart: vertical bars with a subtle isometric top and side ---- */
+.chart {
+  margin: 0;
+  padding: var(--sp-5) var(--sp-5) var(--sp-4);
+  border-bottom: 1px solid color-mix(in srgb, var(--c-border) 65%, transparent);
+}
+
+.bars {
+  --plot: 220px;
+  --depth: 10px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.barCol {
+  display: grid;
+  grid-template-rows: var(--plot) auto;
+  justify-items: center;
+  min-width: 0;
+}
+
+/* Plot area: value + bar stacked from the baseline up. */
+.barSlot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  height: var(--plot);
+  border-bottom: 2px solid var(--c-border-strong);
+}
+
+.barValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: calc(var(--depth) + 6px);
+  color: var(--c-text);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Bar height is its share of the largest bucket, within the room left for the value label. */
+.bar3d {
+  position: relative;
+  flex: none;
+  width: min(56%, 64px);
+  height: calc(var(--h) * (var(--plot) - 2.75rem - var(--depth)));
+  min-height: 3px;
+  margin-right: var(--depth);
+  background: var(--c);
+  transition: filter 120ms ease;
+}
+
+/* Top face: a parallelogram leaning right. */
+.bar3d::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  width: 100%;
+  height: var(--depth);
+  background: color-mix(in srgb, var(--c) 62%, white);
+  transform: skewX(-45deg);
+  transform-origin: bottom left;
+}
+
+/* Side face: a darker parallelogram rising to meet the top. */
+.bar3d::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 100%;
+  width: var(--depth);
+  height: 100%;
+  background: color-mix(in srgb, var(--c) 72%, black);
+  transform: skewY(-45deg);
+  transform-origin: top left;
+}
+
+.barCol:hover .bar3d { filter: brightness(1.06); }
+
+.barLabel {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  margin-top: var(--sp-2);
+  color: var(--c-text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.barShare {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .bars { --plot: 170px; --depth: 7px; gap: var(--sp-2); }
+  .barValue { font-size: var(--fs-sm); }
+  .barLabel { font-size: var(--fs-xs); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar3d { transition: none; }
+}
+
+.footNote {
+  padding: var(--sp-3) var(--sp-5);
+  border-top: 1px solid color-mix(in srgb, var(--c-border) 65%, transparent);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
