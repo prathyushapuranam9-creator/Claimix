@@ -1,5 +1,5 @@
 /**
- * Source of truth for permissions and the default role matrix. `db:seed` writes
+ * Source of truth for permissions and the default role matrix. `db:setup` writes
  * this into the roles / permissions / role_permissions tables; at runtime the
  * database is what authorizes requests, so admins can adjust it without a deploy.
  */

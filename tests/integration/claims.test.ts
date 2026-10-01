@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
 import { auditLogs, beneficiaries, claims, preAuthorizations, settlements } from "@/db/schema";
-import { DEMO } from "@/db/seed/ids";
+import { DEMO } from "@/tests/fixtures/seed/ids";
 import { ConflictError, ForbiddenError, InvalidTransitionError, NotFoundError, ValidationError } from "@/lib/errors";
 import { CLAIM_CHECKLIST } from "@/modules/claims/claims.checklist";
 import { ClaimService } from "@/modules/claims/claims.service";

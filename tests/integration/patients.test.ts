@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { auditLogs, beneficiaries, policies, preAuthorizations, users } from "@/db/schema";
-import { DEMO } from "@/db/seed/ids";
+import { DEMO } from "@/tests/fixtures/seed/ids";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import { PatientService } from "@/modules/patients/patients.service";
 import { demoPrincipals, svc, testContext } from "./helpers";

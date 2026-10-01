@@ -30,6 +30,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/tpas", label: "TPAs", icon: "⇄", permission: "insurer:read", section: "Reference" },
   { href: "/knowledge", label: "Knowledge Center", icon: "✎", permission: "dashboard:view", section: "Reference" },
   { href: "/admin/users", label: "Users", icon: "⚙", permission: "user:manage", section: "Administration" },
+  { href: "/admin/medical-codes", label: "Medical codes", icon: "⚕", permission: "policy:manage", section: "Administration" },
   { href: "/admin/access-requests", label: "Access requests", icon: "✉", permission: "user:manage", section: "Administration" },
   { href: "/audit", label: "Audit log", icon: "☰", permission: "audit:read", section: "Administration" },
 ];

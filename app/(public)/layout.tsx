@@ -46,7 +46,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
         <div className={styles.footerInner}>
           <p className={styles.disclaimer}>{DISCLAIMER_TEXT}</p>
           <p className={styles.fine}>
-            Demo organizations, policies and rules shown here are fictional <strong>DEMO DATA</strong>. ABDM / ABHA are digital-health infrastructure, not insurance. Claimix has no official integration with any insurer, TPA, scheme or ABDM.
+            ABDM / ABHA are digital-health infrastructure, not insurance. Claimix has no official integration with any insurer, TPA, scheme or ABDM.
           </p>
         </div>
       </footer>

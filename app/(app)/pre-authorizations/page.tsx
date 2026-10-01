@@ -28,6 +28,8 @@ export default async function PreauthListPage({ searchParams }: { searchParams: 
   const viewKey = param(sp, "view") ?? "open";
   const view = VIEWS[viewKey] ?? VIEWS.open!;
   const data = await PreauthService.list(ctx, q, { status: view.status });
+  // Only when this view is empty: are there any requests at all? (decides the empty-state wording)
+  const anyPreauths = data.total > 0 || (await PreauthService.list(ctx, { page: 1, pageSize: 1 }, {})).total > 0;
   const isHospital = ctx.principal.orgType === "hospital" && ctx.principal.roleKey !== "patient";
 
   return (
@@ -46,7 +48,15 @@ export default async function PreauthListPage({ searchParams }: { searchParams: 
           caption="Pre-authorizations"
           rows={data.rows}
           rowKey={(r) => r.id}
-          empty={<EmptyState title="No pre-authorizations here" />}
+          empty={
+            anyPreauths ? (
+              <EmptyState title="No pre-authorizations here" />
+            ) : (
+              <EmptyState title="No pre-authorizations yet">
+                {ctx.principal.orgType === "hospital" && ctx.principal.roleKey !== "patient" ? "Create your first pre-authorization to get started." : "Requests appear here once they are submitted."}
+              </EmptyState>
+            )
+          }
           columns={[
             { key: "ref", header: "Reference", cell: (r) => <CellLink href={`/pre-authorizations/${r.id}`} sub={r.patientName}><span className="mono">{r.reference}</span></CellLink> },
             { key: "st", header: "Status", cell: (r) => <Badge tone={STATUS_TONE[r.status]}>{STATUS_LABEL[r.status]}</Badge> },

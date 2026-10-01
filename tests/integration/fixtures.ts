@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { diagnoses, procedures, rejectionReasons } from "@/db/schema";
-import { DEMO } from "@/db/seed/ids";
+import { DEMO } from "@/tests/fixtures/seed/ids";
 import { randomToken } from "@/lib/security/crypto";
 import { DocumentService } from "@/modules/documents/documents.service";
 import { localStorageAdapter, setStorageForTests } from "@/modules/documents/storage";

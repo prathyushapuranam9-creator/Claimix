@@ -5,18 +5,23 @@ Health insurance policy & hospital claims platform (India). Next.js App Router �
 ## Setup
 
 ```bash
-cp .env.example .env.local        # then set SESSION_SECRET (32+ chars) and SEED_DEMO_PASSWORD (12+ chars)
+cp .env.example .env.local        # then set SESSION_SECRET (32+ chars); SEED_DEMO_PASSWORD is for tests only
 npm install
 npm run db:up                      # Postgres 16 on localhost:5442 (Docker)
 docker compose exec db psql -U claimix -c "create database claimix_test;"   # once, for integration tests
 npm run db:migrate                 # applies pending migrations only; never drops data
-npm run db:seed                    # idempotent DEMO DATA (fictional orgs, users per role)
+npm run db:setup                   # system configuration only: roles, permissions, reason guidance
+npm run admin:create -- --email you@example.org --name "Your Name"
+                                   # first administrator; prints a one-time link to set the password
 npm run dev                        # http://localhost:3000
 npm run worker                     # background jobs: emails (.storage/outbox in dev), document re-scans,
                                    # daily policy-expiry reminders
 ```
 
-Demo accounts (all use `SEED_DEMO_PASSWORD`): `admin@`, `readonly@`, `staff.a@`, `staff.b@`, `insurer.a@`, `insurer.b@`, `tpa.a@`, `patient.a1@`, `patient.a2@`, `patient.b1@` — all `@demo.claimix.invalid`.
+The application starts empty: no demo organizations, users, patients, policies or statistics. After signing in,
+the administrator adds hospitals, insurers/TPAs, government schemes (`/schemes/new`), medical codes
+(`/admin/medical-codes`) and policies, and invites users (`/admin/users`). Dashboards and reports show zeros
+and empty states until real records exist.
 
 ## Checks
 
@@ -36,7 +41,8 @@ UI → Server Action / Route → Application Service → Domain → Repository �
 - `modules/<name>/` — services, repositories, validation per business module
 - `lib/permissions/` — permission catalog, `Principal`, `scopePredicate` (the single tenant-scoping rule)
 - `lib/auth/session.ts` — Next.js cookie adapter over the framework-free `AuthService`
-- `db/schema`, `db/migrations`, `db/seed`
+- `db/schema`, `db/migrations`, `db/setup` (system configuration; no sample data)
+- `tests/fixtures/seed` — fictional fixture data loaded only into the isolated test databases
 - Audit log, status history, payer responses and rule evaluations are append-only (DB triggers).
 
 ## Rules engine
@@ -75,7 +81,7 @@ Database triggers refuse a "rejected" status without a payer rejection and "sett
 - Payers verify documents or request re-upload; such documents stop counting as evidence. `/documents` lists requests missing mandatory documents.
 - `/audit` (admin) views the append-only audit log; viewing it is itself audited.
 - Services and repositories import `server-only`, so the build fails if browser code imports them.
-- Browser (E2E) tests run with one worker against their own `_e2e` database, so they never change dev demo data.
+- Browser (E2E) tests run with one worker against their own `_e2e` database loaded with test fixtures, so they never touch application data.
 
 ## Public site, dashboards, reports
 
@@ -115,4 +121,4 @@ docker compose --profile app up -d --build   # db → migrate (one-off) → app 
   (validated at boot in `instrumentation.ts`).
 - Documents live on the `claimix_storage` volume; back it up together with the database.
 - Postgres is published on `127.0.0.1:5442` only. `GET /api/health` reports app + database readiness (used by the image's HEALTHCHECK).
-- Do not run `db:seed` in production: it creates DEMO DATA accounts.
+- After the first deploy run `npm run db:setup` and `npm run admin:create -- --email … --name …` once (e.g. `docker compose --profile app run --rm app npm run admin:create -- …`).

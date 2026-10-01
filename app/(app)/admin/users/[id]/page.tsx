@@ -5,7 +5,7 @@ import { UserService } from "@/modules/users/users.service";
 import { EditUserForm } from "@/components/admin/UserForms";
 import { UserSecurityActions } from "@/components/admin/UserSecurityActions";
 import { Details } from "@/components/ui/Form";
-import { Alert, Badge, Card, DemoTag, PageHeader, Stack } from "@/components/ui/Surface";
+import { Alert, Badge, Card, PageHeader, Stack } from "@/components/ui/Surface";
 import { resendInviteAction, revokeUserSessionsAction, updateUserAction } from "../actions";
 
 export const metadata: Metadata = { title: "User · Claimix" };
@@ -23,7 +23,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
     <>
       <PageHeader
         title={u.fullName}
-        description={<>{u.email} {u.isDemo && <DemoTag />} {u.isActive ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Disabled</Badge>}</>}
+        description={<>{u.email} {u.isActive ? <Badge tone="success">Active</Badge> : <Badge tone="neutral">Disabled</Badge>}</>}
       />
       <Stack>
         {invited && <Alert tone="success" title="Invitation sent">The user has been emailed a link to set their password. It expires in 72 hours.</Alert>}

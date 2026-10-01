@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { hospitalNetworks, jobs, roles } from "@/db/schema";
-import { DEMO } from "@/db/seed/ids";
+import { DEMO } from "@/tests/fixtures/seed/ids";
 import { ConflictError, ForbiddenError, ValidationError } from "@/lib/errors";
 import { randomToken } from "@/lib/security/crypto";
 import { HospitalService } from "@/modules/hospitals/hospitals.service";

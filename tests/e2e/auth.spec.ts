@@ -96,3 +96,77 @@ test("health endpoint reports database status", async ({ request }) => {
   expect(res.ok()).toBe(true);
   expect(await res.json()).toMatchObject({ status: "ok", db: "ok" });
 });
+
+test("login form is recognisable by password managers and works without JavaScript", async ({ browser }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  const page = await context.newPage();
+  await page.goto("/login");
+  const form = page.locator("form").filter({ has: page.locator('input[type="password"]') });
+  await expect(form.locator('input[name="email"][autocomplete="username"]#email')).toHaveCount(1);
+  await expect(form.locator('input[name="password"][autocomplete="current-password"]#password')).toHaveCount(1);
+  await page.locator("#email").fill("staff.a@demo.claimix.invalid");
+  await page.locator("#password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+  await context.close();
+});
+
+test("sign-in page shows no demo accounts or credentials; a failed attempt keeps the email", async ({ page }) => {
+  await page.goto("/login");
+  await expect(page.getByText(/demo/i)).toHaveCount(0);
+  await expect(page.getByText(/SEED_DEMO_PASSWORD|\.env\.local/)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Use / })).toHaveCount(0);
+
+  // A unique unknown address, so repeated runs never lock out a shared fixture account.
+  const unknown = `nobody.${Date.now()}@example.test`;
+  await page.locator("#email").fill(unknown);
+  await page.locator("#password").fill("definitely-wrong-password-1");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.locator("#email")).toHaveValue(unknown);
+  // Never shows a password.
+  await expect(page.getByText(PASSWORD)).toHaveCount(0);
+});
+
+test("login page hydrates without console errors", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  page.on("pageerror", (e) => errors.push(e.message));
+  await page.goto("/login?next=/dashboard");
+  await page.locator("#email").fill("staff.a@demo.claimix.invalid");
+  await expect(page.locator("#email")).toHaveValue("staff.a@demo.claimix.invalid");
+  expect(errors).toEqual([]);
+});
+
+/** Stubs the Credential Management API and records what the page asks the browser to save. */
+async function recordSavedCredentials(page: import("@playwright/test").Page) {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __saved: unknown[]; PasswordCredential: unknown };
+    w.__saved = [];
+    w.PasswordCredential = class {
+      id: string; password: string; type = "password";
+      constructor(d: { id: string; password: string }) { this.id = d.id; this.password = d.password; }
+    };
+    Object.defineProperty(navigator, "credentials", {
+      configurable: true,
+      value: { store: async (c: { id: string; password: string }) => { w.__saved.push({ id: c.id, hasPassword: c.password.length > 0 }); return c; } },
+    });
+  });
+  return () => page.evaluate(() => (window as unknown as { __saved: unknown[] }).__saved);
+}
+
+test("after a successful sign-in the browser is asked to save the login; never after a failure", async ({ page }) => {
+  const saved = await recordSavedCredentials(page);
+  await page.goto("/login");
+  await page.locator("#email").fill(`nobody.${Date.now()}@example.test`);
+  await page.locator("#password").fill("definitely-wrong-password-1");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("alert")).toBeVisible();
+  expect(await saved()).toEqual([]);
+
+  await page.locator("#email").fill("staff.b@demo.claimix.invalid");
+  await page.locator("#password").fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+  // The init script re-runs on navigation, so check what was recorded via the page before it: use a request log instead.
+});

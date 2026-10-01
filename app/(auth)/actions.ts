@@ -13,13 +13,20 @@ function safeNext(next: unknown): string {
   return typeof next === "string" && /^\/(?!\/)[\w\-/?=&.%]*$/.test(next) ? next : "/dashboard";
 }
 
-export async function loginAction(input: { email: string; password: string; next?: string }): Promise<ActionResult> {
+/**
+ * Sign-in as a native form submission (`<form action>`), which browsers' password managers
+ * recognise. With JavaScript ("enhanced"), success is returned to the form so it can offer
+ * to save the login in the browser's password manager before navigating; without it, we redirect.
+ */
+export async function loginAction(_prev: ActionResult<{ next: string }> | null, form: FormData): Promise<ActionResult<{ next: string }>> {
+  const field = (k: string) => (typeof form.get(k) === "string" ? (form.get(k) as string) : "");
+  const next = safeNext(field("next"));
   const result = await runAction("auth.login", async () => {
-    const { token, expiresAt } = await authService().login(input, await requestMeta());
+    const { token, expiresAt } = await authService().login({ email: field("email"), password: field("password") }, await requestMeta());
     await setSessionCookie(token, expiresAt);
-    return undefined;
+    return { next };
   });
-  if (result.ok) redirect(safeNext(input.next));
+  if (result.ok && field("enhanced") !== "1") redirect(next);
   return result;
 }
 

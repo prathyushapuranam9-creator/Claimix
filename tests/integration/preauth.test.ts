@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { auditLogs, diagnoses, notifications, payerResponses, preAuthorizations, procedures, queries, rejectionReasons, statusHistory, users } from "@/db/schema";
-import { DEMO } from "@/db/seed/ids";
+import { DEMO } from "@/tests/fixtures/seed/ids";
 import { ConflictError, ForbiddenError, InvalidTransitionError, NotFoundError, ValidationError } from "@/lib/errors";
 import { DocumentService } from "@/modules/documents/documents.service";
 import { localStorageAdapter, setStorageForTests } from "@/modules/documents/storage";

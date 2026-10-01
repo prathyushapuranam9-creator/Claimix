@@ -61,7 +61,13 @@ export default async function HospitalsPage({ searchParams }: { searchParams: SP
           caption="Hospitals"
           rows={data.rows}
           rowKey={(r) => r.id}
-          empty={<EmptyState title="No hospitals match these filters" />}
+          empty={
+            q.q || filters.state || filters.insurerId || filters.schemeId || filters.cashlessOnly ? (
+              <EmptyState title="No hospitals match these filters" />
+            ) : (
+              <EmptyState title="No hospitals yet">{can(ctx.principal, "hospital:manage") ? "Add your first hospital to get started." : "Hospitals appear here once an administrator adds them."}</EmptyState>
+            )
+          }
           columns={[
             { key: "name", header: "Hospital", cell: (r) => <CellLink href={`/hospitals/${r.id}`}>{r.name}</CellLink> },
             { key: "loc", header: "Location", cell: (r) => <CellText sub={r.state}>{r.city}</CellText> },

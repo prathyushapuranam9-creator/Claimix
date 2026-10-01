@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, count, eq, isNotNull, sql } from "drizzle-orm";
 import { accessRequests, auditLogs, claims, hospitalNetworks, preAuthorizations } from "@/db/schema";
-import { DEMO } from "@/db/seed/ids";
+import { DEMO } from "@/tests/fixtures/seed/ids";
 import { ConflictError, ForbiddenError, RateLimitedError, ValidationError } from "@/lib/errors";
 import { randomToken } from "@/lib/security/crypto";
 import { AccessRequestService } from "@/modules/access-requests/access-requests.service";

@@ -12,7 +12,7 @@ import { CoverageForm } from "@/components/patients/CoverageForm";
 import { ButtonLink } from "@/components/ui/Button";
 import { CellText, DataTable } from "@/components/ui/DataTable";
 import { Details } from "@/components/ui/Form";
-import { Badge, Card, DemoTag, EmptyState, PageHeader, Stack } from "@/components/ui/Surface";
+import { Badge, Card, EmptyState, PageHeader, Stack } from "@/components/ui/Surface";
 import { addCoverageAction } from "../actions";
 
 export const metadata: Metadata = { title: "Patient · Claimix" };
@@ -32,7 +32,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
     <>
       <PageHeader
         title={p.fullName}
-        description={<>Patient <span className="mono">{p.patientNo}</span> · {hospitalName} {p.isDemo && <DemoTag />}</>}
+        description={<>Patient <span className="mono">{p.patientNo}</span> · {hospitalName}</>}
         actions={canWrite && <ButtonLink href={`/patients/${p.id}/edit`} variant="secondary">Edit details</ButtonLink>}
       />
       <Stack>

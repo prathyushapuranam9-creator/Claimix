@@ -2,10 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LogoMark } from "@/components/brand/Logo";
 import type { NavItem } from "@/lib/navigation";
+import { BackButton } from "./BackButton";
 import styles from "./AppShell.module.css";
+
+/** Pages that already carry their own working "Back to …" control. */
+const HAS_OWN_BACK = [/^\/policies\/[^/]+\/rules$/];
 
 interface Props {
   nav: NavItem[];
@@ -30,8 +34,18 @@ export function AppShell({ nav, user, logout, unread, children }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // Becomes true after the first in-app route change, i.e. once there is app history to return to.
+  const [hasHistory, setHasHistory] = useState(false);
+  const firstPath = useRef(pathname);
+  useEffect(() => {
+    if (pathname !== firstPath.current) setHasHistory(true);
+  }, [pathname]);
+
   const sections = [...new Set(nav.map((n) => n.section))];
   const current = nav.find((n) => pathname === n.href || pathname.startsWith(n.href + "/"));
+  // Section landing pages are the roots; everything below them (detail, new, edit, …) gets a Back control.
+  const showBack = pathname !== "/dashboard" && !nav.some((n) => n.href === pathname) && !HAS_OWN_BACK.some((r) => r.test(pathname));
+  const backFallback = pathname.slice(0, pathname.lastIndexOf("/")) || "/dashboard";
 
   return (
     <div className={styles.shell}>
@@ -74,6 +88,7 @@ export function AppShell({ nav, user, logout, unread, children }: Props) {
           >
             ☰
           </button>
+          {showBack && <BackButton hasHistory={hasHistory} fallback={backFallback} />}
           <span className={styles.topTitle}>{current?.label ?? "Claimix"}</span>
           {unread !== null && (
             <Link href="/notifications" className={styles.bell} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
