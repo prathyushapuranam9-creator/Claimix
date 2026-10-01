@@ -74,10 +74,6 @@ export function Stat({ label, value, hint }: { label: string; value: ReactNode; 
   );
 }
 
-export function DemoTag() {
-  return <span className={styles.demoTag} title="Fictional demonstration data">DEMO DATA</span>;
-}
-
 /** Vertical rhythm between page sections. */
 export function Stack({ children }: { children: ReactNode }) {
   return <div className={styles.stack}>{children}</div>;

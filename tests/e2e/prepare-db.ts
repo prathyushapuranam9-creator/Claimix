@@ -2,13 +2,13 @@ import { config } from "dotenv";
 import postgres from "postgres";
 import { createDb } from "@/db/client";
 import { runMigrations } from "@/db/migrate";
-import { seed } from "@/db/seed";
+import { seed } from "@/tests/fixtures/seed";
 
 config({ path: ".env.local" });
 
 /**
  * Browser tests run against their own database so they never change the dev
- * demo data. It is created if missing, migrated, seeded, and demo balances are
+ * test fixture data. It is created if missing, migrated, seeded, and demo balances are
  * restored each run. Nothing is dropped.
  */
 async function prepare() {

@@ -93,7 +93,7 @@ test.describe("request access", () => {
     // No account exists: signing in with that email fails.
     await page.goto("/login");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill("whatever-password-123");
+    await page.locator("#password").fill("whatever-password-123");
     await page.getByRole("button", { name: "Sign in" }).click();
     await expect(page.getByRole("alert")).toBeVisible();
 

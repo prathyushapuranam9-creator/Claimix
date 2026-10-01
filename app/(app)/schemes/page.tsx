@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { pageContext } from "@/lib/auth/context";
 import { SchemeService } from "@/modules/schemes/schemes.service";
-import { Alert, Card, PageHeader, Stack } from "@/components/ui/Surface";
+import { can } from "@/lib/permissions/principal";
+import { ButtonLink } from "@/components/ui/Button";
+import { Alert, Card, EmptyState, PageHeader, Stack } from "@/components/ui/Surface";
 import styles from "./schemes.module.css";
 
 export const metadata: Metadata = { title: "Government schemes · Claimix" };
@@ -12,8 +14,13 @@ export default async function SchemesPage() {
   const schemes = await SchemeService.list(ctx);
   return (
     <>
-      <PageHeader title="Government health schemes" description="Scheme eligibility is verified with the scheme itself and is separate from private insurance." />
+      <PageHeader
+        title="Government health schemes"
+        description="Scheme eligibility is verified with the scheme itself and is separate from private insurance."
+        actions={can(ctx.principal, "policy:manage", "all") && <ButtonLink href="/schemes/new">Add scheme</ButtonLink>}
+      />
       <Stack>
+        {schemes.length === 0 && <EmptyState title="No government schemes yet">Schemes appear here once an administrator adds them.</EmptyState>}
         <div className={styles.grid}>
           {schemes.map((s) => (
             <Card key={s.id}>

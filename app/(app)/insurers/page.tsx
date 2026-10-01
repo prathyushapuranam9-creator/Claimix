@@ -28,7 +28,13 @@ export default async function InsurersPage({ searchParams }: { searchParams: SP 
           caption="Insurance companies"
           rows={data.rows}
           rowKey={(r) => r.id}
-          empty={<EmptyState title="No insurers found" />}
+          empty={
+            q.q ? (
+              <EmptyState title="No insurers match your search" />
+            ) : (
+              <EmptyState title="No insurers yet">{can(ctx.principal, "insurer:manage") ? "Add your first insurance company to get started." : "Insurers appear here once an administrator adds them."}</EmptyState>
+            )
+          }
           columns={[
             { key: "name", header: "Insurer", cell: (r) => <CellLink href={`/insurers/${r.id}`}>{r.name}</CellLink> },
             { key: "code", header: "Code", cell: (r) => <span className="mono">{r.code}</span> },

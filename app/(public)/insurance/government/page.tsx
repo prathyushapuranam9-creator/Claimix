@@ -33,7 +33,7 @@ export default function GovernmentSchemesPage() {
           The Ayushman Bharat Digital Mission (ABDM) and ABHA numbers are digital-health infrastructure for health records and identity. They are not an insurance scheme and do not provide cover by themselves.
         </div>
         <p className={s.muted}>
-          Claimix has no official integration with any government scheme or ABDM. Schemes shown inside the platform are fictional DEMO DATA.
+          Claimix has no official integration with any government scheme or ABDM. Scheme details inside the platform are entered by its users and must be confirmed with the scheme.
         </p>
       </section>
     </>

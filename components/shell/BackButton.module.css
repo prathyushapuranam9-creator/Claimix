@@ -1,0 +1,40 @@
+.back {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--tap);
+  height: var(--tap);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  color: var(--c-text);
+  cursor: pointer;
+}
+
+.back:hover { background: var(--c-accent); border-color: var(--c-accent-edge); color: var(--c-on-accent); }
+.back:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
+
+/* Tooltip (the title attribute is the non-visual fallback). */
+.back::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--c-text);
+  color: var(--c-bg);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.back:hover::after,
+.back:focus-visible::after { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .back::after { transition: none; }
+}

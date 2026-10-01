@@ -13,6 +13,16 @@ export const SchemeRepository = {
       .orderBy(asc(governmentSchemes.name));
   },
 
+  async codeTaken(db: DbOrTx, code: string) {
+    const [row] = await db.select({ id: governmentSchemes.id }).from(governmentSchemes).where(eq(governmentSchemes.code, code)).limit(1);
+    return !!row;
+  },
+
+  async insert(db: DbOrTx, values: typeof governmentSchemes.$inferInsert) {
+    const [row] = await db.insert(governmentSchemes).values(values).returning();
+    return row!;
+  },
+
   async exists(db: DbOrTx, id: string) {
     const [row] = await db
       .select({ id: governmentSchemes.id })

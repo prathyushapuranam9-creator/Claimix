@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { beneficiaries, claims, patients, policies, users } from "@/db/schema";
-import { DEMO } from "@/db/seed/ids";
+import { DEMO } from "@/tests/fixtures/seed/ids";
 import { ForbiddenError } from "@/lib/errors";
 import type { Principal } from "@/lib/permissions/principal";
 import { requirePermission } from "@/lib/permissions/principal";

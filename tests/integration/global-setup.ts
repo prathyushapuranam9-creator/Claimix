@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import type { TestProject } from "vitest/node";
 import { createDb } from "@/db/client";
 import { runMigrations } from "@/db/migrate";
-import { seed } from "@/db/seed";
+import { seed } from "@/tests/fixtures/seed";
 
 config({ path: ".env.local" });
 

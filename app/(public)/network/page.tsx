@@ -37,12 +37,16 @@ export default async function PublicNetworkPage({ searchParams }: { searchParams
         <form role="search" method="get" action="/network" className={s.searchRow}>
           <SelectField label="Insurance or scheme" name="payer" defaultValue={payerValue} required>
             <option value="">Choose…</option>
-            <optgroup label="Private insurers">
-              {payers.insurers.map((p) => <option key={p.id} value={`insurer:${p.id}`}>{p.name}</option>)}
-            </optgroup>
-            <optgroup label="Government schemes">
-              {payers.schemes.map((p) => <option key={p.id} value={`scheme:${p.id}`}>{p.name}</option>)}
-            </optgroup>
+            {payers.insurers.length > 0 && (
+              <optgroup label="Private insurers">
+                {payers.insurers.map((p) => <option key={p.id} value={`insurer:${p.id}`}>{p.name}</option>)}
+              </optgroup>
+            )}
+            {payers.schemes.length > 0 && (
+              <optgroup label="Government schemes">
+                {payers.schemes.map((p) => <option key={p.id} value={`scheme:${p.id}`}>{p.name}</option>)}
+              </optgroup>
+            )}
           </SelectField>
           <SelectField label="City" name="city" defaultValue={city ?? ""} disabled={!payer} hint={payer ? undefined : "Choose a payer first"}>
             <option value="">All cities</option>
@@ -54,12 +58,14 @@ export default async function PublicNetworkPage({ searchParams }: { searchParams
       </section>
 
       <Alert tone="info" title="Always confirm before admission">
-        Network status changes. Confirm cashless availability with the insurer, TPA or scheme before admission. Listings here are fictional DEMO DATA.
+        Network status changes. Confirm cashless availability with the insurer, TPA or scheme before admission.
       </Alert>
 
       <section className={s.section} aria-labelledby="results-heading">
         <h2 id="results-heading">{isScheme ? "Empanelled hospitals" : "Network hospitals"}</h2>
-        {!data ? (
+        {payers.insurers.length + payers.schemes.length === 0 ? (
+          <EmptyState title="No hospital networks published yet">Network listings appear here once insurers, schemes and hospitals have been added.</EmptyState>
+        ) : !data ? (
           <EmptyState title="Choose an insurer or scheme to see hospitals" />
         ) : (
           <>

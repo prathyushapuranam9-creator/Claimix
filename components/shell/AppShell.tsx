@@ -6,7 +6,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LogoMark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import type { NavItem } from "@/lib/navigation";
+import { BackButton } from "./BackButton";
 import styles from "./AppShell.module.css";
+
+/** Pages that already carry their own working "Back to …" control. */
+const HAS_OWN_BACK = [/^\/policies\/[^/]+\/rules$/];
 
 interface Props {
   nav: NavItem[];
@@ -63,6 +67,17 @@ export function AppShell({ nav, user, logout, unread, children }: Props) {
     setTrail({ href: current?.href, from: prev });
   }
   const crumb = current?.hidden && trail.from && trail.from.href !== current.href ? trail.from : undefined;
+
+  // Becomes true after the first in-app route change, i.e. once there is app history to return to.
+  const [hasHistory, setHasHistory] = useState(false);
+  const firstPath = useRef(pathname);
+  useEffect(() => {
+    if (pathname !== firstPath.current) setHasHistory(true);
+  }, [pathname]);
+
+  // Sidebar landing pages are the roots; everything else (detail, new, edit, and pages reached only by links) gets a Back control.
+  const showBack = pathname !== "/dashboard" && !nav.some((n) => n.href === pathname && !n.hidden) && !HAS_OWN_BACK.some((r) => r.test(pathname));
+  const backFallback = pathname.slice(0, pathname.lastIndexOf("/")) || "/dashboard";
 
   return (
     <div className={styles.shell} data-collapsed={collapsed}>
@@ -121,6 +136,7 @@ export function AppShell({ nav, user, logout, unread, children }: Props) {
           >
             ☰
           </button>
+          {showBack && <BackButton hasHistory={hasHistory} fallback={backFallback} />}
           <span className={styles.topTitle}>{crumb ? `${titleOf(crumb)} > ${titleOf(current)}` : titleOf(current)}</span>
           <div className={styles.themeSlot}><ThemeToggle /></div>
           {unread !== null && (

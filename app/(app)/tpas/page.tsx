@@ -28,7 +28,13 @@ export default async function TpasPage({ searchParams }: { searchParams: SP }) {
           caption="TPAs"
           rows={data.rows}
           rowKey={(r) => r.id}
-          empty={<EmptyState title="No TPAs found" />}
+          empty={
+            q.q ? (
+              <EmptyState title="No TPAs match your search" />
+            ) : (
+              <EmptyState title="No TPAs yet">{can(ctx.principal, "insurer:manage") ? "Add your first TPA to get started." : "TPAs appear here once an administrator adds them."}</EmptyState>
+            )
+          }
           columns={[
             { key: "name", header: "TPA", cell: (r) => <CellLink href={`/tpas/${r.id}`}>{r.name}</CellLink> },
             { key: "code", header: "Code", cell: (r) => <span className="mono">{r.code}</span> },

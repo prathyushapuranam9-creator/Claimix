@@ -7,7 +7,7 @@ import { PatientService } from "@/modules/patients/patients.service";
 import { GENDER_LABEL } from "@/modules/patients/patients.validation";
 import { ButtonLink } from "@/components/ui/Button";
 import { CellLink, CellText, DataTable, FilterBar, Pagination } from "@/components/ui/DataTable";
-import { Card, DemoTag, EmptyState, PageHeader } from "@/components/ui/Surface";
+import { Card, EmptyState, PageHeader } from "@/components/ui/Surface";
 
 export const metadata: Metadata = { title: "Patients · Claimix" };
 
@@ -38,7 +38,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: SP 
             { key: "name", header: "Patient", cell: (r) => <CellLink href={`/patients/${r.id}`} sub={<span className="mono">{r.patientNo}</span>}>{r.fullName}</CellLink> },
             { key: "age", header: "Age / Gender", nowrap: true, cell: (r) => `${ageOn(r.dob)} y · ${r.gender === "undisclosed" ? "—" : GENDER_LABEL[r.gender]}` },
             ...(multiHospital ? [{ key: "hospital", header: "Hospital", cell: (r: (typeof data.rows)[number]) => r.hospitalName }] : []),
-            { key: "registered", header: "Registered", nowrap: true, cell: (r) => <CellText sub={r.isDemo ? <DemoTag /> : undefined}>{formatDate(r.createdAt)}</CellText> },
+            { key: "registered", header: "Registered", nowrap: true, cell: (r) => formatDate(r.createdAt) },
           ]}
         />
         {data.total > 0 && <Pagination basePath="/patients" params={{ q: q.q }} page={q.page} pageSize={q.pageSize} total={data.total} />}

@@ -94,15 +94,3 @@
   font-size: var(--fs-sm);
 }
 
-.demo {
-  padding: var(--sp-3) var(--sp-4);
-  border: 1px dashed var(--c-border-strong);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-xs);
-  color: var(--c-text-muted);
-}
-
-.demo code {
-  font-family: var(--font-mono);
-  color: var(--c-text);
-}

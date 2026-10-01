@@ -20,7 +20,7 @@ export default function AboutPage() {
       <ul>
         <li>It doesn&apos;t approve, reject or settle claims. Only the insurer, TPA or scheme decides, and the platform records that decision.</li>
         <li>It doesn&apos;t guarantee claim approval or payment.</li>
-        <li>It has no official integration with any insurer, TPA, government scheme or ABDM. Organizations, policies and rules in this installation are fictional DEMO DATA.</li>
+        <li>It has no official integration with any insurer, TPA, government scheme or ABDM. Organizations, policies and rules are entered by the people who use it.</li>
       </ul>
       <h2>Privacy</h2>
       <p>

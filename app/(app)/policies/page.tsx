@@ -51,7 +51,15 @@ export default async function PoliciesPage({ searchParams }: { searchParams: SP 
           caption={category === "private" ? "Private insurance policies" : "Government scheme covers"}
           rows={data.rows}
           rowKey={(r) => r.id}
-          empty={<EmptyState title="No policies found" />}
+          empty={
+            q.q || f.productType ? (
+              <EmptyState title="No policies match these filters" />
+            ) : (
+              <EmptyState title={category === "private" ? "No private insurance policies yet" : "No government scheme covers yet"}>
+                {can(ctx.principal, "policy:manage") ? "Add your first policy to get started." : "Policies appear here once an administrator adds them."}
+              </EmptyState>
+            )
+          }
           columns={[
             { key: "name", header: category === "private" ? "Policy" : "Scheme cover", cell: (r) => <CellLink href={`/policies/${r.id}`} sub={PRODUCT_TYPE_LABEL[r.productType]}>{r.name}</CellLink> },
             {

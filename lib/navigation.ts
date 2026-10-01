@@ -36,6 +36,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/knowledge", label: "Knowledge Center", icon: "✎", permission: "dashboard:view", section: "Reference" },
   { href: "/profile", label: "Profile Settings", icon: "☺", permission: "dashboard:view", section: "Workspace", hidden: true },
   { href: "/admin/users", label: "Users", icon: "⚙", permission: "user:manage", section: "Administration" },
+  { href: "/admin/medical-codes", label: "Medical codes", icon: "⚕", permission: "policy:manage", section: "Administration" },
   { href: "/admin/access-requests", label: "Access requests", icon: "✉", permission: "user:manage", section: "Administration" },
   { href: "/audit", label: "Audit log", icon: "☰", permission: "audit:read", section: "Administration" },
 ];

@@ -34,6 +34,8 @@ export default async function ClaimsPage({ searchParams }: { searchParams: SP })
     SchemeRepository.options(ctx.db),
     isHospital ? Promise.resolve([]) : OrganizationRepository.options(ctx.db, ["hospital"]),
   ]);
+  // Only when this view is empty: are there any claims at all? (decides the empty-state wording)
+  const anyClaims = data.total > 0 || (await ClaimService.list(ctx, { page: 1, pageSize: 1 }, {})).total > 0;
   const params = claimFilterParams(sp);
   const exportQs = new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
   const viewHref = (k: string) => `/claims?${new URLSearchParams({ ...Object.fromEntries(Object.entries(params).filter(([key, v]) => v && key !== "view" && key !== "page")), view: k } as Record<string, string>).toString()}`;
@@ -98,7 +100,13 @@ export default async function ClaimsPage({ searchParams }: { searchParams: SP })
           caption="Claims"
           rows={data.rows}
           rowKey={(r) => r.id}
-          empty={<EmptyState title="No claims match these filters" />}
+          empty={
+            anyClaims ? (
+              <EmptyState title="No claims match these filters" />
+            ) : (
+              <EmptyState title="No claims yet">{isStaff ? "Create your first claim to get started." : "Claims appear here once they are submitted."}</EmptyState>
+            )
+          }
           columns={[
             { key: "id", header: "Claim ID", cell: (r) => <CellLink href={`/claims/${r.id}`} sub={r.claimType === "cashless" ? "Cashless" : "Reimbursement"}><span className="mono">{r.reference}</span></CellLink> },
             { key: "st", header: "Status", cell: (r) => <CellText sub={r.lastReason}><Badge tone={CLAIM_STATUS_TONE[r.status]}>{CLAIM_STATUS_LABEL[r.status]}</Badge></CellText> },

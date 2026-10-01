@@ -2,7 +2,7 @@ import { inject } from "vitest";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "@/db/client";
 import { roles, users } from "@/db/schema";
-import { DEMO } from "@/db/seed/ids";
+import { DEMO } from "@/tests/fixtures/seed/ids";
 import { hashPassword, randomToken } from "@/lib/security/crypto";
 import { createAuthService, type AuthService } from "@/modules/auth/auth.service";
 import type { Principal } from "@/lib/permissions/principal";
