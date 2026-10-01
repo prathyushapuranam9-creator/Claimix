@@ -92,7 +92,7 @@ Database triggers refuse a "rejected" status without a payer rejection and "sett
   scheme empanelment are searched separately.
 - `/register` creates an **access request** only (honeypot, per-IP limit, no account enumeration). Admins review
   them at `/admin/access-requests`; approving records the decision — accounts are still created by invitation.
-- `/dashboard` is role-specific (admin, hospital, payer, patient, read-only); `/reports` gives status, money,
+- `/dashboard` is role-specific (admin, hospital, payer); patient and read-only users have none and land on `/patients` / `/hospitals`; `/reports` gives status, money,
   monthly volume, turnaround and top query/rejection reasons, with CSV export. Every number comes from the same
   tenant-scoped queries as the list pages.
 
