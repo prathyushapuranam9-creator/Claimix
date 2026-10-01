@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LogoMark } from "@/components/brand/Logo";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import type { NavItem } from "@/lib/navigation";
 import styles from "./AppShell.module.css";
 
 interface Props {
   nav: NavItem[];
-  user: { fullName: string; roleName: string; orgName: string };
+  user: { fullName: string; email: string; roleName: string; orgName: string };
   logout: () => Promise<void>;
   /** Unread notifications for the signed-in user (null when the role has no inbox). */
   unread: number | null;
@@ -22,6 +23,11 @@ export function AppShell({ nav, user, logout, unread, children }: Props) {
   const [openedAt, setOpenedAt] = useState<string | null>(null);
   const open = openedAt === pathname;
   const setOpen = (v: boolean) => setOpenedAt(v ? pathname : null);
+  const [collapsed, setCollapsed] = useState(false);
+  // Same pattern for the profile menu: it closes when the route changes.
+  const [menuAt, setMenuAt] = useState<string | null>(null);
+  const menuOpen = menuAt === pathname;
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -30,25 +36,57 @@ export function AppShell({ nav, user, logout, unread, children }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  const sections = [...new Set(nav.map((n) => n.section))];
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!menuRef.current?.contains(e.target as Node)) setMenuAt(null);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuAt(null);
+    document.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  const sidebarNav = nav.filter((n) => !n.hidden);
+  const sections = [...new Set(sidebarNav.map((n) => n.section))];
   const current = nav.find((n) => pathname === n.href || pathname.startsWith(n.href + "/"));
+  const titleOf = (n?: NavItem) => n?.title ?? n?.label ?? "Claimix";
+
+  // Remember which section the user came from, so pages reached by links (not the sidebar) can show the path.
+  // A direct load has no previous section; moving within a section (list -> detail) keeps the earlier one.
+  const [trail, setTrail] = useState<{ href?: string; from?: NavItem }>({ href: current?.href });
+  if (current?.href !== trail.href) {
+    const prev = nav.find((n) => n.href === trail.href);
+    setTrail({ href: current?.href, from: prev });
+  }
+  const crumb = current?.hidden && trail.from && trail.from.href !== current.href ? trail.from : undefined;
 
   return (
-    <div className={styles.shell}>
+    <div className={styles.shell} data-collapsed={collapsed}>
       <a href="#main" className="skip-link">Skip to content</a>
       {open && <button className={styles.scrim} aria-label="Close menu" onClick={() => setOpen(false)} />}
       <aside id="app-sidebar" className={styles.sidebar} data-open={open} aria-label="Main navigation">
         <Link href="/dashboard" className={styles.brand}>
-          <LogoMark /> Claimix
+          <LogoMark /> <span className={styles.label}>Claimix</span>
         </Link>
         <nav className={styles.nav}>
           {sections.map((s) => (
             <div key={s}>
               <p className={styles.section}>{s}</p>
-              {nav.filter((n) => n.section === s).map((n) => (
-                <Link key={n.href} href={n.href} className={styles.link} aria-current={current?.href === n.href ? "page" : undefined}>
+              {sidebarNav.filter((n) => n.section === s).map((n) => (
+                <Link
+                  key={n.href}
+                  href={n.href}
+                  className={styles.link}
+                  title={collapsed ? n.label : undefined}
+                  aria-label={collapsed ? n.label : undefined}
+                  aria-current={current?.href === n.href ? "page" : undefined}
+                >
                   <span className={styles.icon} aria-hidden="true">{n.icon}</span>
-                  {n.label}
+                  <span className={styles.label}>{n.label}</span>
                 </Link>
               ))}
             </div>
@@ -57,9 +95,18 @@ export function AppShell({ nav, user, logout, unread, children }: Props) {
         <div className={styles.user}>
           <p className={styles.userName}>{user.fullName}</p>
           <p className={styles.userMeta}>{user.roleName} · {user.orgName}</p>
-          <form action={logout}>
-            <button type="submit" className={styles.logout}>Sign out</button>
-          </form>
+          <button
+            type="button"
+            className={styles.collapse}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() => setCollapsed((v) => !v)}
+          >
+            <svg className={styles.chevron} width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+            <span className={styles.label}>Collapse Sidebar</span>
+          </button>
         </div>
       </aside>
       <div className={styles.column}>
@@ -74,7 +121,8 @@ export function AppShell({ nav, user, logout, unread, children }: Props) {
           >
             ☰
           </button>
-          <span className={styles.topTitle}>{current?.label ?? "Claimix"}</span>
+          <span className={styles.topTitle}>{crumb ? `${titleOf(crumb)} > ${titleOf(current)}` : titleOf(current)}</span>
+          <div className={styles.themeSlot}><ThemeToggle /></div>
           {unread !== null && (
             <Link href="/notifications" className={styles.bell} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
               <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -84,6 +132,29 @@ export function AppShell({ nav, user, logout, unread, children }: Props) {
               {unread > 0 && <span className={styles.count}>{unread > 99 ? "99+" : unread}</span>}
             </Link>
           )}
+          <div className={styles.profile} ref={menuRef}>
+            <button
+              type="button"
+              className={styles.profileBtn}
+              aria-label="Profile menu"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuAt(menuOpen ? null : pathname)}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="8" r="4" />
+                <path d="M4 21a8 8 0 0 1 16 0" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <div className={styles.menu} role="menu">
+                <Link href="/profile" role="menuitem" className={styles.menuItem}>Profile Settings</Link>
+                <form action={logout} className={styles.menuSep}>
+                  <button type="submit" role="menuitem" className={styles.menuItem}>Sign out</button>
+                </form>
+              </div>
+            )}
+          </div>
         </header>
         <main id="main" className={styles.content}>
           {children}

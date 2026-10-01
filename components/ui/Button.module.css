@@ -54,9 +54,7 @@
 }
 .danger:hover:not(:disabled) { filter: brightness(0.92); }
 
-@media (prefers-color-scheme: dark) {
-  .danger { color: var(--c-bg); }
-}
+:global(:root[data-theme="dark"]) .danger { color: var(--c-bg); }
 
 .sm {
   min-height: 36px;
