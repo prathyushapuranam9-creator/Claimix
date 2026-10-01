@@ -62,12 +62,12 @@ test("session cookie is httpOnly and SameSite=Lax", async ({ page, context }) =>
   expect(cookie?.sameSite).toBe("Lax");
 });
 
-test("patients get the own-records dashboard and no staff navigation", async ({ page }) => {
+test("patients have no dashboard and no staff navigation", async ({ page }) => {
   await signIn(page, "patient.a1@demo.claimix.invalid");
-  await expect(page).toHaveURL(/\/dashboard/);
-  await expect(page.getByRole("heading", { name: "Your claims" })).toBeVisible();
+  await expect(page).toHaveURL(/\/patients/);
   await openMenuIfCollapsed(page);
   const nav = page.getByRole("complementary", { name: "Main navigation" });
+  await expect(nav.getByRole("link", { name: "Dashboard" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Reports" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Eligibility checker" })).toHaveCount(0);
 });

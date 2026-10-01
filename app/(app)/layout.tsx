@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const unread = hasInbox ? await InboxService.unreadCount({ db: getDb(), principal: user.principal, meta: await requestMeta() }) : null;
   return (
     <AppShell
-      nav={visibleNav(user.principal.permissions)}
+      nav={visibleNav(user.principal)}
       portal={PORTALS[portalFor(user.principal.orgType)].label}
       user={{ fullName: user.fullName, email: user.email, roleName: user.roleName, orgName: user.orgName }}
       logout={logoutAction}

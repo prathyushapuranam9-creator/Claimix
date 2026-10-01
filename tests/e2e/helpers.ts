@@ -22,7 +22,8 @@ export async function signIn(page: Page, email: string, password = PASSWORD) {
   await page.getByLabel("Email").fill(email);
   await page.locator("#password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL(/\/dashboard/);
+  // Patient and read-only users have no dashboard and land on their first page instead.
+  await page.waitForURL(/\/(dashboard|patients|hospitals)/);
 }
 
 export async function openMenuIfCollapsed(page: Page) {

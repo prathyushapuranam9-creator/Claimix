@@ -169,13 +169,10 @@ describe("reports and dashboards are tenant-scoped", () => {
     expect((await DashboardService.forCaller(as("staffA"))).variant).toBe("hospital");
     expect((await DashboardService.forCaller(as("insurerA"))).variant).toBe("payer");
     expect((await DashboardService.forCaller(as("tpaA"))).variant).toBe("payer");
-    expect((await DashboardService.forCaller(as("readOnly"))).variant).toBe("reference");
 
-    const p = await DashboardService.forCaller(as("patientA1"));
-    expect(p.variant).toBe("patient");
-    if (p.variant !== "patient") return;
-    const [own] = await ctx.db.select({ n: count() }).from(preAuthorizations).where(eq(preAuthorizations.patientId, who.patientA1.patientId!));
-    expect(p.preauths.length).toBe(Math.min(10, own!.n));
+    // Patient and read-only users have no dashboard.
+    await expect(DashboardService.forCaller(as("readOnly"))).rejects.toThrow();
+    await expect(DashboardService.forCaller(as("patientA1"))).rejects.toThrow();
 
     const staff = await DashboardService.forCaller(as("staffB"));
     if (staff.variant !== "hospital") throw new Error("expected hospital");
