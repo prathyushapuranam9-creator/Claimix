@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { PASSWORD } from "./helpers";
+import { PASSWORD, portalRoleFor } from "./helpers";
 
 async function signIn(page: Page, email: string, password = PASSWORD) {
   await page.goto("/login");
+  await page.getByRole("radio", { name: portalRoleFor(email) }).check();
   await page.getByLabel("Email").fill(email);
   await page.locator("#password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -245,4 +246,14 @@ test("password toggle keeps browser-autofilled values", async ({ page }) => {
   await page.getByRole("button", { name: "Show password" }).click();
   await expect(page.locator("#password")).toHaveValue(PASSWORD);
   await expect(page.locator("#password")).toHaveAttribute("type", "text");
+});
+
+test("the email field is a plain credential input: no custom menu competes with the browser's saved logins", async ({ page }) => {
+  await page.goto("/login");
+  const email = page.locator("#email");
+  await expect(email).not.toHaveAttribute("role", /.+/);
+  await expect(email).not.toHaveAttribute("aria-autocomplete", /.+/);
+  await email.click();
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+  await expect(page.getByRole("combobox")).toHaveCount(0);
 });

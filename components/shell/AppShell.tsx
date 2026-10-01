@@ -14,6 +14,8 @@ const HAS_OWN_BACK = [/^\/policies\/[^/]+\/rules$/];
 
 interface Props {
   nav: NavItem[];
+  /** Portal name for the taskbar, derived from the signed-in account (e.g. "Hospital Staff"). */
+  portal: string;
   user: { fullName: string; email: string; roleName: string; orgName: string };
   logout: () => Promise<void>;
   /** Unread notifications for the signed-in user (null when the role has no inbox). */
@@ -21,7 +23,7 @@ interface Props {
   children: ReactNode;
 }
 
-export function AppShell({ nav, user, logout, unread, children }: Props) {
+export function AppShell({ nav, portal, user, logout, unread, children }: Props) {
   const pathname = usePathname();
   // The drawer remembers the path it was opened on, so navigating closes it.
   const [openedAt, setOpenedAt] = useState<string | null>(null);
@@ -136,8 +138,8 @@ export function AppShell({ nav, user, logout, unread, children }: Props) {
           >
             ☰
           </button>
-          {showBack && <BackButton hasHistory={hasHistory} fallback={backFallback} />}
-          <span className={styles.topTitle}>{crumb ? `${titleOf(crumb)} > ${titleOf(current)}` : titleOf(current)}</span>
+          {/* The taskbar shows only the portal; Back and the section name sit just below it. */}
+          <span className={styles.topTitle}>{portal}</span>
           <div className={styles.themeSlot}><ThemeToggle /></div>
           {unread !== null && (
             <Link href="/notifications" className={styles.bell} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
@@ -172,6 +174,19 @@ export function AppShell({ nav, user, logout, unread, children }: Props) {
             )}
           </div>
         </header>
+        {/* Below the taskbar: Back (to the page the user actually came from) + the current section. */}
+        <div className={styles.pagebar}>
+          {showBack && <BackButton hasHistory={hasHistory} fallback={backFallback} />}
+          <nav aria-label="Current section" className={styles.sectionName}>
+            {crumb && (
+              <>
+                <Link href={crumb.href}>{titleOf(crumb)}</Link>
+                <span aria-hidden="true" className={styles.sep}>›</span>
+              </>
+            )}
+            <span aria-current="page">{titleOf(current)}</span>
+          </nav>
+        </div>
         <main id="main" className={styles.content}>
           {children}
         </main>
