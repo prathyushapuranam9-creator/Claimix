@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import { useId, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent, type RefObject } from "react";
 import { LogoMark } from "@/components/brand/Logo";
 import { TextField } from "@/components/ui/Field";
 import { forgetRememberedAccounts, readRememberedAccounts, type RememberedAccount } from "@/lib/auth/remembered-accounts";
@@ -11,18 +11,20 @@ import styles from "./EmailWithSuggestions.module.css";
  * device (combobox + listbox pattern: ↑/↓ to move, Enter to choose, Esc to close).
  * Only emails are listed; the password line is always masked and the password itself
  * comes from the browser's password manager when an account is chosen.
+ *
+ * The input is uncontrolled: the browser owns its value, so a password manager's autofill
+ * is never overwritten by a React re-render. `query` only mirrors it for filtering.
  */
 export function EmailWithSuggestions({
-  value,
-  onChange,
+  inputRef,
   onPick,
   error,
 }: {
-  value: string;
-  onChange: (value: string) => void;
+  inputRef: RefObject<HTMLInputElement | null>;
   onPick: (email: string) => void;
   error?: string;
 }) {
+  const [query, setQuery] = useState("");
   const listId = useId();
   const [accounts, setAccounts] = useState<RememberedAccount[]>([]);
   const [open, setOpen] = useState(false);
@@ -34,8 +36,8 @@ export function EmailWithSuggestions({
     if (!wrapRef.current?.contains(e.relatedTarget as Node | null)) setOpen(false);
   }
 
-  const query = value.trim().toLowerCase();
-  const matches = accounts.filter((a) => !query || a.email.includes(query) || a.email === query);
+  const typed = query.trim().toLowerCase();
+  const matches = accounts.filter((a) => !typed || a.email.includes(typed) || a.email === typed);
   const shown = open && matches.length > 0;
 
   function show() {
@@ -45,9 +47,18 @@ export function EmailWithSuggestions({
   }
 
   function pick(email: string) {
+    if (inputRef.current) inputRef.current.value = email;
+    setQuery(email);
     setOpen(false);
     setActive(-1);
     onPick(email);
+  }
+
+  function onChange(e: ChangeEvent<HTMLInputElement>) {
+    setQuery(e.target.value);
+    setActive(-1);
+    // Filled by the browser's password manager: let its choice stand, don't pop our menu over it.
+    setOpen(!isAutofilled(e.target));
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
@@ -84,12 +95,8 @@ export function EmailWithSuggestions({
         aria-expanded={shown}
         aria-controls={listId}
         aria-activedescendant={shown && active >= 0 ? `${listId}-${active}` : undefined}
-        value={value}
-        onChange={(e) => {
-          onChange(e.target.value);
-          setOpen(true);
-          setActive(-1);
-        }}
+        ref={inputRef}
+        onChange={onChange}
         onFocus={show}
         onClick={() => !open && show()}
         onKeyDown={onKeyDown}
@@ -134,4 +141,16 @@ export function EmailWithSuggestions({
       </div>
     </div>
   );
+}
+
+function isAutofilled(el: HTMLInputElement): boolean {
+  try {
+    return el.matches(":autofill");
+  } catch {
+    try {
+      return el.matches(":-webkit-autofill");
+    } catch {
+      return false;
+    }
+  }
 }

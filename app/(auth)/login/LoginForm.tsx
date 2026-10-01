@@ -8,7 +8,7 @@ import { offerToSaveLogin, requestSavedLogin } from "@/lib/auth/save-credential"
 import { EmailWithSuggestions } from "@/components/auth/EmailWithSuggestions";
 import { loginSchema } from "@/modules/auth/auth.validation";
 import { Button } from "@/components/ui/Button";
-import { TextField } from "@/components/ui/Field";
+import { PasswordField } from "@/components/ui/PasswordField";
 import { Alert } from "@/components/ui/Surface";
 import { loginAction } from "../actions";
 import styles from "../auth.module.css";
@@ -20,8 +20,11 @@ type LoginResult = Awaited<ReturnType<typeof loginAction>>;
  * browser's password manager recognises the sign-in. After the server accepts a login we
  * explicitly offer to save it (Credential Management API); the browser then suggests saved
  * accounts in its own dropdown when the email field is focused and fills both fields.
- * Passwords are never stored or displayed by Claimix. Inputs are controlled so a failed
- * attempt keeps the email.
+ * Passwords are never stored or displayed by Claimix.
+ *
+ * Email and password are uncontrolled inputs: the browser owns their values, so autofill from
+ * a password manager (even when it fires no input events) is never overwritten by a re-render,
+ * and a failed attempt keeps what was typed. Submission reads the values from the form itself.
  */
 export function LoginForm({ next }: { next?: string }) {
   const router = useRouter();
@@ -32,9 +35,8 @@ export function LoginForm({ next }: { next?: string }) {
   const [clientState, setClientState] = useState<LoginResult | null>(null);
   const [pending, startSubmit] = useTransition();
   const state = clientState ?? serverState;
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -42,8 +44,6 @@ export function LoginForm({ next }: { next?: string }) {
     const form = new FormData(e.currentTarget);
     // Read the submitted fields so values filled in by the browser's autofill are always used.
     const values = { email: String(form.get("email") ?? ""), password: String(form.get("password") ?? "") };
-    setEmail(values.email);
-    setPassword(values.password);
     // Quick client-side check; the server validates everything again.
     const r = loginSchema.safeParse(values);
     if (!r.success) {
@@ -65,13 +65,12 @@ export function LoginForm({ next }: { next?: string }) {
 
   // A saved account was chosen: fill the email, then ask the browser's password manager for its
   // password (masked field). Without that support, focus the password so the browser can autofill it.
-  async function pickSaved(address: string) {
-    setEmail(address);
+  async function pickSaved() {
     setErrors({});
     const saved = await requestSavedLogin();
-    if (saved) {
-      setEmail(saved.email);
-      setPassword(saved.password);
+    if (saved && emailRef.current && passwordRef.current) {
+      emailRef.current.value = saved.email;
+      passwordRef.current.value = saved.password;
       return;
     }
     passwordRef.current?.focus();
@@ -82,17 +81,14 @@ export function LoginForm({ next }: { next?: string }) {
       <form className={styles.form} action={formAction} onSubmit={onSubmit} noValidate>
         {state && !state.ok && !pending && <Alert tone="danger">{state.error}</Alert>}
         <input type="hidden" name="next" value={next ?? ""} />
-        <EmailWithSuggestions value={email} onChange={setEmail} onPick={(a) => void pickSaved(a)} error={errors.email} />
-        <TextField
+        <EmailWithSuggestions inputRef={emailRef} onPick={() => void pickSaved()} error={errors.email} />
+        <PasswordField
           ref={passwordRef}
           id="password"
           name="password"
           label="Password"
-          type="password"
           autoComplete="current-password"
           required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
           error={errors.password}
         />
         <div className={styles.row}>

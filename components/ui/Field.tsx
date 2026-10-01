@@ -1,7 +1,7 @@
 import { forwardRef, useId, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import styles from "./Field.module.css";
 
-interface FieldProps {
+export interface FieldProps {
   label: string;
   error?: string;
   hint?: string;
@@ -9,7 +9,7 @@ interface FieldProps {
 }
 
 /** Label + control + hint/error wiring with correct aria attributes. */
-function FieldShell({ id, label, error, hint, required, children }: FieldProps & { id: string; children: ReactNode }) {
+export function FieldShell({ id, label, error, hint, required, children }: FieldProps & { id: string; children: ReactNode }) {
   return (
     <div className={styles.field}>
       <label htmlFor={id} className={styles.label}>
@@ -23,7 +23,7 @@ function FieldShell({ id, label, error, hint, required, children }: FieldProps &
   );
 }
 
-function aria(id: string, error?: string, hint?: string) {
+export function aria(id: string, error?: string, hint?: string) {
   return {
     "aria-invalid": error ? true : undefined,
     "aria-describedby": error ? `${id}-error` : hint ? `${id}-hint` : undefined,

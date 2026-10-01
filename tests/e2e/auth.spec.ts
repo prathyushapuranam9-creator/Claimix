@@ -5,7 +5,7 @@ import { PASSWORD } from "./helpers";
 async function signIn(page: Page, email: string, password = PASSWORD) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
+  await page.locator("#password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
 }
 
@@ -40,11 +40,14 @@ test("hospital staff can sign in, see their scope, and sign out", async ({ page 
   await expect(page.getByText("Queries to answer")).toBeVisible();
   await openMenuIfCollapsed(page);
   const nav = page.getByRole("complementary", { name: "Main navigation" });
-  await expect(nav.getByRole("link", { name: "Claims" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Eligibility checker" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Users" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Audit log" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  // Sign out lives in the header's profile menu (reload first so the mobile drawer is closed).
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Profile menu" }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/login/);
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login/);
@@ -71,7 +74,7 @@ test("patients get the own-records dashboard and no staff navigation", async ({ 
 test("post-login redirect ignores off-site targets", async ({ page }) => {
   await page.goto("/login?next=//evil.example.com");
   await page.getByLabel("Email").fill("staff.b@demo.claimix.invalid");
-  await page.getByLabel("Password").fill(PASSWORD);
+  await page.locator("#password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/localhost:3100\/dashboard/);
 });
@@ -169,4 +172,77 @@ test("after a successful sign-in the browser is asked to save the login; never a
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/dashboard/);
   // The init script re-runs on navigation, so check what was recorded via the page before it: use a request log instead.
+});
+
+test("browser-autofilled credentials are kept, even when the browser fires no input events", async ({ page }) => {
+  await page.goto("/login");
+  // Fill both fields the way a password manager can: set the values directly, no input/change events.
+  await page.evaluate((pw) => {
+    (document.getElementById("email") as HTMLInputElement).value = "staff.a@demo.claimix.invalid";
+    (document.getElementById("password") as HTMLInputElement).value = pw;
+  }, PASSWORD);
+  // Interacting with the page (focusing the email field re-renders the form) must not clear them.
+  await page.locator("#email").click();
+  await page.locator("#password").click();
+  await expect(page.locator("#email")).toHaveValue("staff.a@demo.claimix.invalid");
+  await expect(page.locator("#password")).toHaveValue(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+});
+
+test("email and password form one credential form for password managers", async ({ page }) => {
+  await page.goto("/login");
+  const form = page.locator("form:has(#email):has(#password)");
+  await expect(form).toHaveCount(1);
+  await expect(form.locator("#email")).toHaveAttribute("type", "email");
+  await expect(form.locator("#email")).toHaveAttribute("name", "email");
+  await expect(form.locator("#email")).toHaveAttribute("autocomplete", "username");
+  await expect(form.locator("#password")).toHaveAttribute("type", "password");
+  await expect(form.locator("#password")).toHaveAttribute("name", "password");
+  await expect(form.locator("#password")).toHaveAttribute("autocomplete", "current-password");
+  await expect(form.locator('button[type="submit"]')).toHaveText("Sign in");
+  await expect(page.locator('[autocomplete="off"]')).toHaveCount(0);
+});
+
+test("required-field validation still works and nothing is submitted", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByText("Enter a valid email address.")).toBeVisible();
+  await expect(page.getByText("Enter your password.")).toBeVisible();
+  await expect(page).toHaveURL(/\/login/);
+});
+
+test("show/hide password toggles visibility without changing the value, and masks again on submit", async ({ page }) => {
+  await page.goto("/login");
+  const pw = page.locator("#password");
+  const toggle = page.getByRole("button", { name: "Show password" });
+  await expect(pw).toHaveAttribute("type", "password");
+  await page.locator("#email").fill("staff.a@demo.claimix.invalid");
+  await pw.fill(PASSWORD);
+
+  await toggle.click();
+  await expect(pw).toHaveAttribute("type", "text");
+  await expect(pw).toHaveValue(PASSWORD);
+  await expect(page).toHaveURL(/\/login/); // the toggle never submits the form
+  await expect(pw).toHaveAttribute("autocomplete", "current-password");
+
+  // Keyboard: the toggle is reachable and works with Enter/Space.
+  const hide = page.getByRole("button", { name: "Hide password" });
+  await hide.focus();
+  await page.keyboard.press("Enter");
+  await expect(pw).toHaveAttribute("type", "password");
+  await page.keyboard.press("Space");
+  await expect(pw).toHaveAttribute("type", "text");
+
+  // Submitting while visible masks it again first, then signs in normally.
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+});
+
+test("password toggle keeps browser-autofilled values", async ({ page }) => {
+  await page.goto("/login");
+  await page.evaluate((v) => { (document.getElementById("password") as HTMLInputElement).value = v; }, PASSWORD);
+  await page.getByRole("button", { name: "Show password" }).click();
+  await expect(page.locator("#password")).toHaveValue(PASSWORD);
+  await expect(page.locator("#password")).toHaveAttribute("type", "text");
 });
