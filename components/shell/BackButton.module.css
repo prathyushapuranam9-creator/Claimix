@@ -5,14 +5,16 @@
   flex: none;
   width: var(--tap);
   height: var(--tap);
-  border: 1px solid var(--c-border);
+  /* Icon only: no border or background. The tap area stays full size. */
+  padding: 0;
+  border: 0;
   border-radius: var(--radius-sm);
-  background: var(--c-surface);
-  color: var(--c-text);
+  background: none;
+  color: var(--c-text-muted);
   cursor: pointer;
 }
 
-.back:hover { background: var(--c-accent); border-color: var(--c-accent-edge); color: var(--c-on-accent); }
+.back:hover { color: var(--c-text); }
 .back:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
 
 /* Tooltip (the title attribute is the non-visual fallback). */

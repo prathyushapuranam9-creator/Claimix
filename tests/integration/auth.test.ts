@@ -153,3 +153,20 @@ describe("password reset", () => {
     ).rejects.toBeInstanceOf(ValidationError);
   });
 });
+
+describe("portal-based sign-in", () => {
+  it("accepts the account's own portal, refuses another only after the password is verified, and never grants a role", async () => {
+    const { auth, demoPassword } = ctx;
+    const insurer = "insurer.a@demo.claimix.invalid";
+    await expect(auth.login({ email: insurer, password: demoPassword, portal: "hospital" }, { ...META, ipAddress: uniqueIp() })).rejects.toThrow(/Insurance Reviewer/);
+    // Wrong password with the wrong portal: the generic message (no hint about the account).
+    await expect(auth.login({ email: insurer, password: "Wrong-password-123", portal: "hospital" }, { ...META, ipAddress: uniqueIp() })).rejects.toThrow("Incorrect email or password.");
+    await expect(auth.login({ email: insurer, password: demoPassword, portal: "bogus" }, { ...META, ipAddress: uniqueIp() })).rejects.toThrow(/Choose how/);
+    const ok = await auth.login({ email: insurer, password: demoPassword, portal: "insurance" }, { ...META, ipAddress: uniqueIp() });
+    const user = await auth.resolve(ok.token);
+    expect(user?.principal.orgType).toBe("insurer");
+    expect(user?.principal.roleKey).toBe("insurer_reviewer");
+    // Choosing "admin" can never make an insurer an admin.
+    await expect(auth.login({ email: insurer, password: demoPassword, portal: "admin" }, { ...META, ipAddress: uniqueIp() })).rejects.toThrow(/Insurance Reviewer/);
+  });
+});

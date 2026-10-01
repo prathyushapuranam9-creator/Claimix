@@ -16,6 +16,7 @@ export const AuthRepository = {
         isActive: users.isActive,
         sessionVersion: users.sessionVersion,
         orgActive: organizations.isActive,
+        orgType: organizations.type,
       })
       .from(users)
       .innerJoin(organizations, eq(organizations.id, users.organizationId))

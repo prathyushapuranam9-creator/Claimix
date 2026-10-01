@@ -253,7 +253,8 @@
 
 .topTitle {
   font-size: var(--fs-sm);
-  color: var(--c-text-muted);
+  font-weight: 600;
+  color: var(--c-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -300,3 +301,36 @@
   text-align: center;
 }
 
+
+/* Below the taskbar: Back + current section (with where the user came from, when relevant). */
+.pagebar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: calc(var(--tap) + var(--sp-4));
+  padding: var(--sp-3) var(--sp-4) 0;
+}
+
+@media (min-width: 768px) {
+  .pagebar { padding: var(--sp-3) var(--sp-6) 0; }
+}
+
+.sectionName {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+  color: var(--c-text);
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+.sectionName a {
+  color: var(--c-text-muted);
+  font-weight: 500;
+}
+
+.sep {
+  color: var(--c-text-subtle);
+}

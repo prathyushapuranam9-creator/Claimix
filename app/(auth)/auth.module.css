@@ -94,3 +94,66 @@
   font-size: var(--fs-sm);
 }
 
+
+/* "Sign in as" portal choice: native radios styled as a segmented control. */
+.portals {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.portalsLegend {
+  margin-bottom: var(--sp-1);
+  padding: 0;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.portalOptions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+}
+
+.portalOption {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 40px;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-sm);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+
+/* The radio stays in the accessibility tree and keyboard order; only its dot is hidden. */
+.portalOption input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.portalOption:hover { color: var(--c-text); }
+
+.portalOption:has(input:checked) {
+  background: var(--c-input);
+  color: var(--c-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.portalOption:has(input:focus-visible) {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
