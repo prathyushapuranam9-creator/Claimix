@@ -58,3 +58,70 @@
   color: var(--c-text-muted);
   font-size: var(--fs-sm);
 }
+
+/* Grouped dashboard metrics */
+.groups {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-3);
+}
+
+@media (min-width: 720px) {
+  .groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1100px) {
+  .groups { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .groupSm { grid-column: span 2; }
+  .groupMd { grid-column: span 3; }
+  .groupLg { grid-column: span 4; }
+}
+
+.group {
+  display: grid;
+  gap: var(--sp-3);
+  align-content: start;
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+
+.groupTitle {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.groupBody {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+  gap: var(--sp-4);
+}
+
+.metric {
+  display: grid;
+  gap: var(--sp-1);
+  align-content: start;
+}
+
+.metricValue {
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.metricLabel {
+  color: var(--c-text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.metricHint {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}

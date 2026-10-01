@@ -41,6 +41,25 @@ function CaseList({ rows, kind, empty }: { rows: Row[]; kind: "preauth" | "claim
   );
 }
 
+type Metric = { label: string; value: React.ReactNode; hint?: string };
+
+function Group({ title, metrics, size }: { title: string; metrics: Metric[]; size: "Sm" | "Md" | "Lg" }) {
+  return (
+    <section className={`${r.group} ${r[`group${size}`]}`}>
+      <h2 className={r.groupTitle}>{title}</h2>
+      <div className={r.groupBody}>
+        {metrics.map((m) => (
+          <div key={m.label} className={r.metric}>
+            <span className={r.metricValue}>{m.value}</span>
+            <span className={r.metricLabel}>{m.label}</span>
+            {m.hint && <span className={r.metricHint}>{m.hint}</span>}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function Money({ d }: { d: CaseData }) {
   const t = d.financials.reduce((a, f) => ({ approved: a.approved + f.approved, settled: a.settled + f.settled, claimed: a.claimed + f.claimed }), { approved: 0, settled: 0, claimed: 0 });
   return (
@@ -166,25 +185,38 @@ export default async function DashboardPage() {
   }
 
   // Administrator
+  const adminTotals = d.financials.reduce((t, f) => ({ approved: t.approved + f.approved, settled: t.settled + f.settled, claimed: t.claimed + f.claimed }), { approved: 0, settled: 0, claimed: 0 });
   return (
     <>
       {header}
       <Stack>
-        <div className={r.stats}>
+        <div className={r.groups}>
           {d.admin && (
             <>
-              <Stat label="Active users" value={d.admin.activeUsers} />
-              <Stat label="Patients" value={d.admin.patients} />
-              <Stat label="Access requests" value={<Link href="/admin/access-requests">{d.admin.pendingAccessRequests}</Link>} hint="Pending review" />
-              <Stat label="Failed jobs" value={d.admin.failedJobs} hint="Emails and scans" />
+              <Group size="Sm" title="Users & Patients" metrics={[
+                { label: "Active users", value: d.admin.activeUsers },
+                { label: "Patients", value: d.admin.patients },
+              ]} />
+              <Group size="Sm" title="System issues" metrics={[
+                { label: "Access requests", value: <Link href="/admin/access-requests">{d.admin.pendingAccessRequests}</Link>, hint: "Pending review" },
+                { label: "Failed jobs", value: d.admin.failedJobs, hint: "Emails and scans" },
+              ]} />
             </>
           )}
-          <Stat label="Pre-auths awaiting payer" value={sum(ps, ["submitted", "pending"])} />
-          <Stat label="Claims awaiting payer" value={sum(cs, ["submitted", "pending"])} />
-          <Stat label="Open queries" value={(ps.query ?? 0) + (cs.query ?? 0)} />
-          <Stat label="Claims rejected" value={cs.rejected ?? 0} />
-          <Money d={d} />
-          {d.openReviews !== null && <Stat label="Assistant reviews" value={d.openReviews} hint="Open questions" />}
+          <Group size="Sm" title="Awaiting action" metrics={[
+            { label: "Pre-auths awaiting payer", value: sum(ps, ["submitted", "pending"]) },
+            { label: "Claims awaiting payer", value: sum(cs, ["submitted", "pending"]) },
+            { label: "Open queries", value: (ps.query ?? 0) + (cs.query ?? 0) },
+            { label: "Claims rejected", value: cs.rejected ?? 0 },
+          ]} />
+          <Group size="Lg" title="Financial (₹)" metrics={[
+            { label: "Claimed", value: formatINR(adminTotals.claimed), hint: "Submitted claims" },
+            { label: "Approved", value: formatINR(adminTotals.approved), hint: "By payer decision" },
+            { label: "Settled (paid)", value: formatINR(adminTotals.settled) },
+          ]} />
+          {d.openReviews !== null && (
+            <Group size="Sm" title="Assistant" metrics={[{ label: "Assistant reviews", value: d.openReviews, hint: "Open questions" }]} />
+          )}
         </div>
         <div className={r.split}>
           <Card title="Pre-authorizations awaiting payer" actions={<Link href="/pre-authorizations">All</Link>}>

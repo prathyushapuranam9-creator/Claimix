@@ -15,7 +15,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   return (
     <AppShell
       nav={visibleNav(user.principal.permissions)}
-      user={{ fullName: user.fullName, roleName: user.roleName, orgName: user.orgName }}
+      user={{ fullName: user.fullName, email: user.email, roleName: user.roleName, orgName: user.orgName }}
       logout={logoutAction}
       unread={unread}
     >

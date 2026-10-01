@@ -1,0 +1,13 @@
+.btn {
+  display: inline-grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-text-muted);
+  cursor: pointer;
+}
+
+.btn:hover { background: var(--c-accent); color: var(--c-text); }

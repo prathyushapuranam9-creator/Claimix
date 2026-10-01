@@ -69,6 +69,4 @@
   color: var(--c-text-muted);
 }
 
-@media (prefers-color-scheme: dark) {
-  .step[data-state="done"] .marker { color: var(--c-bg); }
-}
+:global(:root[data-theme="dark"]) .step[data-state="done"] .marker { color: var(--c-bg); }
