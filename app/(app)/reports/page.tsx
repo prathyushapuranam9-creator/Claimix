@@ -8,6 +8,7 @@ import { fillMonths, formatHours, monthLabel, presetRange, type RangePreset } fr
 import { parseRange, ReportService } from "@/modules/reports/reports.service";
 import { CaseReportService, parseCaseOptions } from "@/modules/reports/cases-report.service";
 import { CasesReportCard, TatDistributionCard } from "@/components/reports/CaseReports";
+import { PerformanceCharts } from "@/components/reports/PerformanceCharts";
 import { BarList, ColumnChart } from "@/components/reports/Charts";
 import r from "@/components/reports/Reports.module.css";
 import { Button, ButtonLink } from "@/components/ui/Button";
@@ -91,13 +92,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: SP }
               label: "Overview",
               panel: (
                 <Stack>
+              <PerformanceCharts data={data} />
               <div className={r.stats}>
-                <Stat label="Claimed" value={formatINR(totals.claimed)} hint="Submitted claims" />
-                <Stat label="Approved" value={formatINR(totals.approved)} hint="By payer decision" />
-                <Stat label="Settled (paid)" value={formatINR(totals.settled)} />
                 <Stat label="Patient share" value={formatINR(totals.patient)} hint="On approved claims" />
-                <Stat label="Pre-auth turnaround" value={formatHours(data.preauthTat?.medianHours ?? null)} hint={`Median · ${data.preauthTat?.decided ?? 0} decided`} />
-                <Stat label="Claim turnaround" value={formatHours(data.claimTat?.medianHours ?? null)} hint={`Median · ${data.claimTat?.decided ?? 0} decided`} />
               </div>
 
               <Card title="Claims submitted per month">

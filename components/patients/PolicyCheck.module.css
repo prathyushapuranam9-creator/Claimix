@@ -36,6 +36,12 @@
 
 .body { padding: var(--sp-4) var(--sp-5) var(--sp-5); }
 
+.scope {
+  margin-bottom: var(--sp-3);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
 .stack {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

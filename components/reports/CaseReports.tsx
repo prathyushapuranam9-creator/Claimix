@@ -127,38 +127,47 @@ export function CasesReportCard({
 /* ---------------- TAT distribution ---------------- */
 
 /**
- * Vertical bars with a subtle isometric (3D) face, one per TAT bucket. Every value is
- * printed above its bar, so the chart reads without hovering; the table below carries
- * the same numbers (and the money) for screen readers and exact figures.
+ * The TAT distribution as a bar graph (it replaces the former table): one isometric bar per
+ * TAT bucket, its height from the real case count. Each bucket keeps every figure the table
+ * had — count above the bar; name, share, billed, approved, received and avg risk below —
+ * all as real text, so screen readers get the full data without a separate table.
  */
 function TatBarChart({ buckets, total }: { buckets: TatDistribution["buckets"]; total: number }) {
   const max = Math.max(0, ...buckets.map((b) => b.cases));
   return (
-    <figure className={styles.chart}>
-      <figcaption className="visually-hidden">Number of submitted cases in each turnaround-time bucket</figcaption>
-      <ol className={styles.bars}>
-        {buckets.map((b, i) => {
-          const share = total > 0 ? Math.round((b.cases / total) * 100) : 0;
-          return (
-            <li key={b.key} className={styles.barCol} style={{ "--c": TAT_COLORS[i], "--h": max > 0 ? b.cases / max : 0 } as React.CSSProperties}>
-              {/* Plot area: the value label rides directly on top of its bar. */}
-              <span className={styles.barSlot}>
-                <span className={styles.barValue}>
-                  <span className={styles.dot} aria-hidden="true" />
-                  {b.cases.toLocaleString("en-IN")}
-                  <span className="visually-hidden"> {b.cases === 1 ? "case" : "cases"} in {b.label}</span>
+    <div className={styles.chartScroll} role="region" aria-label="TAT distribution graph" tabIndex={0}>
+      <figure className={styles.chart}>
+        <figcaption className="visually-hidden">Number of submitted cases in each turnaround-time bucket, with billed, approved and received amounts</figcaption>
+        <ol className={styles.bars}>
+          {buckets.map((b, i) => {
+            const share = total > 0 ? Math.round((b.cases / total) * 100) : 0;
+            return (
+              <li key={b.key} className={styles.barCol} style={{ "--c": TAT_COLORS[i], "--h": max > 0 ? b.cases / max : 0 } as React.CSSProperties}>
+                {/* Plot area: the value label rides directly on top of its bar. */}
+                <span className={styles.barSlot}>
+                  <span className={styles.barValue}>
+                    <span className={styles.dot} aria-hidden="true" />
+                    {b.cases.toLocaleString("en-IN")}
+                    <span className="visually-hidden"> {b.cases === 1 ? "case" : "cases"} in</span>
+                  </span>
+                  {b.cases > 0 && <span className={styles.bar3d} aria-hidden="true" />}
                 </span>
-                {b.cases > 0 && <span className={styles.bar3d} aria-hidden="true" />}
-              </span>
-              <span className={styles.barLabel} aria-hidden="true">
-                {b.label}
-                <span className={styles.barShare}>{total > 0 ? `${share}%` : "—"}</span>
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-    </figure>
+                <span className={styles.barLabel}>
+                  {b.label}
+                  <span className={styles.barShare}>{total > 0 ? `${share}% of cases` : "—"}</span>
+                </span>
+                <dl className={styles.figures}>
+                  <div><dt>Billed</dt><dd>{formatINR(b.billed)}</dd></div>
+                  <div><dt>Approved</dt><dd className={styles.good}>{formatINR(b.approved)}</dd></div>
+                  <div><dt>Received</dt><dd className={styles.good}>{formatINR(b.received)}</dd></div>
+                  <div title={NOT_RECORDED}><dt>Avg risk</dt><dd className={styles.muted}>—</dd></div>
+                </dl>
+              </li>
+            );
+          })}
+        </ol>
+      </figure>
+    </div>
   );
 }
 
@@ -172,41 +181,6 @@ export function TatDistributionCard({ data }: { data: TatDistribution | null }) 
         <span className={styles.cardNote}>{total.toLocaleString("en-IN")} submitted {total === 1 ? "case" : "cases"} · TAT = days from submission to decision</span>
       </header>
       <TatBarChart buckets={buckets} total={total} />
-      <div className={styles.scroller} role="region" aria-label="Turnaround time distribution" tabIndex={0}>
-        <table className={styles.table}>
-          <caption className="visually-hidden">Cases by turnaround time</caption>
-          <thead>
-            <tr>
-              <th scope="col">TAT bucket</th>
-              <th scope="col" className={styles.right}>Cases</th>
-              <th scope="col" className={styles.right}>Billed</th>
-              <th scope="col" className={styles.right}>Approved</th>
-              <th scope="col" className={styles.right}>Received</th>
-              <th scope="col" className={styles.center}><span title={NOT_RECORDED}>Avg risk</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {buckets.map((b, i) => {
-              const color = TAT_COLORS[i]!;
-              return (
-                <tr key={b.key} className={styles.bucketRow} style={{ "--c": color } as React.CSSProperties}>
-                  <th scope="row">
-                    <span className={styles.bucket}>
-                      <span className={styles.dot} aria-hidden="true" />
-                      {b.label}
-                    </span>
-                  </th>
-                  <td className={`${styles.right} ${styles.strong}`}>{b.cases.toLocaleString("en-IN")}</td>
-                  <td className={styles.right}>{formatINR(b.billed)}</td>
-                  <td className={`${styles.right} ${styles.good}`}>{formatINR(b.approved)}</td>
-                  <td className={`${styles.right} ${styles.good}`}>{formatINR(b.received)}</td>
-                  <td className={styles.center}><span className={styles.neutralPill} title={NOT_RECORDED}>—</span></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
       {total === 0 && <p className={styles.footNote}>No submitted cases yet — the buckets fill in as claims are submitted and decided.</p>}
       {data && data.notSubmitted > 0 && (
         <p className={styles.footNote}>{data.notSubmitted.toLocaleString("en-IN")} draft {data.notSubmitted === 1 ? "claim is" : "claims are"} not yet submitted, so {data.notSubmitted === 1 ? "it has" : "they have"} no TAT and {data.notSubmitted === 1 ? "is" : "are"} not included.</p>

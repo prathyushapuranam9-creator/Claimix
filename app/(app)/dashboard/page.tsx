@@ -9,7 +9,8 @@ import { CLAIM_STATUS_LABEL, CLAIM_STATUS_TONE, type ClaimStatus } from "@/modul
 import { DashboardService, type DashboardData } from "@/modules/dashboard/dashboard.service";
 import { STATUS_LABEL, STATUS_TONE, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
 import { formatHours } from "@/modules/reports/format";
-import { CardGrid, KpiCard, ListCard, ListPair, PipelinePill, SectionHeader, WorkflowCard, type CaseRowData } from "@/components/dashboard/DashboardCards";
+import { CardGrid, ListCard, ListPair, PipelinePill, SectionHeader, WorkflowCard, type CaseRowData } from "@/components/dashboard/DashboardCards";
+import { PerformanceGraphs } from "@/components/reports/PerformanceCharts";
 import r from "@/components/reports/Reports.module.css";
 import { ActionLink, BarMetric, Card as GlassCard, Col, Donut, HospitalPage, Icons, KV, Layout, Metric, Panel, Perf, Queues, RingMetric, Rings, TrendChart, WelcomeCard } from "@/components/dashboard/HospitalDashboard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
@@ -211,13 +212,10 @@ export default async function DashboardPage() {
           </CardGrid>
 
           <SectionHeader id="performance" title="Performance & financial metrics" chip="All time" chipTone="success" dot="success" caption="INR cumulative" />
-          <CardGrid columns={5} labelledBy="performance">
-            <KpiCard label="Pre-auth turnaround" value={formatHours(d.preauthTat?.medianHours ?? null)} caption="Median" />
-            <KpiCard label="Claim turnaround" value={formatHours(d.claimTat?.medianHours ?? null)} caption="Median" />
-            <KpiCard label="Claimed" value={formatINR(money.claimed)} caption="Submitted claims" />
-            <KpiCard label="Approved" value={formatINR(money.approved)} caption="By payer decision" />
-            <KpiCard label="Settled (paid)" value={formatINR(money.settled)} caption="Completed transfers" />
-          </CardGrid>
+          {/* Turnaround (Days) and money (₹) as two bar graphs, from the same dashboard data. */}
+          <section aria-labelledby="performance">
+            <PerformanceGraphs data={d} />
+          </section>
 
           <ListPair>
             <ListCard

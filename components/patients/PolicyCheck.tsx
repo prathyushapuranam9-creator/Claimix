@@ -15,6 +15,8 @@ import { Badge, EmptyState } from "@/components/ui/Surface";
 import styles from "./PolicyCheck.module.css";
 
 interface PatientInfo {
+  /** The selected patient's unique ID: every record below was loaded for this ID only. */
+  id: string;
   fullName: string;
   patientNo: string;
   dob: string;
@@ -77,7 +79,7 @@ export function PolicyCheck({ patient, coverage, data, today }: { patient: Patie
       </Section>
       <Section title="Insurance & policy">
         {coverage.length === 0 ? (
-          <EmptyState title="No coverage recorded" />
+          <EmptyState title="No information available for this patient." />
         ) : (
           <div className={styles.cards}>
             {coverage.map((c) => (
@@ -108,7 +110,7 @@ export function PolicyCheck({ patient, coverage, data, today }: { patient: Patie
     <div className={styles.stack}>
       <Section title="Cover available">
         {coverage.length === 0 ? (
-          <EmptyState title="No coverage recorded" />
+          <EmptyState title="No information available for this patient." />
         ) : (
           <div className={styles.cards}>
             {coverage.map((c) => (
@@ -120,48 +122,66 @@ export function PolicyCheck({ patient, coverage, data, today }: { patient: Patie
           </div>
         )}
       </Section>
-      <Section title="Pre-authorizations">
-        {data.preauths === null ? (
-          <NoAccess what="pre-authorizations" />
-        ) : (
-          <DataTable
-            caption="Pre-authorizations for this patient"
-            rows={data.preauths}
-            rowKey={(r) => r.id}
-            empty={<EmptyState title="No pre-authorizations yet" />}
-            columns={[
-              { key: "ref", header: "Reference", cell: (r) => <CellText sub={<Badge tone={STATUS_TONE[r.status as PreauthStatus]}>{STATUS_LABEL[r.status as PreauthStatus]}</Badge>}><Link href={`/pre-authorizations/${r.id}`} className="mono">{r.reference}</Link></CellText> },
-              { key: "dx", header: "Diagnosis / treatment", cell: (r) => <CellText sub={r.procedureName ?? undefined}>{r.diagnosisCode ? `${r.diagnosisCode} · ${r.diagnosisName ?? ""}` : "—"}</CellText> },
-              { key: "adm", header: "Admission", nowrap: true, cell: (r) => <CellText sub={r.expectedStayDays ? `${r.expectedStayDays} day stay` : undefined}>{formatDate(r.expectedAdmission)}</CellText> },
-              { key: "ped", header: "PED / accident", cell: (r) => <CellText sub={`Accident: ${tri(r.isAccident)}`}>{`PED declared: ${tri(r.pedDeclared)}${r.pedRelated === "yes" ? " (related)" : ""}`}</CellText> },
-              { key: "room", header: "Room", cell: (r) => <CellText sub={r.roomRentPerDay ? `${formatINR(r.roomRentPerDay)}/day` : undefined}>{r.roomCategory ?? "—"}</CellText> },
-              { key: "est", header: "Estimate", align: "right", cell: (r) => <CellText sub={r.expectedInsuranceAmount ? `Insurance ${formatINR(r.expectedInsuranceAmount)}` : undefined}>{formatINR(r.estimatedCost)}</CellText> },
-              { key: "appr", header: "Approved", align: "right", cell: (r) => <CellText sub={r.patientContribution ? `Patient ${formatINR(r.patientContribution)}` : undefined}>{formatINR(r.approvedAmount)}</CellText> },
-            ]}
-          />
-        )}
-      </Section>
-      <Section title="Claims">
-        {data.claims === null ? (
-          <NoAccess what="claims" />
-        ) : (
-          <DataTable
-            caption="Claims for this patient"
-            rows={data.claims}
-            rowKey={(r) => r.id}
-            empty={<EmptyState title="No claims yet" />}
-            columns={[
-              { key: "ref", header: "Claim", cell: (r) => <CellText sub={<Badge tone={CLAIM_STATUS_TONE[r.status as ClaimStatus]}>{CLAIM_STATUS_LABEL[r.status as ClaimStatus]}</Badge>}><Link href={`/claims/${r.id}`} className="mono">{r.reference}</Link></CellText> },
-              { key: "dx", header: "Diagnosis / treatment", cell: (r) => <CellText sub={r.procedureName ?? undefined}>{r.diagnosisCode ? `${r.diagnosisCode} · ${r.diagnosisName ?? ""}` : "—"}</CellText> },
-              { key: "stay", header: "Admission – discharge", nowrap: true, cell: (r) => <CellText sub={r.payerName ?? undefined}>{`${formatDate(r.admissionDate)} – ${formatDate(r.dischargeDate)}`}</CellText> },
-              { key: "c", header: "Claimed", align: "right", cell: (r) => formatINR(r.claimedAmount) },
-              { key: "a", header: "Approved", align: "right", cell: (r) => formatINR(r.approvedAmount) },
-              { key: "p", header: "Patient pays", align: "right", cell: (r) => formatINR(r.patientAmount) },
-              { key: "rcv", header: "Received", align: "right", cell: (r) => formatINR(r.received ?? 0) },
-            ]}
-          />
-        )}
-      </Section>
+      {/* Pre-authorizations and claims switch in place, inside this block. */}
+      <ButtonTabs
+        label="Medical & financial records"
+        tabs={[
+          {
+            key: "preauths",
+            label: "Pre-authorizations",
+            panel: (
+              <Section title="Pre-authorization checks">
+                      {data.preauths === null ? (
+                        <NoAccess what="pre-authorizations" />
+                      ) : (
+                        <DataTable
+                          caption="Pre-authorizations for this patient"
+                          rows={data.preauths}
+                          rowKey={(r) => r.id}
+                          empty={<EmptyState title="No pre-authorizations available for this patient" />}
+                          columns={[
+                            { key: "ref", header: "Reference", cell: (r) => <CellText sub={<Badge tone={STATUS_TONE[r.status as PreauthStatus]}>{STATUS_LABEL[r.status as PreauthStatus]}</Badge>}><Link href={`/pre-authorizations/${r.id}`} className="mono">{r.reference}</Link></CellText> },
+                            { key: "dx", header: "Diagnosis / treatment", cell: (r) => <CellText sub={r.procedureName ?? undefined}>{r.diagnosisCode ? `${r.diagnosisCode} · ${r.diagnosisName ?? ""}` : "—"}</CellText> },
+                            { key: "adm", header: "Admission", nowrap: true, cell: (r) => <CellText sub={r.expectedStayDays ? `${r.expectedStayDays} day stay` : undefined}>{formatDate(r.expectedAdmission)}</CellText> },
+                            { key: "ped", header: "PED / accident", cell: (r) => <CellText sub={`Accident: ${tri(r.isAccident)}`}>{`PED declared: ${tri(r.pedDeclared)}${r.pedRelated === "yes" ? " (related)" : ""}`}</CellText> },
+                            { key: "room", header: "Room", cell: (r) => <CellText sub={r.roomRentPerDay ? `${formatINR(r.roomRentPerDay)}/day` : undefined}>{r.roomCategory ?? "—"}</CellText> },
+                            { key: "est", header: "Estimate", align: "right", cell: (r) => <CellText sub={r.expectedInsuranceAmount ? `Insurance ${formatINR(r.expectedInsuranceAmount)}` : undefined}>{formatINR(r.estimatedCost)}</CellText> },
+                            { key: "appr", header: "Approved", align: "right", cell: (r) => <CellText sub={r.patientContribution ? `Patient ${formatINR(r.patientContribution)}` : undefined}>{formatINR(r.approvedAmount)}</CellText> },
+                          ]}
+                        />
+                      )}
+                    </Section>
+            ),
+          },
+          {
+            key: "claims",
+            label: "Claims",
+            panel: (
+              <Section title="Claims">
+                      {data.claims === null ? (
+                        <NoAccess what="claims" />
+                      ) : (
+                        <DataTable
+                          caption="Claims for this patient"
+                          rows={data.claims}
+                          rowKey={(r) => r.id}
+                          empty={<EmptyState title="No claims available for this patient" />}
+                          columns={[
+                            { key: "ref", header: "Claim", cell: (r) => <CellText sub={<Badge tone={CLAIM_STATUS_TONE[r.status as ClaimStatus]}>{CLAIM_STATUS_LABEL[r.status as ClaimStatus]}</Badge>}><Link href={`/claims/${r.id}`} className="mono">{r.reference}</Link></CellText> },
+                            { key: "dx", header: "Diagnosis / treatment", cell: (r) => <CellText sub={r.procedureName ?? undefined}>{r.diagnosisCode ? `${r.diagnosisCode} · ${r.diagnosisName ?? ""}` : "—"}</CellText> },
+                            { key: "stay", header: "Admission – discharge", nowrap: true, cell: (r) => <CellText sub={r.payerName ?? undefined}>{`${formatDate(r.admissionDate)} – ${formatDate(r.dischargeDate)}`}</CellText> },
+                            { key: "c", header: "Claimed", align: "right", cell: (r) => formatINR(r.claimedAmount) },
+                            { key: "a", header: "Approved", align: "right", cell: (r) => formatINR(r.approvedAmount) },
+                            { key: "p", header: "Patient pays", align: "right", cell: (r) => formatINR(r.patientAmount) },
+                            { key: "rcv", header: "Received", align: "right", cell: (r) => formatINR(r.received ?? 0) },
+                          ]}
+                        />
+                      )}
+                    </Section>
+            ),
+          },
+        ]}
+      />
     </div>
   );
 
@@ -174,7 +194,7 @@ export function PolicyCheck({ patient, coverage, data, today }: { patient: Patie
           caption="Documents for this patient"
           rows={data.documents}
           rowKey={(d) => d.id}
-          empty={<EmptyState title="No documents uploaded yet" />}
+          empty={<EmptyState title="No documents available for this patient" />}
           columns={[
             { key: "t", header: "Document", cell: (d) => <CellText sub={d.originalName}>{documentLabel(d.docType)}</CellText> },
             { key: "c", header: "Category", cell: (d) => d.category.replace("_", " ").replace(/^./, (s) => s.toUpperCase()) },
@@ -189,7 +209,7 @@ export function PolicyCheck({ patient, coverage, data, today }: { patient: Patie
   );
 
   return (
-    <details className={styles.block} open>
+    <details className={styles.block} open data-patient-id={patient.id}>
       <summary className={styles.summary}>
         <span>Policy Check</span>
         <svg className={styles.chev} width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -197,6 +217,9 @@ export function PolicyCheck({ patient, coverage, data, today }: { patient: Patie
         </svg>
       </summary>
       <div className={styles.body}>
+        <p className={styles.scope}>
+          Showing records for <strong>{patient.fullName}</strong> (<span className="mono">{patient.patientNo}</span>) only.
+        </p>
         <ButtonTabs
           label="Policy check"
           tabs={[

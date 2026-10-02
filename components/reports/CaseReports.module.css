@@ -104,7 +104,6 @@
 .muted { color: var(--c-text-subtle); }
 .good { color: var(--c-success); font-weight: 600; }
 .bad { color: var(--c-danger); font-weight: 600; }
-.strong { font-weight: 700; }
 
 /* TAT pill and bucket colours come from --c (set inline). */
 .pill {
@@ -125,26 +124,6 @@
   font-weight: 500;
 }
 
-.neutralPill {
-  display: inline-block;
-  min-width: 2.25rem;
-  padding: 1px var(--sp-2);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-pill);
-  color: var(--c-text-subtle);
-}
-
-.bucketRow > * { background: color-mix(in srgb, var(--c) 7%, transparent); }
-
-.bucket {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  color: var(--c-text);
-  font-weight: 600;
-  text-align: left;
-}
-
 .dot {
   flex: none;
   width: 10px;
@@ -154,10 +133,50 @@
 }
 
 /* ---- TAT bar chart: vertical bars with a subtle isometric top and side ---- */
+/* On narrow screens the graph scrolls sideways inside the card instead of squeezing labels. */
+.chartScroll {
+  /* position: relative keeps the screen-reader-only labels (absolutely positioned) inside the scroll box. */
+  position: relative;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chartScroll:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; }
+
 .chart {
+  min-width: 660px;
   margin: 0;
   padding: var(--sp-5) var(--sp-5) var(--sp-4);
-  border-bottom: 1px solid color-mix(in srgb, var(--c-border) 65%, transparent);
+}
+
+/* Each bucket's figures (formerly the table), under its label. */
+.figures {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  margin: var(--sp-3) 0 0;
+  padding-top: var(--sp-2);
+  border-top: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+  font-size: var(--fs-xs);
+}
+
+/* Label and amount share a line when there is room; otherwise the amount wraps below. */
+.figures > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  column-gap: var(--sp-2);
+  min-width: 0;
+}
+
+.figures dt { color: var(--c-text-muted); }
+
+.figures dd {
+  margin: 0 0 0 auto;
+  color: var(--c-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .bars {
@@ -173,7 +192,11 @@
 
 .barCol {
   display: grid;
-  grid-template-rows: var(--plot) auto;
+  grid-template-rows: var(--plot) auto auto;
+  align-content: start;
+  padding: 0 var(--sp-1);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(to bottom, transparent 55%, color-mix(in srgb, var(--c) 7%, transparent));
   justify-items: center;
   min-width: 0;
 }
@@ -262,7 +285,8 @@
 }
 
 @media (max-width: 640px) {
-  .bars { --plot: 170px; --depth: 7px; gap: var(--sp-2); }
+  .chart { min-width: 760px; }
+  .bars { --plot: 180px; --depth: 8px; gap: var(--sp-2); }
   .barValue { font-size: var(--fs-sm); }
   .barLabel { font-size: var(--fs-xs); }
 }
@@ -277,3 +301,7 @@
   color: var(--c-text-muted);
   font-size: var(--fs-sm);
 }
+
+/* Keep the amount colours (green for approved/received, muted for "not recorded") inside the graph's figures. */
+.figures dd.good { color: var(--c-success); }
+.figures dd.muted { color: var(--c-text-subtle); font-weight: 400; }

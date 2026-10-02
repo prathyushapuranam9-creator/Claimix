@@ -127,3 +127,17 @@ describe("production configuration guard", () => {
     expect(parseEnv({ ...base, NODE_ENV: "development", STORAGE_DRIVER: "s3", APP_URL: "http://x.test" }).success).toBe(true);
   });
 });
+
+describe("performance chart helpers", () => {
+  it("formats compact rupee ticks and converts hours to days", async () => {
+    const { compactINR, hoursToDays } = await import("@/modules/reports/format");
+    expect(compactINR(0)).toBe("₹0");
+    expect(compactINR(950)).toBe("₹950");
+    expect(compactINR(12_000)).toBe("₹12K");
+    expect(compactINR(1_250_000)).toBe("₹12.5L");
+    expect(compactINR(37_500_000)).toBe("₹3.8Cr");
+    expect(hoursToDays(null)).toBeNull();
+    expect(hoursToDays(57.6)).toBe(2.4);
+    expect(hoursToDays(0.01)).toBe(0);
+  });
+});

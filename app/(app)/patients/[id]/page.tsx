@@ -83,7 +83,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           />
         </Card>
         <PolicyCheck
-          patient={{ fullName: p.fullName, patientNo: p.patientNo, dob: p.dob, gender: p.gender, hospitalName }}
+          key={p.id}
+          patient={{ id: p.id, fullName: p.fullName, patientNo: p.patientNo, dob: p.dob, gender: p.gender, hospitalName }}
           coverage={coverage}
           data={policyCheck}
           today={today}

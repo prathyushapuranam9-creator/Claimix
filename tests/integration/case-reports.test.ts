@@ -89,3 +89,22 @@ describe("policy check", () => {
     await expect(PolicyCheckService.forPatient(as("patientA1"), DEMO.patient.a2)).rejects.toBeInstanceOf(NotFoundError);
   });
 });
+
+describe("policy check data isolation", () => {
+  it("every record shown belongs to the selected patient; two patients' data never mix", async () => {
+    const owner = async (table: "pre_authorizations" | "claims" | "documents", ids: string[]) =>
+      ids.length ? (await ctx.db.execute<{ patient_id: string }>(sql`select distinct patient_id::text from ${sql.raw(table)} where id in ${ids}`)).map((r) => r.patient_id) : [];
+    const seen = new Map<string, Set<string>>();
+    for (const patientId of [DEMO.patient.a1, DEMO.patient.a2]) {
+      const d = await PolicyCheckService.forPatient(as("staffA"), patientId);
+      const ids = [...d.preauths!.map((r) => r.id), ...d.claims!.map((r) => r.id), ...d.documents!.map((r) => r.id)];
+      for (const [table, rows] of [["pre_authorizations", d.preauths!], ["claims", d.claims!], ["documents", d.documents!]] as const) {
+        const owners = await owner(table, rows.map((r) => r.id));
+        expect(owners.every((o) => o === patientId)).toBe(true);
+      }
+      seen.set(patientId, new Set(ids));
+    }
+    const a1 = seen.get(DEMO.patient.a1)!;
+    expect([...seen.get(DEMO.patient.a2)!].some((id) => a1.has(id))).toBe(false);
+  });
+});

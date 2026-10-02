@@ -1,5 +1,7 @@
 .wrap {
   display: grid;
+  /* minmax(0, 1fr): wide content (tables, graphs) scrolls inside its card instead of widening the page. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-4);
   min-width: 0;
 }

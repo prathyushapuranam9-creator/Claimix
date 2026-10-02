@@ -45,3 +45,18 @@ export function presetRange(p: RangePreset, today = new Date()): { from?: string
   else d.setUTCDate(d.getUTCDate() - (p === "30d" ? 29 : 89));
   return { from: d.toISOString().slice(0, 10), to };
 }
+
+/** Compact Indian-rupee axis labels: ₹950, ₹12K, ₹3.5L, ₹1.2Cr (full amounts go in labels/tooltips). */
+export function compactINR(n: number): string {
+  const abs = Math.abs(n);
+  const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1).replace(/\.0$/, ""));
+  if (abs >= 1e7) return `₹${fmt(n / 1e7)}Cr`;
+  if (abs >= 1e5) return `₹${fmt(n / 1e5)}L`;
+  if (abs >= 1e3) return `₹${fmt(n / 1e3)}K`;
+  return `₹${fmt(n)}`;
+}
+
+/** Hours → days with one decimal ("2.4"); null stays null. */
+export function hoursToDays(h: number | null): number | null {
+  return h === null || !Number.isFinite(h) ? null : Math.round((h / 24) * 10) / 10;
+}
