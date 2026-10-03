@@ -11,7 +11,7 @@ import { AuthRepository } from "@/modules/auth/auth.repository";
 import { issuePasswordSetup } from "@/modules/auth/password-setup";
 import { OrganizationRepository } from "@/modules/organizations/organizations.repository";
 import { UserRepository } from "./users.repository";
-import { userCreateSchema, userUpdateSchema } from "./users.validation";
+import { profileUpdateSchema, userCreateSchema, userUpdateSchema } from "./users.validation";
 
 /** Patient portal accounts are created from a patient record, never from generic user admin. */
 const NON_ASSIGNABLE_ROLES = new Set(["patient"]);
@@ -63,6 +63,44 @@ export const UserService = {
         newState: { email: d.email, fullName: d.fullName, role: role.key, organizationId: org.id },
       });
       return { id };
+    });
+  },
+
+  /**
+   * Profile Settings: the signed-in user edits their own name and sign-in email. The user is
+   * always the session's user — no ID is accepted from the client. Changing the email needs
+   * the current password (checked by `confirmPassword`, which applies the sign-in lockout);
+   * other sessions are then signed out. Role, organization and status are admin-controlled
+   * and can't be changed here.
+   */
+  async updateOwnProfile(ctx: ServiceContext, input: unknown, confirmPassword?: (password: string) => Promise<void>) {
+    const d = parseOrThrow(profileUpdateSchema, input);
+    const id = ctx.principal.userId;
+    const before = await UserRepository.get(ctx.db, id);
+    if (!before) throw new NotFoundError("User not found.");
+    const emailChanged = d.email !== before.email;
+    if (emailChanged) {
+      if (!d.currentPassword) throw new ValidationError("Enter your current password to change your email.", { currentPassword: ["Enter your current password to change your email."] });
+      if (!confirmPassword) throw new ValidationError("Your email can't be changed here.");
+      await confirmPassword(d.currentPassword);
+    }
+    if (!emailChanged && before.fullName === d.fullName) return { fullName: before.fullName, email: before.email };
+
+    return ctx.db.transaction(async (tx) => {
+      if (emailChanged && (await UserRepository.emailTaken(tx, d.email))) {
+        throw new ValidationError("This email is already used by another account.", { email: ["This email is already used by another account."] });
+      }
+      await UserRepository.update(tx, id, { fullName: d.fullName, email: d.email });
+      if (emailChanged) await AuthRepository.revokeOthersForUser(tx, id, ctx.principal.sessionId);
+      await AuditService.record(tx, {
+        ...actorOf(ctx),
+        action: emailChanged ? "user.email_changed" : "user.profile_updated",
+        resourceType: "user",
+        resourceId: id,
+        previousState: { fullName: before.fullName, email: before.email },
+        newState: { fullName: d.fullName, email: d.email },
+      });
+      return { fullName: d.fullName, email: d.email };
     });
   },
 

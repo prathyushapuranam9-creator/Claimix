@@ -91,6 +91,10 @@ test.describe("Patient profile: Policy Check", () => {
   test("three buttons show this patient's information inside the block without navigating", async ({ page }) => {
     await signIn(page, "staff.a@demo.claimix.invalid");
     await page.goto(`/patients/${IDS.patientA1}`);
+    // Collapsed by default: the data stays hidden until the summary is clicked.
+    await expect(block(page)).not.toHaveAttribute("open", "");
+    await expect(block(page).getByRole("tablist", { name: "Policy check" })).toBeHidden();
+    await block(page).locator("summary").click();
     await expect(block(page)).toHaveAttribute("open", "");
     await expect(block(page)).toHaveAttribute("data-patient-id", IDS.patientA1);
     await expect(block(page)).toContainText("Showing records for Demo Patient Anil");
@@ -116,11 +120,18 @@ test.describe("Patient profile: Policy Check", () => {
     await expect(page.getByText("Insurance & scheme coverage")).toBeVisible();
     await block(page).locator("summary").click();
     await expect(block(page)).not.toHaveAttribute("open", "");
+
+    // Opened again, then refreshed: closed again.
+    await block(page).locator("summary").click();
+    await expect(block(page)).toHaveAttribute("open", "");
+    await page.reload();
+    await expect(block(page)).not.toHaveAttribute("open", "");
   });
 
   test("a patient with no records gets per-patient empty messages; moving to another patient rebuilds the block", async ({ page }) => {
     await signIn(page, "staff.a@demo.claimix.invalid");
     await page.goto(`/patients/${IDS.patientA1}`);
+    await block(page).locator("summary").click();
     await block(page).getByRole("tab", { name: "Medical & Financial" }).click();
 
     // Register a brand-new patient (no pre-auths, claims or documents) and open their profile.
@@ -133,6 +144,9 @@ test.describe("Patient profile: Policy Check", () => {
     const newId = page.url().split("/").pop()!;
 
     await expect(block(page)).toHaveAttribute("data-patient-id", newId);
+    // Another patient opens collapsed too.
+    await expect(block(page)).not.toHaveAttribute("open", "");
+    await block(page).locator("summary").click();
     await expect(block(page)).toContainText(`Showing records for ${name}`);
     await expect(block(page)).not.toContainText("Demo Patient Anil");
     // Fresh per patient: back on the first tab.

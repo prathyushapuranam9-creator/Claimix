@@ -6,10 +6,12 @@ import { todayIso } from "@/lib/validation";
 import { CoverageService } from "@/modules/patients/coverage.service";
 import { RELATIONSHIP_LABEL } from "@/modules/patients/coverage.validation";
 import { PatientService } from "@/modules/patients/patients.service";
+import { PatientEligibilityService } from "@/modules/eligibility/patient-eligibility.service";
 import { PolicyCheckService } from "@/modules/patients/policy-check.service";
 import { GENDER_LABEL } from "@/modules/patients/patients.validation";
 import { PolicyService } from "@/modules/policies/policies.service";
 import { CoverageForm } from "@/components/patients/CoverageForm";
+import { EligibilityCheckButton, EligibilityCheckProvider, EligibilityResultCard } from "@/components/patients/PatientEligibility";
 import { PolicyCheck } from "@/components/patients/PolicyCheck";
 import { ButtonLink } from "@/components/ui/Button";
 import { CellText, DataTable } from "@/components/ui/DataTable";
@@ -25,6 +27,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const { patient: p, hospitalName } = await orNotFound(PatientService.get(ctx, id));
   const canWrite = can(ctx.principal, "patient:write");
   const canCheck = can(ctx.principal, "eligibility:check");
+  // The profile check is also offered to payer reviewers, for their own policies only (enforced server-side).
+  const canProfileCheck = PatientEligibilityService.canCheck(ctx.principal);
   const [coverage, policyOptions, policyCheck] = await Promise.all([
     CoverageService.forPatient(ctx, p.id),
     canWrite ? PolicyService.options(ctx) : Promise.resolve([]),
@@ -34,12 +38,19 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const showContact = ctx.principal.orgType === "hospital" || ctx.principal.orgType === "platform";
   const today = todayIso();
 
-  return (
+  const content = (
     <>
       <PageHeader
         title={p.fullName}
         description={<>Patient <span className="mono">{p.patientNo}</span> · {hospitalName}</>}
-        actions={canWrite && <ButtonLink href={`/patients/${p.id}/edit`} variant="secondary">Edit details</ButtonLink>}
+        actions={
+          (canWrite || canProfileCheck) && (
+            <>
+              {canWrite && <ButtonLink href={`/patients/${p.id}/edit`} variant="secondary">Edit details</ButtonLink>}
+              {canProfileCheck && <EligibilityCheckButton />}
+            </>
+          )
+        }
       />
       <Stack>
         <Card title="Details">
@@ -58,6 +69,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             ]}
           />
         </Card>
+        {canProfileCheck && <EligibilityResultCard />}
         <Card title="Insurance & scheme coverage" padded={false}>
           <DataTable
             caption="Coverage"
@@ -90,11 +102,25 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           today={today}
         />
         {canWrite && (
-          <Card title="Add coverage">
-            <CoverageForm action={addCoverageAction.bind(null, p.id)} policies={policyOptions} />
-          </Card>
+          <div id="add-coverage">
+            <Card title="Add coverage">
+              <CoverageForm action={addCoverageAction.bind(null, p.id)} policies={policyOptions} />
+            </Card>
+          </div>
         )}
       </Stack>
     </>
+  );
+
+  if (!canProfileCheck) return content;
+  return (
+    <EligibilityCheckProvider
+      key={p.id}
+      patientId={p.id}
+      coverage={PatientEligibilityService.checkable(ctx.principal, coverage).map((c) => ({ id: c.id, policyName: c.policyName, memberId: c.memberId }))}
+      addCoverageHref={canWrite ? "#add-coverage" : null}
+    >
+      {content}
+    </EligibilityCheckProvider>
   );
 }

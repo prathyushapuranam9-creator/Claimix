@@ -60,7 +60,7 @@ export const UserRepository = {
     return row!;
   },
 
-  async update(db: DbOrTx, id: string, values: Partial<Pick<typeof users.$inferInsert, "fullName" | "roleId" | "isActive">>) {
+  async update(db: DbOrTx, id: string, values: Partial<Pick<typeof users.$inferInsert, "fullName" | "email" | "roleId" | "isActive">>) {
     await db.update(users).set(values).where(eq(users.id, id));
   },
 

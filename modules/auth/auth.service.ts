@@ -7,7 +7,7 @@ import { AuditService, type RequestMeta } from "@/modules/audit/audit.service";
 import { issuePasswordSetup } from "./password-setup";
 import { AuthRepository } from "./auth.repository";
 import { isPortal, PORTALS, portalFor } from "@/lib/portals";
-import { forgotPasswordSchema, loginSchema, resetPasswordSchema } from "./auth.validation";
+import { changePasswordSchema, forgotPasswordSchema, loginSchema, resetPasswordSchema } from "./auth.validation";
 
 export const SESSION_POLICY = {
   absoluteMs: 12 * 60 * 60 * 1000, // 12h hard limit
@@ -45,6 +45,31 @@ let dummyHash: Promise<string> | undefined;
  */
 export function createAuthService(db: Db, cfg: AuthConfig) {
   const keyed = (v: string) => hmacHex(v, cfg.secret);
+
+  /**
+   * Re-checks the signed-in user's current password before a sensitive self-service change.
+   * Wrong guesses count toward the same lockout as sign-in, so this can't be used to brute-force.
+   */
+  async function confirmCurrentPassword(actor: Principal, password: string, meta: RequestMeta): Promise<void> {
+    const creds = await AuthRepository.credentialsFor(db, actor.userId);
+    if (!creds) throw new UnauthorizedError("Your session has ended. Please sign in again.");
+    const emailHash = keyed(creds.email);
+    const ipHash = keyed(meta.ipAddress ?? "unknown");
+    const since = new Date(Date.now() - SESSION_POLICY.lockout.windowMs);
+    const [byEmail, byIp] = await Promise.all([
+      AuthRepository.countRecentFailures(db, "email", emailHash, since),
+      AuthRepository.countRecentFailures(db, "ip", ipHash, since),
+    ]);
+    if (byEmail >= SESSION_POLICY.lockout.maxPerEmail || byIp >= SESSION_POLICY.lockout.maxPerIp) {
+      throw new RateLimitedError("Too many incorrect password attempts. Please wait 15 minutes and try again.");
+    }
+    const ok = password.length > 0 && password.length <= 200 && (await verifyPassword(password, creds.passwordHash));
+    await AuthRepository.recordAttempt(db, emailHash, ipHash, ok);
+    if (!ok) {
+      await AuditService.record(db, { action: "auth.password_confirm_failed", actorUserId: actor.userId, organizationId: actor.organizationId, sessionId: actor.sessionId, meta });
+      throw new ValidationError("Your current password is incorrect.", { currentPassword: ["Your current password is incorrect."] });
+    }
+  }
 
   return {
     async login(input: unknown, meta: RequestMeta): Promise<{ token: string; expiresAt: Date }> {
@@ -177,6 +202,26 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
           resourceId: userId,
           meta,
         });
+      });
+    },
+
+    confirmCurrentPassword,
+
+    /**
+     * Profile Settings → Change Password, for the signed-in user only. The current password is
+     * re-checked; other sessions are signed out, the current one stays signed in.
+     */
+    async changePassword(actor: Principal, input: unknown, meta: RequestMeta): Promise<void> {
+      const parsed = changePasswordSchema.safeParse(input);
+      if (!parsed.success) {
+        throw new ValidationError("Please fix the highlighted fields.", parsed.error.flatten().fieldErrors as Record<string, string[]>);
+      }
+      await confirmCurrentPassword(actor, parsed.data.currentPassword, meta);
+      const newHash = await hashPassword(parsed.data.newPassword);
+      await db.transaction(async (tx) => {
+        await AuthRepository.setPassword(tx, actor.userId, newHash);
+        await AuthRepository.revokeOthersForUser(tx, actor.userId, actor.sessionId);
+        await AuditService.record(tx, { action: "auth.password_changed", actorUserId: actor.userId, organizationId: actor.organizationId, sessionId: actor.sessionId, meta });
       });
     },
 

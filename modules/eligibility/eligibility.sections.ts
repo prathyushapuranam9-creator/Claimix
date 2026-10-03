@@ -45,3 +45,12 @@ export const OVERALL_LABEL: Record<Outcome, { title: string; detail: string }> =
   FAIL: { title: "Not eligible", detail: "One or more checks failed under this policy's rules. See the reasons below." },
   NEEDS_VERIFICATION: { title: "Needs verification", detail: "Additional verification required. Some information is missing or needs confirmation with the payer." },
 };
+
+/**
+ * Plain-language reasons from failed / unverified rules, for a short "Why" list.
+ * Several rules can share a generic message, so each reason names its rule and exact
+ * repeats are dropped — every line is unique.
+ */
+export function failureReasons(results: RuleResult[]): string[] {
+  return [...new Set(results.filter((r) => r.applicable && r.outcome !== "PASS").map((r) => `${r.title}: ${r.message}`))];
+}

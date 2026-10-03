@@ -1,0 +1,67 @@
+/* Patient Profile eligibility check: header toggle + collapsible result card, on the existing card style. */
+.caret {
+  margin-left: var(--sp-1);
+  font-size: 0.8em;
+}
+
+.anchor { scroll-margin-top: var(--sp-6); min-width: 0; }
+
+.body {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.picker { max-width: 28rem; }
+
+.checking {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.stale { opacity: 0.55; }
+
+.notes {
+  display: grid;
+  gap: var(--sp-1);
+  margin-top: var(--sp-3);
+  font-size: var(--fs-sm);
+}
+
+.notes ul { margin: 0 0 var(--sp-2); padding-left: 1.25rem; }
+
+.notesTitle {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.basis {
+  margin-top: var(--sp-3);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* Same spinner as the existing loading buttons. */
+.spinner {
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation-duration: 2s; }
+}

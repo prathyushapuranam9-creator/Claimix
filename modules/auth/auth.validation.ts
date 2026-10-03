@@ -32,5 +32,16 @@ export const resetPasswordSchema = z
     message: "Passwords do not match.",
   });
 
+/** Profile Settings → Change Password. The new password follows the same rules as a reset. */
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Enter your current password.").max(200),
+    newPassword: newPasswordSchema,
+    confirmPassword: z.string().min(1, "Confirm your new password."),
+  })
+  .refine((v) => v.newPassword === v.confirmPassword, { path: ["confirmPassword"], message: "Passwords do not match." })
+  .refine((v) => v.newPassword !== v.currentPassword, { path: ["newPassword"], message: "Choose a password different from your current one." });
+
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

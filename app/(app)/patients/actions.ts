@@ -8,6 +8,12 @@ import { PatientService } from "@/modules/patients/patients.service";
 import type { PatientInput } from "@/modules/patients/patients.validation";
 import { CoverageService } from "@/modules/patients/coverage.service";
 import type { CoverageInput } from "@/modules/patients/coverage.validation";
+import { PatientEligibilityService, type PatientEligibilityResult } from "@/modules/eligibility/patient-eligibility.service";
+
+/** Patient Profile "Eligibility Check": the server re-validates the patient and that the coverage is theirs. */
+export async function checkPatientEligibilityAction(patientId: string, beneficiaryId: string): Promise<ActionResult<PatientEligibilityResult>> {
+  return runAction("patient.eligibility_check", async () => PatientEligibilityService.check(await actionContext(), patientId, beneficiaryId));
+}
 
 export async function createPatientAction(input: PatientInput): Promise<ActionResult> {
   const r = await runAction("patient.create", async () => (await PatientService.create(await actionContext(), input)).id);

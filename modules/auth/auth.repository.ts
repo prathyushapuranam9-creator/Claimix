@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, count, eq, gt, isNull, ne, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
 import {
   loginAttempts, organizations, passwordResetTokens, patients, permissions, rolePermissions, roles, sessions, users,
@@ -102,6 +102,24 @@ export const AuthRepository = {
   async revokeAllForUser(db: DbOrTx, userId: string) {
     await db.update(sessions).set({ revokedAt: new Date() }).where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
     await db.update(users).set({ sessionVersion: sql`${users.sessionVersion} + 1` }).where(eq(users.id, userId));
+  },
+
+  /** Ends every other session of the user, keeping the one making the change signed in. */
+  async revokeOthersForUser(db: DbOrTx, userId: string, keepSessionId: string) {
+    await db
+      .update(sessions)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt), ne(sessions.id, keepSessionId)));
+  },
+
+  /** Sign-in email and password hash of one user, for confirming their current password. */
+  async credentialsFor(db: DbOrTx, userId: string) {
+    const [row] = await db
+      .select({ email: users.email, passwordHash: users.passwordHash })
+      .from(users)
+      .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+      .limit(1);
+    return row;
   },
 
   async markLogin(db: DbOrTx, userId: string) {

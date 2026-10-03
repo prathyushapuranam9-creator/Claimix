@@ -144,34 +144,55 @@ export function AppShell({ nav, portal, portalKey, user, logout, unread, childre
           <span className={styles.topTitle}>{portal}</span>
           <div className={styles.themeSlot}><ThemeToggle /></div>
           {unread !== null && (
-            <Link href="/notifications" className={styles.bell} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
-              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-              </svg>
-              {unread > 0 && <span className={styles.count}>{unread > 99 ? "99+" : unread}</span>}
-            </Link>
+            <span className={styles.bellWrap}>
+              <Link href="/notifications" className={styles.bell} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
+                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                </svg>
+                {unread > 0 && <span className={styles.count}>{unread > 99 ? "99+" : unread}</span>}
+              </Link>
+              {/* Hover hint; the link's own label already gives screen readers "Notifications". */}
+              <span className={styles.bellTip} aria-hidden="true">Notifications</span>
+            </span>
           )}
+          {/* Signed-in user: icon with their name below; hover shows name + role; click shows their details. All values come from the session. */}
           <div className={styles.profile} ref={menuRef}>
             <button
               type="button"
               className={styles.profileBtn}
-              aria-label="Profile menu"
-              aria-haspopup="menu"
+              aria-label={`Profile menu: ${user.fullName}`}
+              aria-describedby={menuOpen ? undefined : "profile-tip"}
+              aria-haspopup="dialog"
               aria-expanded={menuOpen}
+              aria-controls="profile-panel"
               onClick={() => setMenuAt(menuOpen ? null : pathname)}
             >
               <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="8" r="4" />
                 <path d="M4 21a8 8 0 0 1 16 0" />
               </svg>
+              <span className={styles.profileName} aria-hidden="true">{user.fullName}</span>
             </button>
+            {!menuOpen && (
+              <span id="profile-tip" role="tooltip" className={styles.profileTip}>
+                <strong>{user.fullName}</strong>
+                <span>{user.roleName}</span>
+              </span>
+            )}
             {menuOpen && (
-              <div className={styles.menu} role="menu">
-                <Link href="/profile" role="menuitem" className={styles.menuItem}>Profile Settings</Link>
-                <form action={logout} className={styles.menuSep}>
-                  <button type="submit" role="menuitem" className={styles.menuItem}>Sign out</button>
-                </form>
+              <div id="profile-panel" className={styles.menu} role="dialog" aria-label="Your profile">
+                {/* Only the signed-in person's name and role, then the two account actions. */}
+                <div className={styles.profileCard}>
+                  <p className={styles.profileCardName}>{user.fullName}</p>
+                  <p className={styles.profileCardRole}>{user.roleName}</p>
+                </div>
+                <div role="menu" aria-label="Account" className={styles.menuSep}>
+                  <Link href="/profile" role="menuitem" className={styles.menuItem}>Profile Settings</Link>
+                  <form action={logout}>
+                    <button type="submit" role="menuitem" className={styles.menuItem}>Sign Out</button>
+                  </form>
+                </div>
               </div>
             )}
           </div>

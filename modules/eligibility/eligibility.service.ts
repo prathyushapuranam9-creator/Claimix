@@ -12,6 +12,7 @@ import { CoverageRepository } from "@/modules/patients/coverage.repository";
 import { PolicyRepository } from "@/modules/policies/policies.repository";
 import type { CaseFacts, Evaluation } from "@/modules/rules/engine/types";
 import { evaluateAndRecord } from "@/modules/rules/rules.service";
+import type { z } from "zod";
 import { eligibilityInputSchema, fromTriState } from "./eligibility.validation";
 
 const num = (v: string | null | undefined) => (v === null || v === undefined ? undefined : Number(v));
@@ -52,63 +53,71 @@ export const EligibilityService = {
   async check(ctx: ServiceContext, input: unknown): Promise<EligibilityOutcome> {
     const scope = requirePermission(ctx.principal, "eligibility:check");
     const d = parseOrThrow(eligibilityInputSchema, input);
-
-    let policyId = d.policyId;
-    let cover: CaseFacts["cover"];
-    let patient: CaseFacts["patient"];
-    if (d.beneficiaryId) {
-      const cov = await CoverageRepository.findScoped(ctx.db, ctx.principal, requirePermission(ctx.principal, "patient:read"), d.beneficiaryId);
-      if (!cov) throw new NotFoundError("Coverage not found.");
-      policyId = cov.policyId!;
-      patient = { dob: cov.patient.dob, relationship: cov.relationship };
-      cover = { start: cov.coverStart, end: cov.coverEnd, inceptionDate: cov.inceptionDate ?? undefined, sumInsured: num(cov.sumInsured), availableBalance: num(cov.sumInsuredAvailable) };
-    } else {
-      patient = { dob: d.dob, relationship: d.relationship };
-      cover = { start: d.coverStart, end: d.coverEnd, inceptionDate: d.inceptionDate, sumInsured: d.sumInsured, availableBalance: d.availableBalance };
-    }
-
-    const policy = await PolicyRepository.get(ctx.db, policyId!);
-    if (!policy) throw new ValidationError("Select a valid policy or scheme.", { policyId: ["Select a valid policy or scheme."] });
-    const hospitalId = await resolveHospital(ctx, scope, d.hospitalId);
-    const [net, [hosp], dxCode, pxCode] = await Promise.all([
-      networkForPolicy(ctx.db, hospitalId, policy),
-      ctx.db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, hospitalId)),
-      codeOf(ctx.db, diagnoses, d.diagnosisId, "diagnosisId"),
-      codeOf(ctx.db, procedures, d.procedureId, "procedureId"),
-    ]);
-
-    const facts: CaseFacts = {
-      stage: "eligibility",
-      asOf: todayIso(),
-      claimType: d.claimType,
-      patient,
-      cover,
-      admissionDate: d.admissionDate,
-      hospital: { networkStatus: net?.status ?? null, cashlessAvailable: net?.cashlessAvailable ?? false, lastVerifiedAt: net?.lastVerifiedAt?.toISOString() ?? null },
-      diagnosisCode: dxCode,
-      procedureCode: pxCode,
-      isAccident: fromTriState(d.isAccident),
-      ped: { declared: fromTriState(d.pedDeclared), related: fromTriState(d.pedRelated) },
-      estimatedCost: d.estimatedCost,
-      roomRentPerDay: d.roomRentPerDay,
-    };
-
-    return ctx.db.transaction(async (tx) => {
-      const res = await evaluateAndRecord(tx, ctx, { policyId: policy.id, subjectType: "eligibility_check", subjectId: d.beneficiaryId, facts });
-      await AuditService.record(tx, {
-        ...actorOf(ctx),
-        action: "eligibility.checked",
-        resourceType: d.beneficiaryId ? "beneficiary" : "policy",
-        resourceId: d.beneficiaryId ?? policy.id,
-        newState: { policyId: policy.id, hospitalId, overall: res.evaluation.overall, evaluationId: res.evaluationId },
-      });
-      return {
-        ...res,
-        policy: { id: policy.id, name: policy.name, category: policy.category },
-        hospital: { id: hospitalId, name: hosp?.name ?? "", networkStatus: net?.status ?? null, lastVerifiedAt: net?.lastVerifiedAt?.toISOString() ?? null },
-        beneficiaryId: d.beneficiaryId ?? null,
-        facts,
-      };
-    });
+    return runEligibility(ctx, d, () => resolveHospital(ctx, scope, d.hospitalId));
   },
 };
+
+/**
+ * The check itself, shared by the eligibility checker and the patient profile. Callers
+ * authorize first and decide which hospital the check is for; nothing here widens access
+ * (recorded coverage is still loaded only inside the caller's patient scope).
+ */
+export async function runEligibility(ctx: ServiceContext, d: z.output<typeof eligibilityInputSchema>, hospitalFor: () => Promise<string>): Promise<EligibilityOutcome> {
+  let policyId = d.policyId;
+  let cover: CaseFacts["cover"];
+  let patient: CaseFacts["patient"];
+  if (d.beneficiaryId) {
+    const cov = await CoverageRepository.findScoped(ctx.db, ctx.principal, requirePermission(ctx.principal, "patient:read"), d.beneficiaryId);
+    if (!cov) throw new NotFoundError("Coverage not found.");
+    policyId = cov.policyId!;
+    patient = { dob: cov.patient.dob, relationship: cov.relationship };
+    cover = { start: cov.coverStart, end: cov.coverEnd, inceptionDate: cov.inceptionDate ?? undefined, sumInsured: num(cov.sumInsured), availableBalance: num(cov.sumInsuredAvailable) };
+  } else {
+    patient = { dob: d.dob, relationship: d.relationship };
+    cover = { start: d.coverStart, end: d.coverEnd, inceptionDate: d.inceptionDate, sumInsured: d.sumInsured, availableBalance: d.availableBalance };
+  }
+
+  const policy = await PolicyRepository.get(ctx.db, policyId!);
+  if (!policy) throw new ValidationError("Select a valid policy or scheme.", { policyId: ["Select a valid policy or scheme."] });
+  const hospitalId = await hospitalFor();
+  const [net, [hosp], dxCode, pxCode] = await Promise.all([
+    networkForPolicy(ctx.db, hospitalId, policy),
+    ctx.db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, hospitalId)),
+    codeOf(ctx.db, diagnoses, d.diagnosisId, "diagnosisId"),
+    codeOf(ctx.db, procedures, d.procedureId, "procedureId"),
+  ]);
+
+  const facts: CaseFacts = {
+    stage: "eligibility",
+    asOf: todayIso(),
+    claimType: d.claimType,
+    patient,
+    cover,
+    admissionDate: d.admissionDate,
+    hospital: { networkStatus: net?.status ?? null, cashlessAvailable: net?.cashlessAvailable ?? false, lastVerifiedAt: net?.lastVerifiedAt?.toISOString() ?? null },
+    diagnosisCode: dxCode,
+    procedureCode: pxCode,
+    isAccident: fromTriState(d.isAccident),
+    ped: { declared: fromTriState(d.pedDeclared), related: fromTriState(d.pedRelated) },
+    estimatedCost: d.estimatedCost,
+    roomRentPerDay: d.roomRentPerDay,
+  };
+
+  return ctx.db.transaction(async (tx) => {
+    const res = await evaluateAndRecord(tx, ctx, { policyId: policy.id, subjectType: "eligibility_check", subjectId: d.beneficiaryId, facts });
+    await AuditService.record(tx, {
+      ...actorOf(ctx),
+      action: "eligibility.checked",
+      resourceType: d.beneficiaryId ? "beneficiary" : "policy",
+      resourceId: d.beneficiaryId ?? policy.id,
+      newState: { policyId: policy.id, hospitalId, overall: res.evaluation.overall, evaluationId: res.evaluationId },
+    });
+    return {
+      ...res,
+      policy: { id: policy.id, name: policy.name, category: policy.category },
+      hospital: { id: hospitalId, name: hosp?.name ?? "", networkStatus: net?.status ?? null, lastVerifiedAt: net?.lastVerifiedAt?.toISOString() ?? null },
+      beneficiaryId: d.beneficiaryId ?? null,
+      facts,
+    };
+  });
+}

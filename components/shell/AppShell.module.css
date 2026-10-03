@@ -170,11 +170,16 @@
 
 .profile { position: relative; }
 
+/* Icon with the signed-in user's name below it; fits inside the taskbar height. */
 .profileBtn {
   display: inline-grid;
-  place-items: center;
-  width: var(--tap);
-  height: var(--tap);
+  justify-items: center;
+  align-content: center;
+  gap: 1px;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  max-width: 10rem;
+  padding: 2px var(--sp-2);
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -185,12 +190,71 @@
 .profileBtn:hover,
 .profileBtn[aria-expanded="true"] { background: var(--c-accent); color: var(--c-text); }
 
+.profileName {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--c-text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Hover / keyboard-focus hint: name + role. Hidden while the details panel is open. */
+.profileTip {
+  position: absolute;
+  top: calc(100% + var(--sp-1));
+  right: 0;
+  z-index: 50;
+  display: none;
+  min-width: 10rem;
+  max-width: min(18rem, calc(100vw - 2rem));
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+.profileTip strong,
+.profileTip span { display: block; overflow-wrap: anywhere; }
+.profileTip strong { color: var(--c-text); font-size: var(--fs-sm); }
+
+.profileBtn:hover + .profileTip,
+.profileBtn:focus-visible + .profileTip { display: block; }
+
+.profileCard {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+}
+
+.profileCardName {
+  color: var(--c-text);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.profileCardRole {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+
 .menu {
   position: absolute;
   top: calc(100% + var(--sp-1));
   right: 0;
   z-index: 50;
-  min-width: 11rem;
+  width: max-content;
+  min-width: 12rem;
+  max-width: min(20rem, calc(100vw - 2rem));
   padding: var(--sp-1);
   background: var(--c-surface);
   border: 1px solid var(--c-border);
@@ -291,6 +355,27 @@
 
 .bell:hover { background: var(--c-accent); color: var(--c-text); }
 
+/* Bell hover tooltip: same look as the profile tooltip, centred under the bell. */
+.bellWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.bellTip {
+  composes: profileTip;
+  right: auto;
+  left: 50%;
+  min-width: 0;
+  transform: translateX(-50%);
+  color: var(--c-text);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.bell:hover + .bellTip,
+.bell:focus-visible + .bellTip { display: block; }
+
 .count {
   position: absolute;
   top: 4px;
@@ -339,4 +424,9 @@
 
 .sep {
   color: var(--c-text-subtle);
+}
+
+/* Small screens: keep the name short so it never pushes into the other taskbar controls. */
+@media (max-width: 480px) {
+  .profileBtn { max-width: 6.5rem; }
 }
