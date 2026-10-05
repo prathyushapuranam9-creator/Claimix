@@ -5,6 +5,7 @@ import type { DocumentReviewInput } from "@/modules/documents/documents.validati
 import { Badge, EmptyState, type Tone } from "@/components/ui/Surface";
 import { DataTable, CellText } from "@/components/ui/DataTable";
 import { DocumentReview } from "./DocumentReview";
+import { DocumentViewButton } from "./DocumentViewer";
 
 interface Doc {
   id: string;
@@ -43,6 +44,7 @@ export function DocumentList({ docs, review }: { docs: Doc[]; review?: (docId: s
         { key: "t", header: "Document", cell: (d) => <CellText sub={`${d.originalName} · ${kb(d.sizeBytes)}`}>{documentLabel(d.docType)}</CellText> },
         { key: "s", header: "Status", cell: (d) => <CellText sub={d.statusNote}><Badge tone={DOC_STATUS[d.status]?.tone ?? "neutral"}>{DOC_STATUS[d.status]?.label ?? d.status}</Badge></CellText> },
         { key: "u", header: "Uploaded", nowrap: true, cell: (d) => <CellText sub={d.uploadedByName}>{formatDateTime(d.createdAt)}</CellText> },
+        { key: "v", header: "", cell: (d) => <DocumentViewButton id={d.id} name={d.originalName} /> },
         {
           key: "d",
           header: "",

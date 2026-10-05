@@ -8,6 +8,7 @@ import type { PolicyCheckData } from "@/modules/patients/policy-check.service";
 import { GENDER_LABEL } from "@/modules/patients/patients.validation";
 import { STATUS_LABEL, STATUS_TONE, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
 import { DOC_STATUS } from "@/components/documents/DocumentList";
+import { DocumentViewButton } from "@/components/documents/DocumentViewer";
 import { ButtonTabs } from "@/components/ui/ButtonTabs";
 import { CellText, DataTable } from "@/components/ui/DataTable";
 import { Details } from "@/components/ui/Form";
@@ -201,6 +202,7 @@ export function PolicyCheck({ patient, coverage, data, today }: { patient: Patie
             { key: "for", header: "For", cell: (d) => (d.subjectRef ? <span className="mono">{d.subjectRef}</span> : "Patient record") },
             { key: "s", header: "Status", cell: (d) => <Badge tone={DOC_STATUS[d.status]?.tone ?? "neutral"}>{DOC_STATUS[d.status]?.label ?? d.status}</Badge> },
             { key: "u", header: "Uploaded", nowrap: true, cell: (d) => formatDateTime(d.createdAt) },
+            { key: "v", header: "", cell: (d) => <DocumentViewButton id={d.id} name={d.originalName} /> },
             { key: "dl", header: "", cell: (d) => <a href={`/api/documents/${d.id}`} className={styles.download}>Download</a> },
           ]}
         />

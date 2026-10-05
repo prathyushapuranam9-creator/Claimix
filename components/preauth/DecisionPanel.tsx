@@ -13,7 +13,8 @@ import { decisionSchema, type DecisionInput } from "@/modules/preauth/preauth.va
 import { STATUS_LABEL } from "@/modules/preauth/preauth.workflow";
 import { Button } from "@/components/ui/Button";
 import { SelectField, TextAreaField, TextField } from "@/components/ui/Field";
-import { FormGrid, FullWidth, formStyles } from "@/components/ui/Form";
+import { FullWidth, formStyles } from "@/components/ui/Form";
+import styles from "./DecisionPanel.module.css";
 import { Alert } from "@/components/ui/Surface";
 
 type Reason = { id: string; title: string; kind: string };
@@ -61,55 +62,57 @@ export function DecisionPanel({
   const reasonList = reasons.filter((r) => r.kind === "both" || r.kind === (to === "query" ? "query" : "rejection"));
 
   return (
-    <form
-      className={formStyles.form}
-      noValidate
-      onSubmit={handleSubmit(async (v) => {
-        setDone(null);
-        if (apply(await send(v))) {
-          setDone(`Recorded: ${LABEL[v.to]}.`);
-          reset({ to: options[0] as DecisionInput["to"], requiredDocuments: [] });
-          router.refresh();
-        }
-      })}
-    >
-      {schemeDesk && (
-        <Alert tone="info" title="Recording a scheme decision">
-          Record the decision exactly as issued by the scheme, with the scheme&apos;s reference number. This platform does not make scheme decisions.
-        </Alert>
-      )}
-      {formError && <Alert tone="danger">{formError}</Alert>}
-      {done && <Alert tone="success">{done}</Alert>}
-      <FormGrid>
-        <SelectField label="Decision" error={e.to?.message} {...register("to")}>
-          {options.map((o) => <option key={o} value={o}>{VERB[o] ?? LABEL[o]}</option>)}
-        </SelectField>
-        {needsAmount && (
-          <TextField label="Approved amount (₹)" inputMode="decimal" hint={requested ? `Requested: ₹${Number(requested).toLocaleString("en-IN")}` : undefined} error={e.amount?.message} {...register("amount")} />
+    <div className={styles.panel}>
+      <form
+        className={formStyles.form}
+        noValidate
+        onSubmit={handleSubmit(async (v) => {
+          setDone(null);
+          if (apply(await send(v))) {
+            setDone(`Recorded: ${LABEL[v.to]}.`);
+            reset({ to: options[0] as DecisionInput["to"], requiredDocuments: [] });
+            router.refresh();
+          }
+        })}
+      >
+        {schemeDesk && (
+          <Alert tone="info" title="Recording a scheme decision">
+            Record the decision exactly as issued by the scheme, with the scheme&apos;s reference number. This platform does not make scheme decisions.
+          </Alert>
         )}
-        {needsReason && (
-          <SelectField label="Reason" required error={e.reasonId?.message} {...register("reasonId")}>
-            <option value="">Select reason…</option>
-            {reasonList.map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}
+        {formError && <Alert tone="danger">{formError}</Alert>}
+        {done && <Alert tone="success">{done}</Alert>}
+        <div className={styles.fields}>
+          <SelectField label="Decision" error={e.to?.message} {...register("to")}>
+            {options.map((o) => <option key={o} value={o}>{VERB[o] ?? LABEL[o]}</option>)}
           </SelectField>
-        )}
-        {(schemeDesk || to !== "pending") && (
-          <TextField label={schemeDesk ? "Scheme reference no." : "Payer reference (optional)"} required={schemeDesk} error={e.payerReference?.message} {...register("payerReference")} />
-        )}
-        {to === "query" && (
-          <FullWidth>
-            <SelectField label="Documents requested" multiple size={5} hint="Hold Ctrl / Cmd to choose several." {...register("requiredDocuments")}>
-              {Object.entries(DOCUMENT_TYPES).map(([t, d]) => <option key={t} value={t}>{d.label}</option>)}
+          {needsAmount && (
+            <TextField label="Approved amount (₹)" inputMode="decimal" hint={requested ? `Requested: ₹${Number(requested).toLocaleString("en-IN")}` : undefined} error={e.amount?.message} {...register("amount")} />
+          )}
+          {needsReason && (
+            <SelectField label="Reason" required error={e.reasonId?.message} {...register("reasonId")}>
+              <option value="">Select reason…</option>
+              {reasonList.map((r) => <option key={r.id} value={r.id}>{r.title}</option>)}
             </SelectField>
+          )}
+          {(schemeDesk || to !== "pending") && (
+            <TextField label={schemeDesk ? "Scheme reference no." : "Payer reference (optional)"} required={schemeDesk} error={e.payerReference?.message} {...register("payerReference")} />
+          )}
+          {to === "query" && (
+            <FullWidth>
+              <SelectField label="Documents requested" multiple size={5} hint="Hold Ctrl / Cmd to choose several." {...register("requiredDocuments")}>
+                {Object.entries(DOCUMENT_TYPES).map(([t, d]) => <option key={t} value={t}>{d.label}</option>)}
+              </SelectField>
+            </FullWidth>
+          )}
+          <FullWidth>
+            <TextAreaField label={needsReason ? "Message to the hospital" : "Remarks"} required={needsReason || to === "partially_approved"} error={e.message?.message} {...register("message")} />
           </FullWidth>
-        )}
-        <FullWidth>
-          <TextAreaField label={needsReason ? "Message to the hospital" : "Remarks"} required={needsReason || to === "partially_approved"} error={e.message?.message} {...register("message")} />
-        </FullWidth>
-      </FormGrid>
-      <div>
-        <Button type="submit" variant={to === "rejected" ? "danger" : "primary"} loading={formState.isSubmitting}>{VERB[to] ?? "Record"}</Button>
-      </div>
-    </form>
+        </div>
+        <div>
+          <Button type="submit" variant={to === "rejected" ? "danger" : "primary"} loading={formState.isSubmitting}>{VERB[to] ?? "Record"}</Button>
+        </div>
+      </form>
+    </div>
   );
 }

@@ -6,7 +6,9 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isProd ? "" : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
+  // blob: only for documents the page itself fetched (authorized) and previews in its viewer popup.
+  "img-src 'self' data: blob:",
+  "frame-src blob:",
   "font-src 'self'",
   "connect-src 'self'",
   "frame-ancestors 'none'",
