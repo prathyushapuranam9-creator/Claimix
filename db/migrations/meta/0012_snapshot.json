@@ -1,6 +1,6 @@
 {
-  "id": "589cf621-fafe-4340-9080-95fac02b7389",
-  "prevId": "d449643a-dcca-4f15-9f2c-74ccae801029",
+  "id": "b60267f7-20cd-416d-b969-1c0e33e8bc5e",
+  "prevId": "589cf621-fafe-4340-9080-95fac02b7389",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -639,6 +639,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "insurance_context": {
+          "name": "insurance_context",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         }
       },
       "indexes": {

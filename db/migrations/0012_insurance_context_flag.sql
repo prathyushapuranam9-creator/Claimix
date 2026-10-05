@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "insurance_context" boolean DEFAULT false NOT NULL;

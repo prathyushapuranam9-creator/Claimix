@@ -1,1 +1,0 @@
-ALTER TABLE "users" ADD COLUMN "insurance_context" boolean DEFAULT false NOT NULL;

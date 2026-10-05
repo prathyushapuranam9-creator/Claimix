@@ -11,8 +11,8 @@ import { PatientRepository } from "./patients.repository";
 import { patientInputSchema } from "./patients.validation";
 
 /** Fields safe to put in audit state (no contact details or DOB). */
-function auditView(p: { patientNo: string; fullName: string; gender: string; hospitalId: string }) {
-  return { patientNo: p.patientNo, fullName: p.fullName, gender: p.gender, hospitalId: p.hospitalId };
+function auditView(p: { patientNo: string; fullName: string; gender: string; hospitalId: string; department?: string | null }) {
+  return { patientNo: p.patientNo, fullName: p.fullName, gender: p.gender, hospitalId: p.hospitalId, department: p.department ?? null };
 }
 
 function generatePatientNo() {
@@ -79,6 +79,8 @@ export const PatientService = {
         gender: data.gender,
         phone: data.phone ?? null,
         email: data.email ?? null,
+        department: data.department ?? null,
+        visitReason: data.visitReason ?? null,
       });
       await AuditService.record(tx, {
         action: "patient.created",
@@ -110,6 +112,8 @@ export const PatientService = {
         gender: data.gender,
         phone: data.phone ?? null,
         email: data.email ?? null,
+        department: data.department ?? null,
+        visitReason: data.visitReason ?? null,
       });
       await AuditService.record(tx, {
         action: "patient.updated",

@@ -6,10 +6,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ActionResult } from "@/lib/action-result";
 import { useServerResult } from "@/lib/use-action-form";
-import { GENDER_LABEL, GENDERS, patientInputSchema, type PatientInput } from "@/modules/patients/patients.validation";
+import { GENDER_LABEL, GENDERS, PATIENT_DEPARTMENTS, patientInputSchema, type PatientInput } from "@/modules/patients/patients.validation";
 import { Button, ButtonLink } from "@/components/ui/Button";
-import { SelectField, TextField } from "@/components/ui/Field";
-import { FormActions, FormGrid, FormSection, formStyles } from "@/components/ui/Form";
+import { SelectField, TextAreaField, TextField } from "@/components/ui/Field";
+import { FormActions, FormGrid, FormSection, FullWidth, formStyles } from "@/components/ui/Form";
 import { Alert } from "@/components/ui/Surface";
 
 interface Props {
@@ -83,6 +83,19 @@ export function PatientForm({ action, defaults, hospitals, cancelHref, submitLab
               ))}
             </SelectField>
           )}
+        </FormGrid>
+      </FormSection>
+      <FormSection title="Visit" hint="Describe the reason in simple words, e.g. 'Headache and dizziness'.">
+        <FormGrid>
+          <SelectField label="Department" error={e.department?.message} {...register("department")}>
+            <option value="">Not assigned</option>
+            {Object.entries(PATIENT_DEPARTMENTS).map(([k, label]) => (
+              <option key={k} value={k}>{label}</option>
+            ))}
+          </SelectField>
+          <FullWidth>
+            <TextAreaField label="Reason for visit" rows={2} maxLength={300} error={e.visitReason?.message} {...register("visitReason")} />
+          </FullWidth>
         </FormGrid>
       </FormSection>
       <FormSection title="Contact">

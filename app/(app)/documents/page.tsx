@@ -8,6 +8,7 @@ import type { DocStatus } from "@/modules/documents/documents.queries";
 import { CLAIM_STATUS_LABEL, type ClaimStatus } from "@/modules/claims/claims.workflow";
 import { STATUS_LABEL, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
 import { DOC_STATUS } from "@/components/documents/DocumentList";
+import { DocumentViewButton } from "@/components/documents/DocumentViewer";
 import { CellLink, CellText, DataTable, Pagination } from "@/components/ui/DataTable";
 import { Badge, Card, EmptyState, PageHeader, Stack } from "@/components/ui/Surface";
 import { Segmented } from "@/components/ui/Tabs";
@@ -68,6 +69,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: SP
                 { key: "r", header: "Request", cell: (d) => (d.subjectId ? <CellLink href={href(d.subjectType!, d.subjectId)} sub={d.patientName}><span className="mono">{d.subjectRef}</span></CellLink> : "—") },
                 { key: "s", header: "Status", cell: (d) => <CellText sub={d.statusNote}><Badge tone={DOC_STATUS[d.status]?.tone ?? "neutral"}>{DOC_STATUS[d.status]?.label ?? d.status}</Badge></CellText> },
                 { key: "u", header: "Uploaded", nowrap: true, cell: (d) => <CellText sub={d.uploadedByName}>{formatDateTime(d.createdAt)}</CellText> },
+                { key: "v", header: "", cell: (d) => <DocumentViewButton id={d.id} name={d.originalName} /> },
                 { key: "dl", header: "", cell: (d) => (d.scanStatus === "clean" ? <a href={`/api/documents/${d.id}`} download>Download</a> : <Badge tone="danger">Blocked</Badge>) },
               ]}
             />

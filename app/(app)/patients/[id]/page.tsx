@@ -11,7 +11,7 @@ import { RELATIONSHIP_LABEL } from "@/modules/patients/coverage.validation";
 import { PatientService } from "@/modules/patients/patients.service";
 import { PatientEligibilityService } from "@/modules/eligibility/patient-eligibility.service";
 import { PolicyCheckService } from "@/modules/patients/policy-check.service";
-import { GENDER_LABEL } from "@/modules/patients/patients.validation";
+import { departmentLabel, GENDER_LABEL, NO_VISIT_REASON } from "@/modules/patients/patients.validation";
 import { PolicyService } from "@/modules/policies/policies.service";
 import { CoverageForm } from "@/components/patients/CoverageForm";
 import { EligibilityCheckButton, EligibilityCheckProvider, EligibilityResultCard } from "@/components/patients/PatientEligibility";
@@ -63,6 +63,9 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           <Details
             columns={3}
             items={[
+              ["Name", p.fullName],
+              ["Department", departmentLabel(p.department)],
+              ["Reason for Visit", p.visitReason ?? NO_VISIT_REASON],
               ["Date of birth", `${formatDate(p.dob)} (${ageOn(p.dob)} years)`],
               ["Gender", GENDER_LABEL[p.gender]],
               ["Registered", formatDateTime(p.createdAt)],
@@ -120,7 +123,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         </Card>
         <PolicyCheck
           key={p.id}
-          patient={{ id: p.id, fullName: p.fullName, patientNo: p.patientNo, dob: p.dob, gender: p.gender, hospitalName }}
+          patient={{ id: p.id, fullName: p.fullName, patientNo: p.patientNo, dob: p.dob, gender: p.gender, hospitalName, department: p.department, visitReason: p.visitReason }}
           coverage={coverage}
           data={policyCheck}
           today={today}

@@ -4,7 +4,7 @@ import { ageOn, formatDate } from "@/lib/india";
 import { parseListQuery } from "@/lib/pagination";
 import { can } from "@/lib/permissions/principal";
 import { PatientService } from "@/modules/patients/patients.service";
-import { GENDER_LABEL } from "@/modules/patients/patients.validation";
+import { departmentLabel, GENDER_LABEL } from "@/modules/patients/patients.validation";
 import { ButtonLink } from "@/components/ui/Button";
 import { CellLink, CellText, DataTable, FilterBar, Pagination } from "@/components/ui/DataTable";
 import { Card, EmptyState, PageHeader } from "@/components/ui/Surface";
@@ -37,6 +37,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: SP 
           columns={[
             { key: "name", header: "Patient", cell: (r) => <CellLink href={`/patients/${r.id}`} sub={<span className="mono">{r.patientNo}</span>}>{r.fullName}</CellLink> },
             { key: "age", header: "Age / Gender", nowrap: true, cell: (r) => `${ageOn(r.dob)} y · ${r.gender === "undisclosed" ? "—" : GENDER_LABEL[r.gender]}` },
+            { key: "department", header: "Department", cell: (r) => departmentLabel(r.department) },
             ...(multiHospital ? [{ key: "hospital", header: "Hospital", cell: (r: (typeof data.rows)[number]) => r.hospitalName }] : []),
             { key: "registered", header: "Registered", nowrap: true, cell: (r) => formatDate(r.createdAt) },
           ]}

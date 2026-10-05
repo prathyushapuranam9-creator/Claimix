@@ -5,9 +5,10 @@ import { CLAIM_STATUS_LABEL, CLAIM_STATUS_TONE, type ClaimStatus } from "@/modul
 import { documentLabel } from "@/modules/documents/document-types";
 import { RELATIONSHIP_LABEL } from "@/modules/patients/coverage.validation";
 import type { PolicyCheckData } from "@/modules/patients/policy-check.service";
-import { GENDER_LABEL } from "@/modules/patients/patients.validation";
+import { departmentLabel, GENDER_LABEL, NO_VISIT_REASON } from "@/modules/patients/patients.validation";
 import { STATUS_LABEL, STATUS_TONE, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
 import { DOC_STATUS } from "@/components/documents/DocumentList";
+import { DocumentViewButton } from "@/components/documents/DocumentViewer";
 import { ButtonTabs } from "@/components/ui/ButtonTabs";
 import { CellText, DataTable } from "@/components/ui/DataTable";
 import { Details } from "@/components/ui/Form";
@@ -22,6 +23,8 @@ interface PatientInfo {
   dob: string;
   gender: string;
   hospitalName: string;
+  department: string | null;
+  visitReason: string | null;
 }
 
 interface CoverageRow {
@@ -70,6 +73,8 @@ export function PolicyCheck({ patient, coverage, data, today }: { patient: Patie
           columns={3}
           items={[
             ["Name", patient.fullName],
+            ["Department", departmentLabel(patient.department)],
+            ["Reason for Visit", patient.visitReason ?? NO_VISIT_REASON],
             ["Patient no", <span key="no" className="mono">{patient.patientNo}</span>],
             ["Date of birth", `${formatDate(patient.dob)} (${ageOn(patient.dob)} years)`],
             ["Gender", GENDER_LABEL[patient.gender as keyof typeof GENDER_LABEL] ?? patient.gender],
@@ -201,6 +206,7 @@ export function PolicyCheck({ patient, coverage, data, today }: { patient: Patie
             { key: "for", header: "For", cell: (d) => (d.subjectRef ? <span className="mono">{d.subjectRef}</span> : "Patient record") },
             { key: "s", header: "Status", cell: (d) => <Badge tone={DOC_STATUS[d.status]?.tone ?? "neutral"}>{DOC_STATUS[d.status]?.label ?? d.status}</Badge> },
             { key: "u", header: "Uploaded", nowrap: true, cell: (d) => formatDateTime(d.createdAt) },
+            { key: "v", header: "", cell: (d) => <DocumentViewButton id={d.id} name={d.originalName} /> },
             { key: "dl", header: "", cell: (d) => <a href={`/api/documents/${d.id}`} className={styles.download}>Download</a> },
           ]}
         />
