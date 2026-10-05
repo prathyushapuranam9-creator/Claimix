@@ -38,6 +38,11 @@ export interface SessionUser {
   canSwitchContext: boolean;
   /** The real account's own view is across all insurers (an administrator), rather than one insurer (a flagged payer login). */
   homeIsAllInsurers: boolean;
+  /**
+   * Which insurer / TPA the testing context may act as: null = any active one (administrators and accounts an
+   * administrator flagged); otherwise only this organization (an ordinary insurer / TPA reviewer's own company).
+   */
+  contextOrganizationId: string | null;
 }
 
 // Verified against when the email is unknown so response time does not reveal which accounts exist.
@@ -83,6 +88,10 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
     if (!real.canSwitchContext) throw new ForbiddenError();
     return real;
   }
+
+  /** A context choice the real account may use: any insurer / TPA, or only its own organization. */
+  const contextAllowed = (real: Pick<SessionUser, "contextOrganizationId">, organizationId: string) =>
+    real.contextOrganizationId === null || real.contextOrganizationId === organizationId;
 
   const service = {
     async login(input: unknown, meta: RequestMeta): Promise<{ token: string; expiresAt: Date }> {
@@ -182,11 +191,17 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
         await AuthRepository.touchSession(db, row.sessionId);
       }
       const permissions = await AuthRepository.loadPermissions(db, row.roleId);
-      // The Administrator permission, or the per-account testing flag an administrator sets on a designated demo login.
-      const canSwitchContext = permissions.has(INSURANCE_CONTEXT_PERMISSION) || row.insuranceContext;
+      // Across every insurer: the Administrator permission, or the per-account testing flag an administrator sets on a
+      // designated demo login. Every insurer / TPA reviewer may also use it, but only for its own organization.
+      const crossInsurer = permissions.has(INSURANCE_CONTEXT_PERMISSION) || row.insuranceContext;
+      const ownReviewer = (row.orgType === "insurer" || row.orgType === "tpa") && (permissions.has("preauth:review") || permissions.has("claim:review"));
+      const canSwitchContext = crossInsurer || ownReviewer;
+      const contextOrganizationId = crossInsurer ? null : ownReviewer ? row.organizationId : null;
       const homeIsAllInsurers = row.orgType === "platform";
       const selection = canSwitchContext ? InsuranceContext.verify(cfg.secret, contextToken, row.sessionId) : null;
-      const acting = selection ? await InsuranceContext.resolve(db, selection) : null;
+      const resolved = selection ? await InsuranceContext.resolve(db, selection) : null;
+      // Re-checked on every request: a context outside what this account may use is ignored.
+      const acting = resolved && contextAllowed({ contextOrganizationId }, resolved.organizationId) ? resolved : null;
       if (acting) {
         return {
           principal: {
@@ -205,6 +220,7 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
           orgName: acting.organizationName,
           canSwitchContext,
           homeIsAllInsurers,
+          contextOrganizationId,
         };
       }
       return {
@@ -224,13 +240,22 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
         orgName: row.orgName,
         canSwitchContext,
         homeIsAllInsurers,
+        contextOrganizationId,
       };
     },
 
-    /** The insurers / TPAs and roles the real account may test as. Only for accounts holding `insurance:context`. */
+    /**
+     * The companies shown in the testing selector. Administrators and flagged logins: every active insurer and TPA,
+     * all selectable. An ordinary reviewer: every active insurance company by name (public reference data) plus its
+     * own organization, but only its own is selectable, and other companies carry no roles. Switching re-checks this.
+     */
     async contextOptions(token: string | undefined | null): Promise<ContextOption[]> {
-      await requireContextHolder(token);
-      return InsuranceContext.options(db);
+      const real = await requireContextHolder(token);
+      const all = await InsuranceContext.options(db);
+      if (real.contextOrganizationId === null) return all;
+      return all
+        .filter((o) => o.type === "insurer" || o.id === real.contextOrganizationId)
+        .map((o) => (contextAllowed(real, o.id) ? o : { ...o, roles: [], selectable: false }));
     },
 
     /** Validates and audits a switch; returns the signed cookie value. Never grants anything the role doesn't hold. */
@@ -242,6 +267,7 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
           ? await InsuranceContext.resolve(db, { organizationId: sel.organizationId, roleKey: sel.roleKey })
           : null;
       if (!info) throw new ValidationError("Choose an insurance company and one of its roles.");
+      if (!contextAllowed(real, info.organizationId)) throw new ForbiddenError("You can only test your own insurance company.");
       await AuditService.record(db, {
         action: "context.switched",
         actorUserId: real.principal.userId,

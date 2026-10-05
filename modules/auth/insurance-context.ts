@@ -5,7 +5,10 @@ import { organizations, roles } from "@/db/schema";
 import { roleFitsOrg } from "@/lib/permissions/catalog";
 import { hmacHex, safeEqualHex } from "@/lib/security/crypto";
 
-/** The permission that lets an account use the testing/demo insurance portal (held by the Administrator role only). */
+/**
+ * The permission that lets an account use the testing/demo insurance portal across every insurer (held by the
+ * Administrator role only). Insurer / TPA reviewers may use the same context for their own organization only.
+ */
 export const INSURANCE_CONTEXT_PERMISSION = "insurance:context" as const;
 
 type PayerType = "insurer" | "tpa";
@@ -21,6 +24,8 @@ export interface ContextOption {
   name: string;
   type: PayerType;
   roles: { key: string; name: string }[];
+  /** False when the account may see the company listed but not act as it (an ordinary reviewer and another insurer). */
+  selectable: boolean;
 }
 
 export interface ResolvedContext {
@@ -54,7 +59,7 @@ export const InsuranceContext = {
     ]);
     return orgs
       .filter((o): o is typeof o & { type: PayerType } => o.type === "insurer" || o.type === "tpa")
-      .map((o) => ({ id: o.id, name: o.name, type: o.type, roles: allRoles.filter((r) => roleFitsOrg(r, o.type)).map((r) => ({ key: r.key, name: r.name })) }))
+      .map((o) => ({ id: o.id, name: o.name, type: o.type, roles: allRoles.filter((r) => roleFitsOrg(r, o.type)).map((r) => ({ key: r.key, name: r.name })), selectable: true }))
       .filter((o) => o.roles.length > 0);
   },
 

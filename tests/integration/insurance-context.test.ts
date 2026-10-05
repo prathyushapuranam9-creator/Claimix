@@ -89,10 +89,10 @@ describe("who may use the testing context", () => {
     expect(await ctx.db.select().from(roles).where(eq(roles.key, "insurance_ops_admin"))).toEqual([]);
   });
 
-  it("only a holder can read the options or switch; others are refused", async () => {
+  it("only a holder or a reviewer can read the options or switch; others are refused", async () => {
     const holder = await login("admin@demo.claimix.invalid");
     await expect(ctx.auth.contextOptions(holder)).resolves.toBeTruthy();
-    for (const email of ["insurer.a@demo.claimix.invalid", "tpa.a@demo.claimix.invalid", "staff.a@demo.claimix.invalid", "readonly@demo.claimix.invalid", "patient.a1@demo.claimix.invalid"]) {
+    for (const email of ["staff.a@demo.claimix.invalid", "readonly@demo.claimix.invalid", "patient.a1@demo.claimix.invalid"]) {
       const t = await login(email);
       await expect(ctx.auth.contextOptions(t), email).rejects.toBeInstanceOf(ForbiddenError);
       await expect(ctx.auth.switchContext(t, sel(DEMO.org.insurerC), META), email).rejects.toBeInstanceOf(ForbiddenError);
@@ -259,7 +259,8 @@ describe("it cannot be used to bypass authorization", () => {
     const viaForged = (await ctx.auth.resolve(insurerToken, forged))!;
     expect(viaForged.principal).toMatchObject({ organizationId: DEMO.org.insurerA, roleKey: "payer_reviewer" });
     expect(viaForged.principal.acting).toBeUndefined();
-    expect(viaForged.canSwitchContext).toBe(false);
+    // It has the testing block, but only for its own company.
+    expect(viaForged.contextOrganizationId).toBe(DEMO.org.insurerA);
     // Hospital staff and read-only users likewise.
     for (const email of ["staff.a@demo.claimix.invalid", "readonly@demo.claimix.invalid"]) {
       const t = await login(email);
@@ -310,8 +311,76 @@ describe("notifications in a testing context", () => {
   });
 });
 
+describe("insurer / TPA reviewers: the testing block for their own organization only", () => {
+  const reviewers = [
+    ["insurer.a@demo.claimix.invalid", DEMO.org.insurerA, "insurer"],
+    ["insurer.b@demo.claimix.invalid", DEMO.org.insurerB, "insurer"],
+    ["tpa.a@demo.claimix.invalid", DEMO.org.tpaA, "tpa"],
+  ] as const;
+
+  it("every reviewer has the block: all active insurance companies listed, only its own selectable", async () => {
+    const activeInsurers = (await ctx.db.select({ id: organizations.id }).from(organizations).where(and(eq(organizations.type, "insurer"), eq(organizations.isActive, true), isNull(organizations.deletedAt)))).map((o) => o.id);
+    const tpas = (await ctx.db.select({ id: organizations.id }).from(organizations).where(eq(organizations.type, "tpa"))).map((o) => o.id);
+    for (const [email, org] of reviewers) {
+      const token = await login(email);
+      const me = (await ctx.auth.resolve(token))!;
+      expect(me.canSwitchContext, email).toBe(true);
+      expect(me.homeIsAllInsurers, email).toBe(false);
+      expect(me.contextOrganizationId, email).toBe(org);
+      // Still a reviewer, nothing added: the block is not a permission.
+      expect(me.principal.permissions.has("insurance:context"), email).toBe(false);
+      const options = await ctx.auth.contextOptions(token);
+      // Every active insurance company by name, plus its own organization (a TPA's own TPA). No other TPA, hospital or platform org.
+      expect(options.map((o) => o.id).sort(), email).toEqual([...new Set([...activeInsurers, org])].sort());
+      expect(options.filter((o) => tpas.includes(o.id) && o.id !== org), email).toEqual([]);
+      // Only its own company can be chosen, with its role; the others carry no roles.
+      const selectable = options.filter((o) => o.selectable);
+      expect(selectable.map((o) => o.id), email).toEqual([org]);
+      expect(selectable[0]!.roles.map((r) => r.key), email).toEqual(["payer_reviewer"]);
+      expect(options.filter((o) => !o.selectable).every((o) => o.roles.length === 0), email).toBe(true);
+    }
+  });
+
+  it("switching to its own company works exactly like its normal view; any other company is refused", async () => {
+    const aarogya = await submittedOn(DEMO.policy.aarogyaFloater);
+    const suraksha = await submittedOn(DEMO.policy.surakshaIndividual);
+    const token = await login("insurer.a@demo.claimix.invalid");
+    const own = svc(ctx.db, (await ctx.auth.resolve(token))!.principal);
+
+    const a = await actingAs(token, DEMO.org.insurerA);
+    expect(a.user.principal).toMatchObject({ organizationId: DEMO.org.insurerA, roleKey: "payer_reviewer" });
+    expect(a.user.principal.acting?.organizationName).toMatch(/^Aarogya/);
+    expect((await ids(a.c)).sort()).toEqual((await ids(own)).sort());
+    expect(await ids(a.c)).toContain(aarogya.p.id);
+    expect(await ids(a.c)).not.toContain(suraksha.p.id);
+    // Exit returns to the normal view.
+    await expect(ctx.auth.clearContext(token, META)).resolves.toBeUndefined();
+
+    // Other insurers and TPAs: refused at switch time, audited nothing.
+    for (const org of [DEMO.org.insurerB, DEMO.org.insurerC, DEMO.org.tpaA]) {
+      await expect(ctx.auth.switchContext(token, sel(org), META), org).rejects.toBeInstanceOf(ForbiddenError);
+    }
+    // Suraksha's pre-auth stays out of reach in the normal view too.
+    expect(await ids(own)).not.toContain(suraksha.p.id);
+  });
+
+  it("a validly signed context for another company is ignored on every request", async () => {
+    const suraksha = await submittedOn(DEMO.policy.surakshaIndividual);
+    for (const [email, org] of reviewers) {
+      const token = await login(email);
+      const real = (await ctx.auth.resolve(token))!;
+      const other = org === DEMO.org.insurerB ? DEMO.org.insurerA : DEMO.org.insurerB;
+      const forged = InsuranceContext.sign(SECRET, real.principal.sessionId, sel(other));
+      const via = (await ctx.auth.resolve(token, forged))!;
+      expect(via.principal.organizationId, email).toBe(org);
+      expect(via.principal.acting, email).toBeUndefined();
+      if (org !== DEMO.org.insurerB) expect(await ids(svc(ctx.db, via.principal)), email).not.toContain(suraksha.p.id);
+    }
+  });
+});
+
 describe("the designated testing login (a payer reviewer an administrator has flagged)", () => {
-  it("sees the switcher on its own dashboard; its own view is its company and role; ordinary reviewers do not", async () => {
+  it("sees the switcher on its own dashboard across every insurer; ordinary reviewers only for their own company", async () => {
     const t = (await ctx.auth.resolve(await login("insurer.portal@demo.claimix.invalid")))!;
     expect(t.canSwitchContext).toBe(true);
     expect(t.homeIsAllInsurers).toBe(false);
@@ -320,8 +389,9 @@ describe("the designated testing login (a payer reviewer an administrator has fl
     // The flag is not a permission: nothing else about the role changed.
     expect(t.principal.permissions.has("insurance:context")).toBe(false);
     expect([...t.principal.permissions.entries()].sort()).toEqual([...who.insurerA.permissions.entries()].sort());
+    expect(t.contextOrganizationId).toBeNull();
     for (const email of ["insurer.a@demo.claimix.invalid", "insurer.b@demo.claimix.invalid", "tpa.a@demo.claimix.invalid"]) {
-      expect((await ctx.auth.resolve(await login(email)))!.canSwitchContext, email).toBe(false);
+      expect((await ctx.auth.resolve(await login(email)))!.contextOrganizationId, email).not.toBeNull();
     }
   });
 
@@ -360,18 +430,19 @@ describe("the designated testing login (a payer reviewer an administrator has fl
     const set = (flag: boolean) => UserService.update(as("admin"), target!.id, { fullName: target!.fullName, roleId: target!.roleId, isActive: true, insuranceContext: flag });
     try {
       const token = await login("insurer.b@demo.claimix.invalid");
-      expect((await ctx.auth.resolve(token))!.canSwitchContext).toBe(false);
+      // Without the flag: its own company only.
+      expect((await ctx.auth.resolve(token))!.contextOrganizationId).toBe(DEMO.org.insurerB);
       await expect(ctx.auth.switchContext(token, sel(DEMO.org.insurerA), META)).rejects.toBeInstanceOf(ForbiddenError);
 
       await set(true);
       const t2 = await login("insurer.b@demo.claimix.invalid");
-      expect((await ctx.auth.resolve(t2))!.canSwitchContext).toBe(true);
+      expect((await ctx.auth.resolve(t2))!.contextOrganizationId).toBeNull(); // every insurer
       const { contextToken } = await ctx.auth.switchContext(t2, sel(DEMO.org.insurerA), META);
       expect((await ctx.auth.resolve(t2, contextToken))!.principal.organizationId).toBe(DEMO.org.insurerA);
 
       await set(false); // takes effect immediately, without signing anyone out
       const after = (await ctx.auth.resolve(t2, contextToken))!;
-      expect(after.canSwitchContext).toBe(false);
+      expect(after.contextOrganizationId).toBe(DEMO.org.insurerB);
       expect(after.principal.organizationId).toBe(DEMO.org.insurerB);
       expect(after.principal.acting).toBeUndefined();
 
@@ -389,6 +460,7 @@ describe("the designated testing login (a payer reviewer an administrator has fl
     for (const k of ["insurerA", "staffA", "portalReviewer"] as const) {
       await expect(UserService.update(as(k), rev!.id, { fullName: rev!.fullName, roleId: rev!.roleId, isActive: true, insuranceContext: true }), k).rejects.toBeInstanceOf(ForbiddenError);
     }
-    expect((await ctx.auth.resolve(await login("insurer.a@demo.claimix.invalid")))!.canSwitchContext).toBe(false);
+    // Still its own company only.
+    expect((await ctx.auth.resolve(await login("insurer.a@demo.claimix.invalid")))!.contextOrganizationId).toBe(DEMO.org.insurerA);
   });
 });

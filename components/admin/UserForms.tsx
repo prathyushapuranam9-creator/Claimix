@@ -90,7 +90,7 @@ export function EditUserForm({
           ))}
         </SelectField>
         {isSelf ? <p>You can&apos;t deactivate your own account.</p> : <Checkbox label="Account active" {...register("isActive")} />}
-        {canTestInsurance && <Checkbox label="Insurance portal testing access (can switch insurer and role from the dashboard)" {...register("insuranceContext")} />}
+        {canTestInsurance && <Checkbox label="Insurance portal testing access (can switch to any insurer and role from the dashboard; without it, only their own company)" {...register("insuranceContext")} />}
       </FormGrid>
       <div>
         <Button type="submit" loading={formState.isSubmitting}>Save changes</Button>

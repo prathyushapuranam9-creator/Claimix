@@ -149,8 +149,8 @@ test("one common login: Aarogya → Navjeevan → Suraksha through the insurance
 
   // --- 2. Switch Context → Navjeevan → Payer Reviewer (no sign-in)
   await p.goto("/pre-authorizations?view=all");
-  await banner(p).getByRole("link", { name: "Switch Context" }).click();
-  await expect(p).toHaveURL(/\/dashboard#context/);
+  await banner(p).getByRole("button", { name: "Switch Context" }).click(); // opens the switcher in place, on any page
+  await expect(p).toHaveURL(/\/pre-authorizations/);
   await expect(p.getByLabel("Insurance Company")).toHaveValue(/[0-9a-f-]{36}/); // current context preselected
   await choose(p, NAVJEEVAN, "Payer Reviewer");
   await expect(banner(p)).toContainText(`Insurance: ${NAVJEEVAN}`);
@@ -188,24 +188,51 @@ test("one common login: Aarogya → Navjeevan → Suraksha through the insurance
   await admin.close();
 });
 
-test("ordinary insurer users have no switcher and cannot use the context, even with a forged cookie", async ({ page, browser }) => {
-  test.setTimeout(240_000);
+test("insurer reviewers get the testing block for their own company only; other companies stay out of reach", async ({ page, browser }) => {
+  test.setTimeout(300_000);
   await signIn(page, "staff.a@demo.claimix.invalid");
+  const a = await submitPreauth(page, "Aarogya Family Floater Plus (DEMO DATA)");
   const n = await submitPreauth(page, "Navjeevan Super Top-Up 10L (DEMO DATA)");
 
   const rev = await as(browser, "insurer.a@demo.claimix.invalid");
-  await rev.page.goto("/dashboard");
-  await expect(rev.page.getByLabel("Insurance Company")).toHaveCount(0);
-  await expect(banner(rev.page)).toHaveCount(0);
-  // A made-up context cookie changes nothing for them.
+  const p = rev.page;
+  await p.goto("/dashboard");
+  // The same block as the testing login, on the reviewer's own dashboard.
+  await expect(p.getByRole("heading", { name: "Insurance portal testing" })).toBeVisible();
+  const company = p.getByLabel("Insurance Company");
+  const role = p.getByLabel("Role", { exact: true });
+  // Every insurance company is listed, but only its own can be chosen; no "All Insurers", no TPAs.
+  for (const other of [NAVJEEVAN, SURAKSHA]) await expect(company.locator("option", { hasText: other })).toBeDisabled();
+  await expect(company.locator("option", { hasText: NAVJEEVAN })).toContainText("not available for your account");
+  await expect(company.locator("option:not([disabled])")).toHaveText([AAROGYA]);
+  await expect(company.locator("option", { hasText: "All Insurers" })).toHaveCount(0);
+  await expect(company.locator("option", { hasText: /MediAssist|CareLink/ })).toHaveCount(0);
+  await expect(company.locator("option:checked")).toHaveText(AAROGYA);
+  await expect(role.locator("option:checked")).toHaveText("Payer Reviewer");
+  await expect(banner(p)).toHaveCount(0);
+
+  // Switching works exactly as for the testing login, and shows its own company's data only.
+  await choose(p, AAROGYA, "Payer Reviewer");
+  await expect(banner(p)).toContainText(`Insurance: ${AAROGYA}`);
+  await expect(banner(p)).toContainText("Role: Payer Reviewer");
+  await p.goto("/pre-authorizations?view=all");
+  await expect(refLink(p, a.reference)).toBeVisible();
+  await expect(refLink(p, n.reference)).toHaveCount(0);
+  expect((await p.goto(n.url))?.status()).toBe(404);
+  // Back to its normal view.
+  await p.goto("/dashboard");
+  await p.getByRole("button", { name: "Back to my own company" }).click();
+  await expect(banner(p)).toHaveCount(0);
+
+  // A made-up context cookie changes nothing.
   await rev.ctx.addCookies([{ name: "claimix_context", value: "eyJzIjoieCJ9.deadbeef", url: "http://localhost:3100" }]);
-  await rev.page.goto("/pre-authorizations?view=all");
-  await expect(refLink(rev.page, n.reference)).toHaveCount(0);
-  expect((await rev.page.goto(n.url))?.status()).toBe(404);
-  await expect(banner(rev.page)).toHaveCount(0);
+  await p.goto("/pre-authorizations?view=all");
+  await expect(refLink(p, n.reference)).toHaveCount(0);
+  expect((await p.goto(n.url))?.status()).toBe(404);
+  await expect(banner(p)).toHaveCount(0);
   await rev.close();
 
-  // Hospital staff don't get it either.
+  // Hospital staff don't get it.
   await page.goto("/dashboard");
   await expect(page.getByLabel("Insurance Company")).toHaveCount(0);
 });
@@ -280,7 +307,7 @@ test("the designated insurance login (a payer reviewer, like Vikram) switches co
   await portal.close();
 });
 
-test("an administrator turns the insurance testing switch on and off for a reviewer account", async ({ browser }) => {
+test("an administrator turns cross-insurer testing on and off for a reviewer account", async ({ browser }) => {
   test.setTimeout(180_000);
   const admin = await as(browser, "admin@demo.claimix.invalid");
   const a = admin.page;
@@ -295,16 +322,18 @@ test("an administrator turns the insurance testing switch on and off for a revie
   try {
     const rev = await as(browser, "insurer.b@demo.claimix.invalid");
     await rev.page.goto("/dashboard");
-    await expect(rev.page.getByLabel("Insurance Company")).toHaveCount(0); // ordinary reviewer: no selectors
+    const company = rev.page.getByLabel("Insurance Company");
+    await expect(company.locator("option:not([disabled])")).toHaveText([SURAKSHA]); // ordinary reviewer: only its own company can be chosen
 
     await toggle(true);
     await rev.page.reload();
-    await expect(rev.page.getByLabel("Insurance Company")).toBeVisible(); // enabled, without signing in again
-    await expect(rev.page.getByLabel("Insurance Company").locator("option:checked")).toHaveText(SURAKSHA);
+    await expect(company.locator("option:checked")).toHaveText(SURAKSHA); // every insurer, without signing in again
+    await expect(company.locator("option", { hasText: AAROGYA })).toBeEnabled();
+    await expect(company.locator("option", { hasText: NAVJEEVAN })).toBeEnabled();
 
     await toggle(false);
     await rev.page.reload();
-    await expect(rev.page.getByLabel("Insurance Company")).toHaveCount(0);
+    await expect(company.locator("option:not([disabled])")).toHaveText([SURAKSHA]);
     await rev.close();
   } finally {
     await toggle(false).catch(() => undefined);

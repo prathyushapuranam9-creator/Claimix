@@ -12,13 +12,16 @@ export interface ContextOptionView {
   id: string;
   name: string;
   roles: { key: string; name: string }[];
+  /** Listed for reference but not available to this account (shown greyed out). */
+  selectable?: boolean;
 }
 
 /**
  * The two selectors of the insurance testing portal: Insurance Company (default "All Insurers") and the Role that
  * exists for that company. Applying a choice makes the whole app behave as that role of that company; it does not
  * sign in again and does not widen anything, because the server re-checks the choice and loads that role's real
- * permissions. Only rendered for accounts that hold the `insurance:context` permission.
+ * permissions. Rendered for administrators and flagged testing logins (every insurer), and for insurer / TPA
+ * reviewers (their own company only — the server supplies just that option and refuses anything else).
  */
 export function ContextSwitcher({
   options,
@@ -86,7 +89,11 @@ export function ContextSwitcher({
         >
           {allowAll && <option value="">All Insurers</option>}
           {!allowAll && !orgId && <option value="">Select company</option>}
-          {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+          {options.map((o) => (
+            <option key={o.id} value={o.id} disabled={o.selectable === false}>
+              {o.selectable === false ? `${o.name} — not available for your account` : o.name}
+            </option>
+          ))}
         </SelectField>
         <SelectField label="Role" value={roleKey} disabled={!orgId} onChange={(e) => { setRoleKey(e.target.value); setError(null); }}>
           <option value="">Select Role</option>

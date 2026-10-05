@@ -296,7 +296,8 @@ async function DashboardContent({ switcher }: { switcher?: React.ReactNode }) {
 }
 
 /**
- * The dashboard. Accounts that hold `insurance:context` (the testing / demo account) get the Insurance Company and
+ * The dashboard. Accounts that may use the testing context (administrators and flagged logins for every insurer;
+ * insurer / TPA reviewers for their own company) get the Insurance Company and
  * Role selectors at the top; while a context is active the rest of the page is that company's role-specific dashboard.
  */
 export default async function DashboardPage() {
