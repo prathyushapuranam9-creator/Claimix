@@ -18,7 +18,7 @@ export default async function EditPatientPage({ params }: { params: Promise<{ id
       <Card>
         <PatientForm
           action={update}
-          defaults={{ fullName: p.fullName, dob: p.dob, gender: p.gender, patientNo: p.patientNo, phone: p.phone ?? "", email: p.email ?? "" }}
+          defaults={{ fullName: p.fullName, dob: p.dob, gender: p.gender, patientNo: p.patientNo, phone: p.phone ?? "", email: p.email ?? "", department: p.department ?? "", visitReason: p.visitReason ?? "" }}
           cancelHref={`/patients/${p.id}`}
           submitLabel="Save changes"
         />

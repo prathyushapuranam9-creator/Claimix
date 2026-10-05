@@ -17,7 +17,7 @@
 .back:hover { color: var(--c-text); }
 .back:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }
 
-/* Tooltip (the title attribute is the non-visual fallback). */
+/* The only Back tooltip (no title attribute, so the browser never shows a second one). */
 .back::after {
   content: attr(data-tip);
   position: absolute;

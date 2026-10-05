@@ -63,6 +63,10 @@ export const patients = pgTable("patients", {
   gender: gender("gender").notNull().default("undisclosed"),
   phone: varchar("phone", { length: 30 }),
   email: varchar("email", { length: 320 }),
+  // Department the patient is registered / being treated in (a PATIENT_DEPARTMENTS key); null = not assigned.
+  department: varchar("department", { length: 40 }),
+  // Plain-language reason for the visit, as recorded by the hospital; null = not recorded.
+  visitReason: varchar("visit_reason", { length: 300 }),
   isDemo: boolean("is_demo").notNull().default(false),
   ...timestamps,
   ...softDelete,

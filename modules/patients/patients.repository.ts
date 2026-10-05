@@ -31,6 +31,7 @@ const listColumns = {
   dob: patients.dob,
   gender: patients.gender,
   phone: patients.phone,
+  department: patients.department,
   hospitalId: patients.hospitalId,
   hospitalName: organizations.name,
   isDemo: patients.isDemo,
