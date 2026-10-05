@@ -1,12 +1,14 @@
+/* The steps share the card width (no horizontal scrolling) and wrap into rows as the card narrows. */
 .wrap {
-  overflow-x: auto;
+  container-type: inline-size;
   padding-bottom: var(--sp-2);
 }
 
 .steps {
-  display: flex;
-  gap: 0;
-  min-width: max-content;
+  --cols: 13;
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  row-gap: var(--sp-4);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -16,9 +18,28 @@
   position: relative;
   display: grid;
   justify-items: center;
+  align-content: start;
   gap: var(--sp-2);
-  width: 116px;
+  min-width: 0;
   text-align: center;
+}
+
+/* Fewer columns on narrower cards; the connector is dropped at the end of each row. */
+@container (max-width: 1040px) {
+  .steps { --cols: 7; }
+  .step:nth-child(7n)::after { display: none; }
+}
+
+@container (max-width: 600px) {
+  .steps { --cols: 4; }
+  .step:nth-child(7n)::after { display: block; }
+  .step:nth-child(4n)::after { display: none; }
+}
+
+@container (max-width: 380px) {
+  .steps { --cols: 3; }
+  .step:nth-child(4n)::after { display: block; }
+  .step:nth-child(3n)::after { display: none; }
 }
 
 /* Connector line to the next step. */
@@ -62,6 +83,7 @@
   font-size: var(--fs-xs);
   font-weight: 650;
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .state {

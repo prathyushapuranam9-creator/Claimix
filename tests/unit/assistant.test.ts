@@ -61,6 +61,32 @@ describe("question classification", () => {
     expect(classify("what's the weather in Pune")).toBeNull();
     expect(classify("   ")).toBeNull();
   });
+
+  it("a generic word on its own never selects a topic (it goes to human review instead)", () => {
+    for (const q of [
+      "Will my cousin's astrology chart affect the premium next year?",
+      "What is the date next Friday?",
+      "Can you check the weather?",
+      "Is the account active?",
+      "Review my horoscope",
+      "Next year I will travel",
+      "What will happen at the cricket match?",
+      "Tell me a joke about elephants.",
+    ]) {
+      expect(classify(q), q).toBeNull();
+    }
+  });
+
+  it("generic words still count inside a phrase that is clearly about the request", () => {
+    expect(classify("What are the next steps?")).toBe("next_step");
+    expect(classify("what should we do next")).toBe("next_step");
+    expect(classify("what's next")).toBe("next_step");
+    expect(classify("now what?")).toBe("next_step");
+    expect(classify("is the cover still active")).toBe("policy_active");
+    expect(classify("what do we need to check")).toBe("what_to_check");
+    expect(classify("is there a checklist")).toBe("what_to_check");
+    expect(classify("which documents are missing")).toBe("missing_documents");
+  });
 });
 
 describe("answer safety", () => {

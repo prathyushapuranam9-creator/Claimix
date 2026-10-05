@@ -3,7 +3,7 @@ import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, s
 import type { DbOrTx } from "@/db/client";
 import { lookup } from "@/db/lookup";
 import {
-  beneficiaries, diagnoses, governmentSchemes, organizations, patients, payerResponses, policies, preAuthorizations, procedures, queries, rejectionReasons, statusHistory, users,
+  beneficiaries, diagnoses, governmentSchemes, organizations, patients, payerResponses, permissions, policies, preAuthorizations, procedures, queries, rejectionReasons, rolePermissions, statusHistory, users,
 } from "@/db/schema";
 import type { Scope } from "@/lib/permissions/catalog";
 import type { Principal } from "@/lib/permissions/principal";
@@ -23,10 +23,34 @@ export const PREAUTH_SCOPE: ScopeColumns = {
 
 
 export const PreauthRepository = {
-  async list(db: DbOrTx, principal: Principal, scope: Scope, q: ListQuery, f: { status?: PreauthStatus[] }) {
+  /**
+   * Names of these payer organizations (insurer / TPA) that have no active user who can review pre-authorizations.
+   * A request routed to such an organization is stored correctly but nobody can see it, so the hospital is told.
+   */
+  async payersWithoutReviewers(db: DbOrTx, orgIds: string[]) {
+    if (orgIds.length === 0) return [];
+    const rows = await db
+      .select({ id: organizations.id, name: organizations.name })
+      .from(organizations)
+      .where(and(
+        inArray(organizations.id, orgIds),
+        sql`not exists (
+          select 1 from ${users}
+          join ${rolePermissions} rp on rp.role_id = ${users.roleId}
+          join ${permissions} perm on perm.id = rp.permission_id and perm.key = 'preauth:review'
+          where ${users.organizationId} = ${organizations.id} and ${users.isActive} = true and ${users.deletedAt} is null
+        )`,
+      ));
+    return rows.map((r) => r.name);
+  },
+
+  async list(db: DbOrTx, principal: Principal, scope: Scope, q: ListQuery, f: { status?: PreauthStatus[]; insurerId?: string; tpaId?: string; hospitalId?: string }) {
     const where = andAll(
       scopePredicate(principal, scope, PREAUTH_SCOPE),
       f.status?.length ? inArray(preAuthorizations.status, f.status) : undefined,
+      f.insurerId ? eq(preAuthorizations.insurerId, f.insurerId) : undefined,
+      f.tpaId ? eq(preAuthorizations.tpaId, f.tpaId) : undefined,
+      f.hospitalId ? eq(preAuthorizations.hospitalId, f.hospitalId) : undefined,
       q.q ? or(ilike(preAuthorizations.reference, likeContains(q.q)), ilike(patients.fullName, likeContains(q.q))) : undefined,
     );
     const [rows, [total]] = await Promise.all([

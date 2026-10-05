@@ -57,6 +57,17 @@ export const PatientService = {
 
     const patientNo = data.patientNo ?? generatePatientNo();
     return ctx.db.transaction(async (tx) => {
+      // Same person registered twice is a likely mistake, but two people can share a name and birth date,
+      // so this is a warning the user can confirm — not a rejection. Only this hospital's own records are checked.
+      if (!data.confirmDuplicate) {
+        const same = await PatientRepository.likelyDuplicates(tx, hospitalId, data.fullName, data.dob);
+        if (same.length) {
+          throw new ValidationError(
+            `A patient named ${data.fullName} with this date of birth is already registered at this hospital (${same.map((s) => s.patientNo).join(", ")}). Check the existing record before creating another.`,
+            { _duplicate: same.map((s) => `${s.id}|${s.patientNo}`) },
+          );
+        }
+      }
       if (await PatientRepository.patientNoTaken(tx, hospitalId, patientNo)) {
         throw new ConflictError(`Patient number ${patientNo} is already in use at this hospital.`);
       }
@@ -74,7 +85,7 @@ export const PatientService = {
         ...actorOf(ctx),
         resourceType: "patient",
         resourceId: row.id,
-        newState: auditView(row),
+        newState: { ...auditView(row), ...(data.confirmDuplicate ? { confirmedPossibleDuplicate: true } : {}) },
       });
       return row;
     });

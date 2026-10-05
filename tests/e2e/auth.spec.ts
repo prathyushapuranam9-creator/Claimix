@@ -41,9 +41,14 @@ test("hospital staff can sign in, see their scope, and sign out", async ({ page 
   await expect(page.getByText("Queries to answer")).toBeVisible();
   await openMenuIfCollapsed(page);
   const nav = page.getByRole("complementary", { name: "Main navigation" });
-  await expect(nav.getByRole("link", { name: "Eligibility checker" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Patients" })).toBeVisible();
+  // The eligibility checker is deliberately not in the sidebar: staff reach it from the dashboard's primary action.
+  await expect(nav.getByRole("link", { name: "Eligibility checker" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Users" })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Audit log" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Check eligibility" }).first().click();
+  await expect(page).toHaveURL(/\/eligibility$/);
+  await expect(page.getByRole("heading", { name: "Eligibility checker", level: 1 })).toBeVisible();
 
   // Sign out lives in the header's profile menu (reload first so the mobile drawer is closed).
   await page.goto("/dashboard");

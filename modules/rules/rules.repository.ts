@@ -1,7 +1,7 @@
 import "server-only";
-import { and, asc, count, desc, eq, max } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, max } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
-import { ruleEvaluations, rules, ruleSets, ruleVersions } from "@/db/schema";
+import { organizations, policies, ruleEvaluations, rules, ruleSets, ruleVersions, users } from "@/db/schema";
 
 /** Each policy has one rule set ("Standard") whose versions move draft → active → retired. */
 export const STANDARD_RULE_SET = "Standard";
@@ -121,6 +121,53 @@ export const RuleRepository = {
       .where(eq(ruleEvaluations.id, id))
       .limit(1);
     return row;
+  },
+
+  /**
+   * Recorded evaluations for one subject (e.g. an eligibility check on a coverage), newest first.
+   * `organizationId` limits them to the tenant that ran them.
+   */
+  async evaluationsForSubject(db: DbOrTx, subjectType: string, subjectId: string, organizationId: string | undefined, limit: number) {
+    return db
+      .select({
+        id: ruleEvaluations.id,
+        evaluatedAt: ruleEvaluations.evaluatedAt,
+        overall: ruleEvaluations.overallResult,
+        inputSnapshot: ruleEvaluations.inputSnapshot,
+        ruleVersion: ruleVersions.version,
+        policyName: policies.name,
+        hospitalName: organizations.name,
+        checkedBy: users.fullName,
+      })
+      .from(ruleEvaluations)
+      .innerJoin(ruleVersions, eq(ruleVersions.id, ruleEvaluations.ruleVersionId))
+      .innerJoin(policies, eq(policies.id, ruleEvaluations.policyId))
+      .innerJoin(organizations, eq(organizations.id, ruleEvaluations.organizationId))
+      .leftJoin(users, eq(users.id, ruleEvaluations.actorUserId))
+      .where(and(
+        eq(ruleEvaluations.subjectType, subjectType),
+        eq(ruleEvaluations.subjectId, subjectId),
+        organizationId ? eq(ruleEvaluations.organizationId, organizationId) : undefined,
+      ))
+      .orderBy(desc(ruleEvaluations.evaluatedAt), desc(ruleEvaluations.id))
+      .limit(limit);
+  },
+
+  /** The most recent evaluation of each subject, for lists (one query, no per-row lookups). */
+  async latestForSubjects(db: DbOrTx, subjectType: string, subjectIds: string[], organizationId: string | undefined) {
+    if (subjectIds.length === 0) return [];
+    const rows = await db
+      .select({ subjectId: ruleEvaluations.subjectId, id: ruleEvaluations.id, evaluatedAt: ruleEvaluations.evaluatedAt, overall: ruleEvaluations.overallResult })
+      .from(ruleEvaluations)
+      .where(and(
+        eq(ruleEvaluations.subjectType, subjectType),
+        inArray(ruleEvaluations.subjectId, subjectIds),
+        organizationId ? eq(ruleEvaluations.organizationId, organizationId) : undefined,
+      ))
+      .orderBy(desc(ruleEvaluations.evaluatedAt), desc(ruleEvaluations.id));
+    // Newest first, so the first row seen for each subject is its latest.
+    const seen = new Set<string>();
+    return rows.filter((r) => r.subjectId && !seen.has(r.subjectId) && seen.add(r.subjectId));
   },
 
   async insertEvaluation(db: DbOrTx, values: typeof ruleEvaluations.$inferInsert) {

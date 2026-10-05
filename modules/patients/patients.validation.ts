@@ -19,6 +19,8 @@ export const patientInputSchema = z.object({
   patientNo: zOptionalText(40).refine((v) => v === undefined || /^[A-Za-z0-9-]+$/.test(v), "Use letters, numbers and hyphens only."),
   // Only platform admins choose a hospital; staff always register into their own.
   hospitalId: zOptionalUuid,
+  /** Set after the user has seen the "possible duplicate" warning and chose to register anyway. */
+  confirmDuplicate: z.boolean().optional(),
 });
 
 export type PatientInput = z.input<typeof patientInputSchema>;

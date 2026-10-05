@@ -44,6 +44,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   isDemo: boolean("is_demo").notNull().default(false),
+  // Testing / demo logins that may switch the insurance portal between insurers and roles (set by an administrator).
+  insuranceContext: boolean("insurance_context").notNull().default(false),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   // Bumped on password change / admin revoke to invalidate all sessions.
   sessionVersion: integer("session_version").notNull().default(1),

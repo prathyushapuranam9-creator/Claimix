@@ -58,11 +58,14 @@ export function EditUserForm({
   roles,
   defaults,
   isSelf,
+  canTestInsurance = false,
 }: {
   action: (i: UserUpdateInput) => Promise<ActionResult>;
   roles: Role[];
   defaults: UserUpdateInput;
   isSelf: boolean;
+  /** Offer the insurance-portal testing switch (insurer / TPA logins). */
+  canTestInsurance?: boolean;
 }) {
   const [saved, setSaved] = useState(false);
   const { register, handleSubmit, setError, formState } = useForm<UserUpdateInput>({ resolver: zodResolver(userUpdateSchema), defaultValues: defaults });
@@ -87,6 +90,7 @@ export function EditUserForm({
           ))}
         </SelectField>
         {isSelf ? <p>You can&apos;t deactivate your own account.</p> : <Checkbox label="Account active" {...register("isActive")} />}
+        {canTestInsurance && <Checkbox label="Insurance portal testing access (can switch insurer and role from the dashboard)" {...register("insuranceContext")} />}
       </FormGrid>
       <div>
         <Button type="submit" loading={formState.isSubmitting}>Save changes</Button>

@@ -97,6 +97,12 @@ export default async function PreauthPage({ params }: { params: Promise<{ id: st
           <WorkflowStepper steps={workflowSteps({ evaluation: w.evaluation?.evaluation, preauthStatus: status })} />
         </Card>
 
+        {w.payersWithoutReviewer.length > 0 && (
+          <Alert tone="warning" title="No reviewer can see this request yet">
+            {w.payersWithoutReviewer.join(" and ")} {w.payersWithoutReviewer.length > 1 ? "have" : "has"} no reviewer account in Claimix, so nobody there can see or decide this pre-authorization.
+            Ask your administrator to add a Payer Reviewer user for {w.payersWithoutReviewer.length > 1 ? "them" : "it"}; the request then appears in their dashboard automatically.
+          </Alert>
+        )}
         {openQueries.length > 0 && (
           <Alert tone="warning" title="Query from the payer">
             {openQueries.map((q) => (

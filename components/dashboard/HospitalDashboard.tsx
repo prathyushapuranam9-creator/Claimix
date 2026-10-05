@@ -25,14 +25,25 @@ export const Icons = {
   search: svg(<><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>),
 };
 
-export function Metric({ icon, label, value, hint }: { icon: ReactNode; label: string; value: ReactNode; hint?: string }) {
+/** A metric card; with `href` the whole card is one link to the matching, already-filtered list. */
+function MetricShell({ href, children }: { href?: string; children: ReactNode }) {
+  return href ? (
+    <Link href={href} className={`${s.glass} ${s.metric} ${s.clickable}`}>
+      {children}
+    </Link>
+  ) : (
+    <div className={`${s.glass} ${s.metric}`}>{children}</div>
+  );
+}
+
+export function Metric({ icon, label, value, hint, href }: { icon: ReactNode; label: string; value: ReactNode; hint?: string; href?: string }) {
   return (
-    <div className={`${s.glass} ${s.metric}`}>
+    <MetricShell href={href}>
       <span className={s.icon}>{icon}</span>
       <span className={s.label}>{label}</span>
       <span className={s.value}>{value}</span>
       {hint && <span className={s.hint}>{hint}</span>}
-    </div>
+    </MetricShell>
   );
 }
 
@@ -124,15 +135,15 @@ export function RingMetric({ label, value, of, hint }: { label: string; value: n
 }
 
 /** Metric card with a thin progress bar showing `value` as a share of `of`. */
-export function BarMetric({ icon, label, value, display, of, hint }: { icon: ReactNode; label: string; value: number; display: ReactNode; of: number; hint?: string }) {
+export function BarMetric({ icon, label, value, display, of, hint, href }: { icon: ReactNode; label: string; value: number; display: ReactNode; of: number; hint?: string; href?: string }) {
   return (
-    <div className={`${s.glass} ${s.metric}`}>
+    <MetricShell href={href}>
       <span className={s.icon}>{icon}</span>
       <span className={s.label}>{label}</span>
       <span className={s.value}>{display}</span>
       {hint && <span className={s.hint}>{hint}</span>}
       <div className={s.bar} role="presentation"><span style={pvar(pct(value, of))} /></div>
-    </div>
+    </MetricShell>
   );
 }
 

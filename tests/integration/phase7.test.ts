@@ -136,7 +136,7 @@ describe("notifications", () => {
 
 describe("policy expiry reminders", () => {
   it("notifies the hospital once per coverage and expiry date, however often it runs", async () => {
-    const p = await PatientService.create(as("staffA"), { fullName: "Expiring Cover Patient", dob: "1970-07-07", gender: "male" });
+    const p = await PatientService.create(as("staffA"), { fullName: "Expiring Cover Patient", dob: "1970-07-07", gender: "male", confirmDuplicate: true });
     const end = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
     await CoverageService.add(as("staffA"), p.id, { policyId: DEMO.policy.surakshaIndividual, memberId: `EXP-${p.id.slice(0, 8)}`, relationship: "self", coverStart: "2025-12-01", coverEnd: end, sumInsured: 300000, sumInsuredAvailable: 300000 });
     const today = new Date().toISOString().slice(0, 10);

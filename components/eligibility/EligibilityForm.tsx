@@ -1,11 +1,12 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ActionResult } from "@/lib/action-result";
 import { useServerResult } from "@/lib/use-action-form";
-import type { EligibilityOutcome } from "@/modules/eligibility/eligibility.service";
+import type { EligibilityHistoryItem, EligibilityOutcome } from "@/modules/eligibility/eligibility.service";
 import { eligibilityInputSchema, type EligibilityInput } from "@/modules/eligibility/eligibility.validation";
 import { workflowSteps } from "@/modules/eligibility/workflow";
 import { RELATIONSHIPS, RELATIONSHIP_LABEL } from "@/modules/patients/coverage.validation";
@@ -15,6 +16,7 @@ import { FormGrid, FormSection, formStyles } from "@/components/ui/Form";
 import { Alert, Card, Stack } from "@/components/ui/Surface";
 import { WorkflowStepper } from "@/components/workflow/WorkflowStepper";
 import { CaseDetailsFields } from "./CaseDetailsFields";
+import { EligibilityHistory } from "./EligibilityHistory";
 import { EligibilityResult } from "./EligibilityResult";
 
 type Opt = { id: string; name: string };
@@ -27,6 +29,7 @@ export function EligibilityForm({
   hospitals,
   diagnoses,
   procedures,
+  history,
 }: {
   action: (i: EligibilityInput) => Promise<ActionResult<EligibilityOutcome>>;
   /** When set, policy/member details come from the recorded coverage. */
@@ -36,7 +39,10 @@ export function EligibilityForm({
   hospitals?: Opt[];
   diagnoses: Coded[];
   procedures: Coded[];
+  /** Recorded checks for this coverage (only when checking a registered coverage). */
+  history?: EligibilityHistoryItem[];
 }) {
+  const router = useRouter();
   const [result, setResult] = useState<EligibilityOutcome | null>(null);
   const { register, handleSubmit, setError, formState, getValues } = useForm<EligibilityInput>({
     resolver: zodResolver(eligibilityInputSchema),
@@ -49,6 +55,8 @@ export function EligibilityForm({
     const r = await action(v);
     if (apply(r)) {
       setResult(r.data);
+      // Re-reads the recorded checks (no new evaluation is run) so this one joins the history.
+      router.refresh();
       requestAnimationFrame(() => document.getElementById("eligibility-result")?.focus());
     }
   });
@@ -122,6 +130,8 @@ export function EligibilityForm({
           </Stack>
         </div>
       )}
+
+      {history && <EligibilityHistory items={history} liveId={result?.evaluationId ?? null} />}
     </Stack>
   );
 }

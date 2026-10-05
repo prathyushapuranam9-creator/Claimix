@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { getDb } from "@/db/client";
 import { runAction, type ActionResult } from "@/lib/actions";
-import { authService, clearSessionCookie, requestMeta, sessionToken, setSessionCookie } from "@/lib/auth/session";
+import { authService, clearContextCookie, clearSessionCookie, requestMeta, sessionToken, setSessionCookie } from "@/lib/auth/session";
 import { env } from "@/lib/config/env";
 import { AccessRequestService } from "@/modules/access-requests/access-requests.service";
 import type { AccessRequestInput } from "@/modules/access-requests/access-requests.validation";
@@ -24,6 +24,7 @@ export async function loginAction(_prev: ActionResult<{ next: string }> | null, 
   const result = await runAction("auth.login", async () => {
     const { token, expiresAt } = await authService().login({ email: field("email"), password: field("password"), portal: field("portal") }, await requestMeta());
     await setSessionCookie(token, expiresAt);
+    await clearContextCookie(); // a new sign-in always starts without a testing context
     return { next };
   });
   if (result.ok && field("enhanced") !== "1") redirect(next);
@@ -33,6 +34,7 @@ export async function loginAction(_prev: ActionResult<{ next: string }> | null, 
 export async function logoutAction(): Promise<void> {
   await authService().logout(await sessionToken(), await requestMeta());
   await clearSessionCookie();
+  await clearContextCookie();
   redirect("/login");
 }
 

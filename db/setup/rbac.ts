@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
 import { permissions, rolePermissions, roles, users } from "@/db/schema";
 import { MERGED_PAYER_ROLE_KEYS, PERMISSIONS, ROLES, type PermissionKey } from "@/lib/permissions/catalog";
@@ -35,6 +35,31 @@ export async function seedRbac(db: DbOrTx) {
     const [payer] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, "payer_reviewer"));
     await db.update(users).set({ roleId: payer!.id }).where(inArray(users.roleId, legacy.map((l) => l.id)));
     await db.delete(roles).where(inArray(roles.id, legacy.map((l) => l.id)));
+  }
+
+  // "Insurance Operations Admin" was replaced by the `insurance:context` permission on the Administrator role.
+  // Anyone who still has the retired role is deactivated and signed out (no access is silently widened), then it is removed.
+  const [retired] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, "insurance_ops_admin"));
+  if (retired) {
+    const [readOnly] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, "read_only"));
+    if (readOnly) {
+      await db
+        .update(users)
+        .set({ roleId: readOnly.id, isActive: false, sessionVersion: sql`${users.sessionVersion} + 1` })
+        .where(eq(users.roleId, retired.id));
+      await db.delete(roles).where(eq(roles.id, retired.id));
+    }
+  }
+
+  // Merging the roles briefly gave payer reviewers policy:read at "all" (the TPA grant). Payers only ever see their
+  // own products, so narrow a leftover "all" back to "organization". (The service layer enforces this regardless.)
+  const [payerRole] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, "payer_reviewer"));
+  const policyRead = permId.get("policy:read");
+  if (payerRole && policyRead) {
+    await db
+      .update(rolePermissions)
+      .set({ scope: "organization" })
+      .where(and(eq(rolePermissions.roleId, payerRole.id), eq(rolePermissions.permissionId, policyRead), eq(rolePermissions.scope, "all")));
   }
 
   const roleRows = await db.select({ id: roles.id, key: roles.key }).from(roles).where(inArray(roles.key, ROLES.map((r) => r.key)));

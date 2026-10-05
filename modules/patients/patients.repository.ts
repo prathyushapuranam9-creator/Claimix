@@ -81,6 +81,25 @@ export const PatientRepository = {
     return row!;
   },
 
+  /**
+   * Patients already registered at this hospital with the same name (ignoring case and extra spaces) and date of
+   * birth. Used to warn about a likely repeat registration; it is never a hard rule.
+   */
+  async likelyDuplicates(db: DbOrTx, hospitalId: string, fullName: string, dob: string) {
+    const normalized = fullName.trim().replace(/\s+/g, " ").toLowerCase();
+    return db
+      .select({ id: patients.id, patientNo: patients.patientNo })
+      .from(patients)
+      .where(and(
+        eq(patients.hospitalId, hospitalId),
+        isNull(patients.deletedAt),
+        eq(patients.dob, dob),
+        sql`lower(regexp_replace(trim(${patients.fullName}), '\\s+', ' ', 'g')) = ${normalized}`,
+      ))
+      .orderBy(asc(patients.createdAt))
+      .limit(5);
+  },
+
   async patientNoTaken(db: DbOrTx, hospitalId: string, patientNo: string, exceptId?: string) {
     const [row] = await db
       .select({ id: patients.id })

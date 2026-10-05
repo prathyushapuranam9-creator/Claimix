@@ -9,8 +9,9 @@ import { diagnosisInputSchema, procedureInputSchema } from "./clinical.validatio
 
 /** Diagnosis and procedure masters. Installations start empty; platform admins maintain them. */
 export const ClinicalService = {
+  /** The master lists, for the administrator's maintenance page. (Forms read options through ClinicalRepository.) */
   async lists(ctx: ServiceContext) {
-    requirePermission(ctx.principal, "policy:read");
+    requirePermission(ctx.principal, "policy:manage");
     const [diagnoses, procedures] = await Promise.all([ClinicalRepository.diagnosisOptions(ctx.db), ClinicalRepository.procedureOptions(ctx.db)]);
     return { diagnoses, procedures };
   },

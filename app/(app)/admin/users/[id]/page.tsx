@@ -32,7 +32,7 @@ export default async function UserPage({ params, searchParams }: { params: Promi
           <Details columns={3} items={[["Organization", u.orgName], ["Last sign-in", formatDateTime(u.lastLoginAt)], ["Created", formatDateTime(u.createdAt)]]} />
         </Card>
         <Card title="Role and status">
-          <EditUserForm action={updateUserAction.bind(null, u.id)} roles={roles} defaults={{ fullName: u.fullName, roleId: u.roleId, isActive: u.isActive }} isSelf={isSelf} />
+          <EditUserForm action={updateUserAction.bind(null, u.id)} roles={roles} defaults={{ fullName: u.fullName, roleId: u.roleId, isActive: u.isActive, insuranceContext: u.insuranceContext }} isSelf={isSelf} canTestInsurance={u.orgType === "insurer" || u.orgType === "tpa"} />
         </Card>
         <Card title="Security">
           <UserSecurityActions

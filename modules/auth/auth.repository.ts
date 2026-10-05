@@ -58,6 +58,7 @@ export const AuthRepository = {
         userActive: users.isActive,
         userDeletedAt: users.deletedAt,
         userSessionVersion: users.sessionVersion,
+        insuranceContext: users.insuranceContext,
         roleId: users.roleId,
         roleKey: roles.key,
         roleName: roles.name,

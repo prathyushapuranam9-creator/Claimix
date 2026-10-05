@@ -10,7 +10,8 @@ import { addDiagnosisAction, addProcedureAction } from "./actions";
 export const metadata: Metadata = { title: "Medical codes · Claimix" };
 
 export default async function MedicalCodesPage() {
-  const ctx = await pageContext("policy:read");
+  // Administrators only (the sidebar entry uses the same permission); the server actions check it again.
+  const ctx = await pageContext("policy:manage");
   const { diagnoses, procedures } = await ClinicalService.lists(ctx);
   const canManage = can(ctx.principal, "policy:manage", "all");
   return (

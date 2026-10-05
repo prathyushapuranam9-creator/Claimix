@@ -18,19 +18,25 @@ export const INTENTS = {
 
 export type Intent = keyof typeof INTENTS;
 
-/** Ordered: more specific patterns first (e.g. "missing documents" before "documents"). */
+/**
+ * Ordered: more specific patterns first (e.g. "missing documents" before "documents").
+ *
+ * A generic word on its own ("next", "check", "review", "active", "year") never selects a topic: those words only
+ * count inside a phrase that is clearly about the request ("what should happen next", "is the policy active",
+ * "what should be checked"). Anything that doesn't match falls through to human review.
+ */
 const PATTERNS: [Intent, RegExp][] = [
-  ["missing_documents", /\b(missing|not uploaded|re-?upload|lacking)\b/i],
-  ["why_rejected", /\b(reject(ed|ion)?|denied|declined|repudiat)/i],
-  ["why_query", /\b(quer(y|ied|ies)|why .*asked)\b/i],
-  ["preauth_required", /\bpre-?auth(ori[sz]ation)?\b.*\b(required|needed|need|necessary)\b|\b(need|require)s?\b.*\bpre-?auth/i],
+  ["missing_documents", /\bwhat(?:'s|\s+is|\s+are)?\b.*\bmissing\b|\b(?:documents?|papers?|reports?|files?|uploads?)\b.*\bmissing\b|\bmissing\b.*\b(?:documents?|papers?|reports?|files?|uploads?)\b|\banything missing\b|\b(?:not uploaded|re-?upload|lacking)\b/i],
+  ["why_rejected", /\b(?:reject(?:ed|ion)?|repudiat\w*)|\b(?:denied|declined)\b.*\b(?:claim|request|pre-?auth\w*|authori[sz]ation|it|this)\b/i],
+  ["why_query", /\bquer(?:y|ied|ies)\b|\bwhy\b.*\b(?:asked|questioned)\b.*\b(?:more|information|documents?|details|clarif\w*)/i],
+  ["preauth_required", /\bpre-?auth(?:ori[sz]ation)?\b.*\b(?:required|needed|need|necessary)\b|\b(?:need|require)s?\b.*\bpre-?auth/i],
   ["cashless_available", /\bcashless\b/i],
-  ["hospital_eligible", /\b(hospital|network|empanel)/i],
-  ["documents_required", /\b(documents?|papers?|paperwork)\b/i],
-  ["patient_eligible", /\b(patient|member)\b.*\b(eligib|covered)|\beligib/i],
-  ["policy_active", /\b(policy|scheme|cover(age)?)\b.*\b(active|valid|expired?|lapsed|in force|running)\b|\bactive\b/i],
-  ["what_to_check", /\b(check(ed|s|ing|list)?|verif(y|ied|ication)|review)\b/i],
-  ["next_step", /\b(next|now what|what (should|do|to do)|happen)\b/i],
+  ["hospital_eligible", /\b(?:hospital|network|empanel)/i],
+  ["documents_required", /\b(?:documents?|papers?|paperwork)\b/i],
+  ["patient_eligible", /\b(?:patient|member)\b.*\b(?:eligib|covered)|\beligib/i],
+  ["policy_active", /\b(?:policy|scheme|cover(?:age)?|insurance|plan|enrol?ment)\b.*\b(?:active|valid|expired?|lapsed|in force|running)\b|\b(?:active|valid|in force|lapsed|expired)\b.*\b(?:policy|scheme|cover(?:age)?|insurance)\b/i],
+  ["what_to_check", /\b(?:what|which)\b.*\b(?:check(?:ed)?|verif(?:y|ied)|review(?:ed)?)\b|\bcheck ?list\b|\bto (?:check|verify)\b/i],
+  ["next_step", /\bnext (?:steps?|actions?|stage)\b|\bwhat(?:'s|\s+is)\s+next\b|\bnow what\b|\bwhat now\b|\bwhat (?:happens|should happen|will happen) (?:next|now|after|then)\b|\bwhat (?:should|do|can|must) (?:we|i|they|the hospital|staff)\b.*\b(?:do|next|now)\b|\bwhat to do\b/i],
 ];
 
 export function classify(question: string): Intent | null {

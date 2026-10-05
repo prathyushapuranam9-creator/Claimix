@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { pageContext } from "@/lib/auth/context";
+import { authService, sessionToken } from "@/lib/auth/session";
+import { ContextSwitcher } from "@/components/insurance/ContextSwitcher";
+import { exitContextAction, switchContextAction } from "../context/actions";
 import { formatDateTime, formatINR } from "@/lib/india";
 import { hasDashboard, landingPath } from "@/lib/navigation";
 import { can } from "@/lib/permissions/principal";
@@ -90,7 +93,7 @@ function Money({ d, settle = true }: { d: DashboardData; settle?: boolean }) {
   );
 }
 
-export default async function DashboardPage() {
+async function DashboardContent({ switcher }: { switcher?: React.ReactNode }) {
   const ctx = await pageContext("dashboard:view");
   if (!hasDashboard(ctx.principal)) redirect(landingPath(ctx.principal));
   const d = await DashboardService.forCaller(ctx);
@@ -105,7 +108,9 @@ export default async function DashboardPage() {
     const drafts = (ps.draft ?? 0) + (cs.draft ?? 0);
     const preauthTotal = Object.values(ps).reduce((a, n) => a + n, 0);
     const caseTotal = preauthTotal + Object.values(cs).reduce((a, n) => a + n, 0);
-    const preauthApproved = sum(ps, ["approved", "partially_approved", "final_approved"]);
+    // Pre-auths that reached approval. A settled pre-auth was approved first (only a final-approved one can settle),
+    // so it stays in this count rather than dropping out when the claim is paid.
+    const preauthApproved = sum(ps, ["approved", "partially_approved", "final_approved", "settled"]);
     const t = d.financials.reduce((a, f) => ({ approved: a.approved + f.approved, settled: a.settled + f.settled, claimed: a.claimed + f.claimed }), { approved: 0, settled: 0, claimed: 0 });
     const clock = new Intl.DateTimeFormat("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Kolkata" });
     const trend = d.awaitingTrend.map((p) => ({ label: clock.format(p.at), n: p.n }));
@@ -124,9 +129,9 @@ export default async function DashboardPage() {
               {d.openReviews !== null && <RingMetric label="Assistant reviews" value={d.openReviews} of={d.openReviews} hint="Open questions" />}
             </Rings>
             <Rings>
-              <Metric icon={Icons.clock} label="Awaiting payer" value={sum(ps, ["submitted", "pending"]) + sum(cs, ["submitted", "pending"])} />
-              <BarMetric icon={Icons.check} label="Pre-auths approved" value={preauthApproved} display={preauthApproved} of={preauthTotal} />
-              <BarMetric icon={Icons.wallet} label="Settled (paid)" value={t.settled} display={formatINR(t.settled)} of={t.approved} />
+              <Metric icon={Icons.clock} label="Awaiting payer" value={sum(ps, ["submitted", "pending"]) + sum(cs, ["submitted", "pending"])} href="/pre-authorizations?view=review" />
+              <BarMetric icon={Icons.check} label="Pre-auths approved" value={preauthApproved} display={preauthApproved} of={preauthTotal} href="/pre-authorizations?view=approved" />
+              <BarMetric icon={Icons.wallet} label="Settled (paid)" value={t.settled} display={formatINR(t.settled)} of={t.approved} href="/claims?view=settled" />
             </Rings>
           </Col>
           <Col side>
@@ -175,6 +180,7 @@ export default async function DashboardPage() {
           actions={<PipelinePill label="Decision pipeline" when={`as of ${formatDateTime(new Date())}`} />}
         />
         <Stack>
+          {switcher}
           <SectionHeader id="workflows" title="Actionable workflows" chip={`${pending} Pending`} caption="Counts as of page load" />
           <CardGrid columns={4} labelledBy="workflows">
             <WorkflowCard
@@ -222,7 +228,7 @@ export default async function DashboardPage() {
               title="Pre-authorizations awaiting decision"
               count={preauthsWaiting}
               dot="blue"
-              href="/pre-authorizations"
+              href="/pre-authorizations?view=all"
               rows={caseRows(d.actionPreauths, "preauth")}
               empty={<EmptyState title="Nothing awaiting a decision" />}
             />
@@ -230,7 +236,7 @@ export default async function DashboardPage() {
               title="Claims awaiting decision"
               count={claimsWaiting}
               dot="navy"
-              href="/claims"
+              href="/claims?view=all"
               rows={caseRows(d.actionClaims, "claim")}
               empty={<EmptyState title="Nothing awaiting a decision" />}
             />
@@ -246,6 +252,7 @@ export default async function DashboardPage() {
     <>
       {header}
       <Stack>
+        {switcher}
         <div className={r.groups}>
           {d.admin && (
             <>
@@ -285,5 +292,33 @@ export default async function DashboardPage() {
         <p className={r.note}><Link href="/reports">Open reports</Link> for trends, turnaround and top reasons.</p>
       </Stack>
     </>
+  );
+}
+
+/**
+ * The dashboard. Accounts that hold `insurance:context` (the testing / demo account) get the Insurance Company and
+ * Role selectors at the top; while a context is active the rest of the page is that company's role-specific dashboard.
+ */
+export default async function DashboardPage() {
+  const ctx = await pageContext("dashboard:view");
+  if (!ctx.user.canSwitchContext) return <DashboardContent />;
+  const options = await authService().contextOptions(await sessionToken());
+  // Shown with the payer / administrator dashboard it switches; preselected to the company and role currently in use.
+  const inUse = ctx.principal.acting || ctx.principal.orgType === "insurer" || ctx.principal.orgType === "tpa";
+  return (
+    <DashboardContent
+      switcher={
+        <ContextSwitcher
+          // Re-initialise the form whenever the server-side context changes, so it always shows what is really in use.
+          key={`${inUse ? ctx.principal.organizationId : "all"}:${ctx.principal.roleKey}:${ctx.principal.acting ? "ctx" : "own"}`}
+          options={options}
+          allowAll={ctx.user.homeIsAllInsurers}
+          current={inUse ? { organizationId: ctx.principal.organizationId, roleKey: ctx.principal.roleKey } : null}
+          active={!!ctx.principal.acting}
+          switchAction={switchContextAction}
+          exitAction={exitContextAction}
+        />
+      }
+    />
   );
 }

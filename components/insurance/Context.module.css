@@ -1,0 +1,50 @@
+/* Insurance-portal testing context: the selectors on the dashboard and the banner shown on every page. */
+.switcher {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  margin-bottom: var(--sp-4);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  scroll-margin-top: var(--sp-6);
+}
+
+.title { font-size: var(--fs-md); }
+.intro p { color: var(--c-text-muted); font-size: var(--fs-sm); margin-top: var(--sp-1); }
+
+.form {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) auto;
+  gap: var(--sp-3);
+  align-items: end;
+}
+
+@media (max-width: 860px) {
+  .form { grid-template-columns: minmax(0, 1fr); }
+}
+
+.actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
+.banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  margin-bottom: var(--sp-4);
+  background: var(--c-accent);
+  border: 1px solid var(--c-accent-edge);
+  border-radius: var(--radius-md);
+  color: var(--c-text);
+  font-size: var(--fs-sm);
+}
+
+.tag {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--fs-xs);
+}
+
+.bannerActions { display: flex; align-items: center; gap: var(--sp-3); margin-left: auto; }

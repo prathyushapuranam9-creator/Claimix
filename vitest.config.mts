@@ -21,6 +21,8 @@ export default defineConfig({
           globalSetup: ["tests/integration/global-setup.ts"],
           fileParallelism: false,
           testTimeout: 30000,
+          // Setup signs in every demo account (slow password hashing by design) and teardown drops databases.
+          hookTimeout: 60000,
         },
       },
     ],

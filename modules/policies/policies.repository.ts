@@ -18,9 +18,15 @@ export const POLICY_SCOPE: ScopeColumns = {
   patientId: (pid) => sql`exists (select 1 from ${beneficiaries} b where b.policy_id = ${policies.id} and b.patient_id = ${pid} and b.deleted_at is null)`,
 };
 
-/** "all" on policy:read is reference-data access, so it needs no tenant filter for any org type. */
+/**
+ * "all" on policy:read is reference-data access for hospital staff, administrators and read-only users, so it
+ * needs no tenant filter for them. Payer organizations (insurers and TPAs) never get it: whatever their role grant
+ * says, they only see their own products. This is enforced here, in the one place policy queries are scoped, so a
+ * misconfigured or merged role matrix can't widen a payer's view.
+ */
 function policyScope(principal: Principal, scope: Scope) {
-  return scope === "all" ? undefined : scopePredicate(principal, scope, POLICY_SCOPE);
+  const effective: Scope = scope === "all" && (principal.orgType === "insurer" || principal.orgType === "tpa") ? "organization" : scope;
+  return effective === "all" ? undefined : scopePredicate(principal, effective, POLICY_SCOPE);
 }
 
 const insurerOrg = aliasedTable(organizations, "insurer_org");
@@ -124,13 +130,13 @@ export const PolicyRepository = {
   },
 
   /** Options for coverage enrolment pickers (active, non-deleted). */
-  async options(db: DbOrTx, category?: "private" | "government") {
+  async options(db: DbOrTx, category?: "private" | "government", viewer?: { principal: Principal; scope: Scope }) {
     return db
       .select({ id: policies.id, name: policies.name, category: policies.category, insurerName: insurerOrg.name, schemeName: governmentSchemes.name })
       .from(policies)
       .leftJoin(insurerOrg, eq(insurerOrg.id, policies.insurerId))
       .leftJoin(governmentSchemes, eq(governmentSchemes.id, policies.schemeId))
-      .where(and(isNull(policies.deletedAt), eq(policies.isActive, true), category ? eq(policies.category, category) : undefined))
+      .where(and(isNull(policies.deletedAt), eq(policies.isActive, true), category ? eq(policies.category, category) : undefined, viewer ? policyScope(viewer.principal, viewer.scope) : undefined))
       .orderBy(asc(policies.name));
   },
 };

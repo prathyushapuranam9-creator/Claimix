@@ -56,6 +56,7 @@ export async function demoPrincipals(auth: AuthService, password: string) {
     insurerA: "insurer.a@demo.claimix.invalid",
     insurerB: "insurer.b@demo.claimix.invalid",
     tpaA: "tpa.a@demo.claimix.invalid",
+    portalReviewer: "insurer.portal@demo.claimix.invalid",
     patientA1: "patient.a1@demo.claimix.invalid",
     patientA2: "patient.a2@demo.claimix.invalid",
     patientB1: "patient.b1@demo.claimix.invalid",

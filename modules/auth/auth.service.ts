@@ -1,11 +1,12 @@
 import "server-only";
 import type { Db } from "@/db/client";
-import { RateLimitedError, UnauthorizedError, ValidationError } from "@/lib/errors";
+import { ForbiddenError, RateLimitedError, UnauthorizedError, ValidationError } from "@/lib/errors";
 import type { Principal } from "@/lib/permissions/principal";
 import { hashPassword, hmacHex, randomToken, sha256Hex, verifyPassword } from "@/lib/security/crypto";
 import { AuditService, type RequestMeta } from "@/modules/audit/audit.service";
 import { issuePasswordSetup } from "./password-setup";
 import { AuthRepository } from "./auth.repository";
+import { INSURANCE_CONTEXT_PERMISSION, InsuranceContext, type ContextOption, type ContextSelection, type ResolvedContext } from "./insurance-context";
 import { isPortal, PORTALS, portalFor } from "@/lib/portals";
 import { changePasswordSchema, forgotPasswordSchema, loginSchema, resetPasswordSchema } from "./auth.validation";
 
@@ -33,6 +34,10 @@ export interface SessionUser {
   email: string;
   roleName: string;
   orgName: string;
+  /** The real account may use the insurance-portal testing context (true even while a context is active). */
+  canSwitchContext: boolean;
+  /** The real account's own view is across all insurers (an administrator), rather than one insurer (a flagged payer login). */
+  homeIsAllInsurers: boolean;
 }
 
 // Verified against when the email is unknown so response time does not reveal which accounts exist.
@@ -71,7 +76,15 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
     }
   }
 
-  return {
+  /** The REAL signed-in account (never the testing context), and only if it may use the insurance-portal context. */
+  async function requireContextHolder(token: string | undefined | null) {
+    const real = await service.resolve(token);
+    if (!real) throw new UnauthorizedError("Your session has ended. Please sign in again.");
+    if (!real.canSwitchContext) throw new ForbiddenError();
+    return real;
+  }
+
+  const service = {
     async login(input: unknown, meta: RequestMeta): Promise<{ token: string; expiresAt: Date }> {
       const parsed = loginSchema.safeParse(input);
       if (!parsed.success) throw new ValidationError("Enter your email and password.");
@@ -145,8 +158,12 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
       return { token, expiresAt };
     },
 
-    /** Resolves a cookie token to the caller, or null if missing/expired/revoked. */
-    async resolve(token: string | undefined | null): Promise<SessionUser | null> {
+    /**
+     * Resolves a cookie token to the caller, or null if missing/expired/revoked. `contextToken` is the optional
+     * insurance-portal testing context; it is applied only when valid for this session AND the real account
+     * holds `insurance:context`, and the effective permissions are always loaded from the chosen role.
+     */
+    async resolve(token: string | undefined | null, contextToken?: string | null): Promise<SessionUser | null> {
       if (!token || token.length > 200) return null;
       const row = await AuthRepository.findSessionContext(db, sha256Hex(token));
       if (!row) return null;
@@ -165,6 +182,31 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
         await AuthRepository.touchSession(db, row.sessionId);
       }
       const permissions = await AuthRepository.loadPermissions(db, row.roleId);
+      // The Administrator permission, or the per-account testing flag an administrator sets on a designated demo login.
+      const canSwitchContext = permissions.has(INSURANCE_CONTEXT_PERMISSION) || row.insuranceContext;
+      const homeIsAllInsurers = row.orgType === "platform";
+      const selection = canSwitchContext ? InsuranceContext.verify(cfg.secret, contextToken, row.sessionId) : null;
+      const acting = selection ? await InsuranceContext.resolve(db, selection) : null;
+      if (acting) {
+        return {
+          principal: {
+            userId: row.userId,
+            organizationId: acting.organizationId,
+            orgType: acting.orgType,
+            roleKey: acting.roleKey,
+            patientId: null,
+            sessionId: row.sessionId,
+            permissions: await AuthRepository.loadPermissions(db, acting.roleId),
+            acting: { organizationName: acting.organizationName, roleName: acting.roleName },
+          },
+          fullName: row.fullName,
+          email: row.email,
+          roleName: acting.roleName,
+          orgName: acting.organizationName,
+          canSwitchContext,
+          homeIsAllInsurers,
+        };
+      }
       return {
         principal: {
           userId: row.userId,
@@ -180,7 +222,43 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
         email: row.email,
         roleName: row.roleName,
         orgName: row.orgName,
+        canSwitchContext,
+        homeIsAllInsurers,
       };
+    },
+
+    /** The insurers / TPAs and roles the real account may test as. Only for accounts holding `insurance:context`. */
+    async contextOptions(token: string | undefined | null): Promise<ContextOption[]> {
+      await requireContextHolder(token);
+      return InsuranceContext.options(db);
+    },
+
+    /** Validates and audits a switch; returns the signed cookie value. Never grants anything the role doesn't hold. */
+    async switchContext(token: string | undefined | null, input: unknown, meta: RequestMeta): Promise<{ contextToken: string; info: ResolvedContext }> {
+      const real = await requireContextHolder(token);
+      const sel = input as Partial<ContextSelection> | null;
+      const info =
+        typeof sel?.organizationId === "string" && typeof sel?.roleKey === "string"
+          ? await InsuranceContext.resolve(db, { organizationId: sel.organizationId, roleKey: sel.roleKey })
+          : null;
+      if (!info) throw new ValidationError("Choose an insurance company and one of its roles.");
+      await AuditService.record(db, {
+        action: "context.switched",
+        actorUserId: real.principal.userId,
+        organizationId: real.principal.organizationId,
+        sessionId: real.principal.sessionId,
+        newState: { organizationId: info.organizationId, organizationName: info.organizationName, roleKey: info.roleKey },
+        meta,
+      });
+      return {
+        contextToken: InsuranceContext.sign(cfg.secret, real.principal.sessionId, { organizationId: info.organizationId, roleKey: info.roleKey }),
+        info,
+      };
+    },
+
+    async clearContext(token: string | undefined | null, meta: RequestMeta): Promise<void> {
+      const real = await requireContextHolder(token);
+      await AuditService.record(db, { action: "context.cleared", actorUserId: real.principal.userId, organizationId: real.principal.organizationId, sessionId: real.principal.sessionId, meta });
     },
 
     async logout(token: string | undefined | null, meta: RequestMeta): Promise<void> {
@@ -260,6 +338,7 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
       });
     },
   };
+  return service;
 }
 
 export type AuthService = ReturnType<typeof createAuthService>;

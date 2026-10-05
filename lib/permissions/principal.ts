@@ -11,6 +11,12 @@ export interface Principal {
   patientId: string | null;
   sessionId: string;
   permissions: ReadonlyMap<PermissionKey, Scope>;
+  /**
+   * Set only while an account that holds `insurance:context` is testing the insurance portal as an insurer / TPA
+   * and role. Everything else on the principal is then that organization's and that role's (real authorization),
+   * while `userId` stays the real signed-in account so changes and audit entries are traceable to it.
+   */
+  acting?: { organizationName: string; roleName: string };
 }
 
 const RANK: Record<Scope, number> = { own: 1, organization: 2, all: 3 };

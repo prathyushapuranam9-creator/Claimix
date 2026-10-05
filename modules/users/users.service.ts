@@ -125,15 +125,19 @@ export const UserService = {
         throw new ValidationError("You can't change your own role or deactivate yourself.");
       }
 
-      await UserRepository.update(tx, id, { fullName: d.fullName, roleId: role.id, isActive: d.isActive });
+      const insuranceContext = d.insuranceContext ?? before.insuranceContext;
+      if (insuranceContext && before.orgType !== "insurer" && before.orgType !== "tpa") {
+        throw new ValidationError("Insurance testing access is for insurer and TPA logins (administrators already have it).", { insuranceContext: ["Only for insurer and TPA users."] });
+      }
+      await UserRepository.update(tx, id, { fullName: d.fullName, roleId: role.id, isActive: d.isActive, insuranceContext });
       if (roleChanged || (before.isActive && !d.isActive)) await AuthRepository.revokeAllForUser(tx, id);
       await AuditService.record(tx, {
         ...actorOf(ctx),
         action: roleChanged ? "user.role_changed" : "user.updated",
         resourceType: "user",
         resourceId: id,
-        previousState: { fullName: before.fullName, role: before.roleKey, isActive: before.isActive },
-        newState: { fullName: d.fullName, role: role.key, isActive: d.isActive },
+        previousState: { fullName: before.fullName, role: before.roleKey, isActive: before.isActive, insuranceContext: before.insuranceContext },
+        newState: { fullName: d.fullName, role: role.key, isActive: d.isActive, insuranceContext },
       });
     });
   },

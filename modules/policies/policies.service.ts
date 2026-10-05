@@ -31,8 +31,8 @@ export const PolicyService = {
   },
 
   async options(ctx: ServiceContext, category?: "private" | "government") {
-    requirePermission(ctx.principal, "policy:read");
-    return PolicyRepository.options(ctx.db, category);
+    const scope = requirePermission(ctx.principal, "policy:read");
+    return PolicyRepository.options(ctx.db, category, { principal: ctx.principal, scope });
   },
 
   async create(ctx: ServiceContext, input: unknown) {

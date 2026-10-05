@@ -5,13 +5,14 @@ import { diagnoses, organizations, procedures } from "@/db/schema";
 import type { ServiceContext } from "@/lib/auth/context";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import { requirePermission } from "@/lib/permissions/principal";
-import { parseOrThrow, todayIso } from "@/lib/validation";
+import { parseOrThrow, requireId, todayIso } from "@/lib/validation";
 import { actorOf, AuditService } from "@/modules/audit/audit.service";
 import { HospitalRepository, networkForPolicy } from "@/modules/hospitals/hospitals.repository";
 import { CoverageRepository } from "@/modules/patients/coverage.repository";
 import { PolicyRepository } from "@/modules/policies/policies.repository";
 import type { CaseFacts, Evaluation } from "@/modules/rules/engine/types";
-import { evaluateAndRecord } from "@/modules/rules/rules.service";
+import { RuleRepository } from "@/modules/rules/rules.repository";
+import { evaluateAndRecord, loadEvaluation } from "@/modules/rules/rules.service";
 import type { z } from "zod";
 import { eligibilityInputSchema, fromTriState } from "./eligibility.validation";
 
@@ -45,7 +46,61 @@ export interface EligibilityOutcome {
   facts: CaseFacts;
 }
 
+/** A previously recorded eligibility check, replayed from its stored rule version and input snapshot. */
+export interface EligibilityHistoryItem {
+  id: string;
+  evaluatedAt: Date;
+  overall: Evaluation["overall"];
+  ruleVersion: number;
+  policyName: string;
+  hospitalName: string;
+  checkedBy: string | null;
+  /** Case details that were checked (from the stored input snapshot). */
+  case: { claimType?: string; admissionDate?: string; diagnosisCode?: string; procedureCode?: string; estimatedCost?: number };
+  evaluation: Evaluation;
+}
+
+const HISTORY_LIMIT = 10;
+
 export const EligibilityService = {
+  /**
+   * Previous eligibility checks for a coverage the caller may see, newest first. Reads recorded
+   * evaluations only — it never runs the check again. Tenant users only get checks run by their own
+   * organization; platform admins see all.
+   */
+  async history(ctx: ServiceContext, beneficiaryId: string): Promise<EligibilityHistoryItem[]> {
+    const scope = requirePermission(ctx.principal, "eligibility:check");
+    const cov = await CoverageRepository.findScoped(ctx.db, ctx.principal, requirePermission(ctx.principal, "patient:read"), requireId(beneficiaryId, "Coverage"));
+    if (!cov) throw new NotFoundError("Coverage not found.");
+    const rows = await RuleRepository.evaluationsForSubject(ctx.db, "eligibility_check", cov.id, scope === "all" ? undefined : ctx.principal.organizationId, HISTORY_LIMIT);
+    const items: EligibilityHistoryItem[] = [];
+    for (const r of rows) {
+      const loaded = await loadEvaluation(ctx.db, r.id);
+      if (!loaded) continue;
+      const f = r.inputSnapshot as Partial<CaseFacts>;
+      items.push({
+        id: r.id,
+        evaluatedAt: r.evaluatedAt,
+        overall: r.overall,
+        ruleVersion: r.ruleVersion,
+        policyName: r.policyName,
+        hospitalName: r.hospitalName,
+        checkedBy: r.checkedBy,
+        case: { claimType: f.claimType, admissionDate: f.admissionDate, diagnosisCode: f.diagnosisCode, procedureCode: f.procedureCode, estimatedCost: f.estimatedCost },
+        evaluation: loaded.evaluation,
+      });
+    }
+    return items;
+  },
+
+  /** Latest check per coverage, for the coverage list on a patient page. Empty for users who can't run checks. */
+  async latestChecks(ctx: ServiceContext, beneficiaryIds: string[]) {
+    if (!ctx.principal.permissions.has("eligibility:check")) return new Map<string, { id: string; evaluatedAt: Date; overall: Evaluation["overall"] }>();
+    const scope = requirePermission(ctx.principal, "eligibility:check");
+    const rows = await RuleRepository.latestForSubjects(ctx.db, "eligibility_check", beneficiaryIds, scope === "all" ? undefined : ctx.principal.organizationId);
+    return new Map(rows.map((r) => [r.subjectId!, { id: r.id, evaluatedAt: r.evaluatedAt, overall: r.overall }]));
+  },
+
   /**
    * Runs the policy's own active rules against the case. Recorded coverage is the
    * source of truth when a beneficiary is given; nothing missing is ever assumed.

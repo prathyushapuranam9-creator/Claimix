@@ -13,6 +13,8 @@ export const userUpdateSchema = z.object({
   fullName: zName,
   roleId: zUuid,
   isActive: z.preprocess((v) => v === true || v === "true" || v === "on", z.boolean()),
+  /** Insurance-portal testing access (insurer / TPA logins only). Omitted = unchanged. */
+  insuranceContext: z.preprocess((v) => (v === undefined ? undefined : v === true || v === "true" || v === "on"), z.boolean().optional()),
 });
 
 /**

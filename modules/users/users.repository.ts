@@ -12,6 +12,7 @@ const safeColumns = {
   fullName: users.fullName,
   isActive: users.isActive,
   isDemo: users.isDemo,
+  insuranceContext: users.insuranceContext,
   lastLoginAt: users.lastLoginAt,
   createdAt: users.createdAt,
   roleId: users.roleId,
@@ -60,7 +61,7 @@ export const UserRepository = {
     return row!;
   },
 
-  async update(db: DbOrTx, id: string, values: Partial<Pick<typeof users.$inferInsert, "fullName" | "email" | "roleId" | "isActive">>) {
+  async update(db: DbOrTx, id: string, values: Partial<Pick<typeof users.$inferInsert, "fullName" | "email" | "roleId" | "isActive" | "insuranceContext">>) {
     await db.update(users).set(values).where(eq(users.id, id));
   },
 

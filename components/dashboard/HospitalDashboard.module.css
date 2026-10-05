@@ -93,6 +93,20 @@
   padding: var(--sp-4);
 }
 
+/* A metric card that links to its list: same look, with a subtle lift on hover and a visible keyboard focus. */
+.clickable {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+.clickable:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg, var(--shadow-md)); border-color: var(--c-accent-edge); }
+.clickable:focus-visible { outline: 2px solid var(--c-accent-edge); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .clickable { transition: none; }
+  .clickable:hover { transform: none; }
+}
+
 .icon {
   display: grid;
   place-items: center;
@@ -135,7 +149,7 @@
 }
 
 .panelHead h2 { flex: 1; font-size: var(--fs-md); }
-.panelBody { min-height: 0; padding: var(--sp-3) var(--sp-5); display: grid; align-content: center; overflow: auto; }
+.panelBody { min-height: 8rem; padding: var(--sp-3) var(--sp-5); display: grid; align-content: center; overflow: auto; }
 
 /* Composition: main column + side column on wide screens */
 .layout {
@@ -226,8 +240,8 @@
 }
 
 .kv { display: grid; gap: 2px; align-content: start; }
-.kvGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); flex: 1; min-width: 0; }
-.kv strong { font-size: var(--fs-xl); font-variant-numeric: tabular-nums; }
+.kvGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: var(--sp-3); flex: 1; min-width: 0; }
+.kv strong { font-size: var(--fs-xl); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .kv span { color: var(--c-text-muted); font-size: var(--fs-sm); }
 
 .perf { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); }
@@ -236,8 +250,12 @@
  * Desktop: the dashboard is exactly one screen tall (no page scroll). It fills the space under the top
  * bar and the section bar (pagebar), absorbing the shell's content padding; the work queues take whatever
  * height is left and scroll inside their panels if a list is long.
+ *
+ * Only on screens tall enough to leave the queues a usable height (the cards above them need about 590px,
+ * and the queues need roughly 150px). On shorter laptop screens (e.g. 1280x720, 1366x768) the page scrolls
+ * normally instead, so every queue row stays reachable.
  */
-@media (min-width: 1100px) and (min-height: 720px) {
+@media (min-width: 1100px) and (min-height: 880px) {
   .page {
     --chrome: calc(var(--topbar-h) + var(--tap) + var(--sp-4) + var(--sp-6));
     height: calc(100dvh - var(--chrome));
@@ -252,7 +270,7 @@
   .colSide { grid-template-rows: minmax(0, 1fr) auto auto; }
   .queues { min-height: 0; gap: var(--sp-3); }
   .queues > section { display: flex; flex-direction: column; min-height: 0; }
-  .queues .panelBody { flex: 1; }
+  .queues .panelBody { flex: 1; min-height: 8rem; }
   .panelBody > div { padding: var(--sp-2) var(--sp-4); gap: var(--sp-1); }
   .panelBody > div > span { width: 36px; height: 36px; margin-bottom: 0; font-size: 16px; }
 

@@ -20,7 +20,10 @@ import { PreauthRepository } from "./preauth.repository";
 import {
   cancelSchema, CLINICAL_FIELDS, confirmItemSchema, decisionSchema, preauthCreateSchema, preauthDetailsSchema, queryResponseSchema, submitSchema,
 } from "./preauth.validation";
-import { allowedTransitions, canTransition, HOSPITAL_EDITABLE, PAYER_DECISIONS, STATUS_LABEL, type PreauthStatus, type Side } from "./preauth.workflow";
+import { allowedTransitions, canTransition, HOSPITAL_EDITABLE, PAYER_DECISIONS, STATUS_LABEL, TERMINAL, type PreauthStatus, type Side } from "./preauth.workflow";
+
+/** Statuses in which the request is still waiting on someone (so a missing reviewer matters). */
+const TERMINAL_STATUSES = new Set<PreauthStatus>([...TERMINAL, "approved", "partially_approved", "final_approved"]);
 
 type Row = NonNullable<Awaited<ReturnType<typeof PreauthRepository.findScoped>>>;
 
@@ -121,7 +124,7 @@ async function checklistFor(db: DbOrTx, row: Row) {
 }
 
 export const PreauthService = {
-  async list(ctx: ServiceContext, q: ListQuery, f: { status?: PreauthStatus[] }) {
+  async list(ctx: ServiceContext, q: ListQuery, f: { status?: PreauthStatus[]; insurerId?: string; tpaId?: string; hospitalId?: string }) {
     const scope = requirePermission(ctx.principal, "preauth:read");
     return PreauthRepository.list(ctx.db, ctx.principal, scope, q, f);
   },
@@ -140,8 +143,12 @@ export const PreauthService = {
     const payerSide = payerSideFor(ctx.principal, row.preauth);
     const status = row.preauth.status as PreauthStatus;
     await AuditService.record(ctx.db, { ...actorOf(ctx), action: "preauth.viewed", resourceType: "preauth", resourceId: row.preauth.id });
+    // Tell the hospital when the request's insurer / TPA has nobody who can review it (it would otherwise just sit unseen).
+    const payerIds = [row.preauth.insurerId, row.preauth.tpaId].filter((x): x is string => !!x);
+    const payersWithoutReviewer = side === "hospital" && !TERMINAL_STATUSES.has(status) ? await PreauthRepository.payersWithoutReviewers(ctx.db, payerIds) : [];
     return {
       ...row,
+      payersWithoutReviewer,
       history,
       documents: docs,
       queries: queryRows,

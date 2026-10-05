@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { getDb } from "@/db/client";
+import { ContextBanner } from "@/components/insurance/ContextBanner";
 import { AppShell } from "@/components/shell/AppShell";
 import { requestMeta, requireUser } from "@/lib/auth/session";
 import { visibleNav } from "@/lib/navigation";
@@ -22,6 +23,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       logout={logoutAction}
       unread={unread}
     >
+      {user.principal.acting && <ContextBanner organizationName={user.principal.acting.organizationName} roleName={user.principal.acting.roleName} />}
       {children}
     </AppShell>
   );

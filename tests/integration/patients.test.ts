@@ -16,7 +16,9 @@ beforeAll(async () => {
 });
 afterAll(() => ctx.close());
 
-const valid = (over: Record<string, unknown> = {}) => ({ fullName: "Test Patient", dob: "1985-06-15", gender: "female", ...over });
+// These tests re-register the same fixed fixtures on every run, so they confirm the "possible duplicate" warning
+// (covered in patient-duplicates.test.ts) and focus on scoping, validation and audit.
+const valid = (over: Record<string, unknown> = {}) => ({ fullName: "Test Patient", dob: "1985-06-15", gender: "female", confirmDuplicate: true, ...over });
 
 describe("PatientService scoping", () => {
   it("hospital staff always register into their own hospital, ignoring a client-sent hospitalId", async () => {

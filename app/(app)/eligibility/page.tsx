@@ -7,6 +7,7 @@ import { ClinicalRepository } from "@/modules/clinical/clinical.repository";
 import { OrganizationRepository } from "@/modules/organizations/organizations.repository";
 import { CoverageService } from "@/modules/patients/coverage.service";
 import { RELATIONSHIP_LABEL } from "@/modules/patients/coverage.validation";
+import { EligibilityService } from "@/modules/eligibility/eligibility.service";
 import { PolicyService } from "@/modules/policies/policies.service";
 import { EligibilityForm } from "@/components/eligibility/EligibilityForm";
 import { ButtonLink } from "@/components/ui/Button";
@@ -24,11 +25,12 @@ export default async function EligibilityPage({ searchParams }: { searchParams: 
   const beneficiary = param(sp, "beneficiary");
   const cov = beneficiary ? await orNotFound(CoverageService.get(ctx, beneficiary)) : null;
   const isAdmin = scopeFor(ctx.principal, "eligibility:check") === "all";
-  const [policies, diagnoses, procedures, hospitals] = await Promise.all([
+  const [policies, diagnoses, procedures, hospitals, history] = await Promise.all([
     PolicyService.options(ctx),
     ClinicalRepository.diagnosisOptions(ctx.db),
     ClinicalRepository.procedureOptions(ctx.db),
     isAdmin ? OrganizationRepository.options(ctx.db, ["hospital"]) : Promise.resolve(undefined),
+    cov ? EligibilityService.history(ctx, cov.id) : Promise.resolve(undefined),
   ]);
 
   return (
@@ -54,7 +56,7 @@ export default async function EligibilityPage({ searchParams }: { searchParams: 
             />
           </Card>
         )}
-        <EligibilityForm action={checkEligibilityAction} beneficiaryId={cov?.id} policies={policies} hospitals={hospitals} diagnoses={diagnoses} procedures={procedures} />
+        <EligibilityForm action={checkEligibilityAction} beneficiaryId={cov?.id} policies={policies} hospitals={hospitals} diagnoses={diagnoses} procedures={procedures} history={history} />
       </Stack>
     </>
   );

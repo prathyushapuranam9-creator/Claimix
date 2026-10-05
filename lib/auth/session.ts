@@ -46,13 +46,32 @@ export async function sessionToken(): Promise<string | undefined> {
   return (await cookies()).get(SESSION_COOKIE)?.value;
 }
 
+/**
+ * The insurance-portal testing context (signed, tied to this session, re-validated on every request). It only has an
+ * effect for the one kind of account that holds `insurance:context`; for everyone else the cookie is simply ignored.
+ */
+export const CONTEXT_COOKIE = process.env.NODE_ENV === "production" ? "__Host-claimix_context" : "claimix_context";
+
+export async function contextToken(): Promise<string | undefined> {
+  return (await cookies()).get(CONTEXT_COOKIE)?.value;
+}
+
+export async function setContextCookie(value: string) {
+  (await cookies()).set(CONTEXT_COOKIE, value, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/" });
+}
+
+export async function clearContextCookie() {
+  // `__Host-` cookies are only changed by a response that carries the same attributes (incl. Secure), so expire it explicitly.
+  (await cookies()).set(CONTEXT_COOKIE, "", { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 0 });
+}
+
 /** The current user for this request (memoized per request), or null. */
 export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
   // Read the cookie first: it marks the render as dynamic (never prerendered at build,
   // where no configuration exists) and lets signed-out requests skip the database.
   const token = await sessionToken();
   if (!token) return null;
-  return authService().resolve(token);
+  return authService().resolve(token, await contextToken());
 });
 
 /** For pages: redirects to login when there is no valid session. */

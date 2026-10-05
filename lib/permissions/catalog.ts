@@ -34,6 +34,7 @@ export const PERMISSIONS = {
   "assistant:review": "Answer questions sent to human review",
   "report:view": "View reports",
   "audit:read": "View audit logs",
+  "insurance:context": "Test and demonstrate the insurance portal as any insurer and role",
 } as const;
 
 export type PermissionKey = keyof typeof PERMISSIONS;
@@ -90,7 +91,8 @@ export const ROLES: RoleDef[] = [
       "patient:read": "organization",
       "hospital:read": "all",
       "insurer:read": "all",
-      "policy:read": "all",
+      // Own products only (an insurer's, or those a TPA administers); also enforced in PolicyRepository.
+      "policy:read": "organization",
       "preauth:read": "organization",
       "preauth:review": "organization",
       "claim:read": "organization",

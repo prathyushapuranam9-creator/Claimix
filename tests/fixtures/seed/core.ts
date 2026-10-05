@@ -51,6 +51,8 @@ export async function seedCore(
     { email: "insurer.a@demo.claimix.invalid", fullName: "Vikram Reviewer (Aarogya)", role: "payer_reviewer", org: DEMO.org.insurerA },
     { email: "insurer.b@demo.claimix.invalid", fullName: "Nisha Reviewer (Suraksha)", role: "payer_reviewer", org: DEMO.org.insurerB },
     { email: "tpa.a@demo.claimix.invalid", fullName: "Farhan Analyst (MediAssist)", role: "payer_reviewer", org: DEMO.org.tpaA },
+    // The designated testing / demo Insurance Portal login: an Aarogya payer reviewer an administrator has flagged to switch insurer and role.
+    { email: "insurer.portal@demo.claimix.invalid", fullName: "Portal Reviewer (Aarogya)", role: "payer_reviewer", org: DEMO.org.insurerA, insuranceContext: true },
     { email: "patient.a1@demo.claimix.invalid", fullName: "Demo Patient Anil", role: "patient", org: DEMO.org.hospitalA },
     { email: "patient.a2@demo.claimix.invalid", fullName: "Demo Patient Bhavna", role: "patient", org: DEMO.org.hospitalA },
     { email: "patient.b1@demo.claimix.invalid", fullName: "Demo Patient Chetan", role: "patient", org: DEMO.org.hospitalB },
@@ -59,8 +61,8 @@ export async function seedCore(
   for (const u of demoUsers) {
     const [row] = await db
       .insert(users)
-      .values({ email: u.email, fullName: u.fullName, organizationId: u.org, roleId: roleIds.get(u.role)!, passwordHash, isDemo: true })
-      .onConflictDoUpdate({ target: users.email, set: { fullName: u.fullName, ...(opts.resetDemoPasswords ? { passwordHash } : {}) } })
+      .values({ email: u.email, fullName: u.fullName, organizationId: u.org, roleId: roleIds.get(u.role)!, passwordHash, isDemo: true, insuranceContext: u.insuranceContext ?? false })
+      .onConflictDoUpdate({ target: users.email, set: { fullName: u.fullName, insuranceContext: u.insuranceContext ?? false, ...(opts.resetDemoPasswords ? { passwordHash } : {}) } })
       .returning({ id: users.id });
     userIds.set(u.email, row!.id);
   }

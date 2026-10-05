@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { orNotFound, pageContext } from "@/lib/auth/context";
 import { ageOn, formatDate, formatDateTime, formatINR } from "@/lib/india";
 import { can } from "@/lib/permissions/principal";
 import { todayIso } from "@/lib/validation";
+import { EligibilityService } from "@/modules/eligibility/eligibility.service";
+import { OVERALL_LABEL } from "@/modules/eligibility/eligibility.sections";
 import { CoverageService } from "@/modules/patients/coverage.service";
 import { RELATIONSHIP_LABEL } from "@/modules/patients/coverage.validation";
 import { PatientService } from "@/modules/patients/patients.service";
@@ -13,6 +16,7 @@ import { PolicyService } from "@/modules/policies/policies.service";
 import { CoverageForm } from "@/components/patients/CoverageForm";
 import { EligibilityCheckButton, EligibilityCheckProvider, EligibilityResultCard } from "@/components/patients/PatientEligibility";
 import { PolicyCheck } from "@/components/patients/PolicyCheck";
+import { OUTCOME_TONE } from "@/components/eligibility/EligibilityResult";
 import { ButtonLink } from "@/components/ui/Button";
 import { CellText, DataTable } from "@/components/ui/DataTable";
 import { Details } from "@/components/ui/Form";
@@ -37,6 +41,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   // Contact details are shown to the registering hospital and the patient only.
   const showContact = ctx.principal.orgType === "hospital" || ctx.principal.orgType === "platform";
   const today = todayIso();
+  // Latest recorded eligibility check per coverage (read only; never re-runs the check).
+  const lastChecks = await EligibilityService.latestChecks(ctx, coverage.map((c) => c.id));
 
   const content = (
     <>
@@ -90,6 +96,24 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
                 ),
               },
               { key: "b", header: "Available", align: "right", cell: (c) => <CellText sub={`of ${formatINR(c.sumInsured)}`}>{formatINR(c.sumInsuredAvailable)}</CellText> },
+              ...(canCheck
+                ? [{
+                    key: "e",
+                    header: "Last eligibility check",
+                    nowrap: true,
+                    cell: (c: (typeof coverage)[number]) => {
+                      const last = lastChecks.get(c.id);
+                      if (!last) return <span>Not checked yet</span>;
+                      return (
+                        <CellText sub={formatDateTime(last.evaluatedAt)}>
+                          <Link href={`/eligibility?beneficiary=${c.id}#previous-checks`}>
+                            <Badge tone={OUTCOME_TONE[last.overall]}>{OVERALL_LABEL[last.overall].title}</Badge>
+                          </Link>
+                        </CellText>
+                      );
+                    },
+                  }]
+                : []),
               ...(canCheck ? [{ key: "a", header: "", cell: (c: (typeof coverage)[number]) => <ButtonLink size="sm" variant="secondary" href={`/eligibility?beneficiary=${c.id}`}>Check eligibility</ButtonLink> }] : []),
             ]}
           />

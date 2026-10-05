@@ -2,10 +2,15 @@ import type { Metadata } from "next";
 import { pageContext } from "@/lib/auth/context";
 import { formatDate, formatDateTime, formatINR } from "@/lib/india";
 import { param, parseListQuery } from "@/lib/pagination";
+import { scopeFor } from "@/lib/permissions/principal";
+import { InsurerService } from "@/modules/insurers/insurers.service";
+import { OrganizationRepository } from "@/modules/organizations/organizations.repository";
 import { PreauthService } from "@/modules/preauth/preauth.service";
 import { STATUS_LABEL, STATUS_TONE, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
+import { TpaService } from "@/modules/tpas/tpas.service";
 import { ButtonLink } from "@/components/ui/Button";
 import { CellLink, CellText, DataTable, FilterBar, Pagination } from "@/components/ui/DataTable";
+import { SelectField } from "@/components/ui/Field";
 import { Badge, Card, EmptyState, PageHeader } from "@/components/ui/Surface";
 import { Segmented } from "@/components/ui/Tabs";
 
@@ -17,6 +22,8 @@ const VIEWS: Record<string, { label: string; status?: PreauthStatus[] }> = {
   open: { label: "Open", status: ["draft", "submitted", "pending", "query"] },
   action: { label: "Needs action", status: ["draft", "query"] },
   review: { label: "Awaiting payer", status: ["submitted", "pending"] },
+  // Approved only (no rejections); matches the dashboard's "Pre-auths approved" count.
+  approved: { label: "Approved", status: ["approved", "partially_approved", "final_approved", "settled"] },
   decided: { label: "Decided", status: ["approved", "partially_approved", "final_approved", "rejected", "settled"] },
   all: { label: "All" },
 };
@@ -27,7 +34,20 @@ export default async function PreauthListPage({ searchParams }: { searchParams: 
   const q = parseListQuery(sp);
   const viewKey = param(sp, "view") ?? "open";
   const view = VIEWS[viewKey] ?? VIEWS.open!;
-  const data = await PreauthService.list(ctx, q, { status: view.status });
+  // Insurer / TPA / hospital filters are for users who see across organizations (administrators, insurance operations).
+  const crossOrg = scopeFor(ctx.principal, "preauth:read") === "all";
+  const uuid = (k: string) => {
+    const v = param(sp, k);
+    return crossOrg && v && /^[0-9a-f-]{36}$/i.test(v) ? v : undefined;
+  };
+  const filters = { insurerId: uuid("insurer"), tpaId: uuid("tpa"), hospitalId: uuid("hospital") };
+  const filterQs = { insurer: filters.insurerId, tpa: filters.tpaId, hospital: filters.hospitalId };
+  const [data, insurers, tpas, hospitals] = await Promise.all([
+    PreauthService.list(ctx, q, { status: view.status, ...filters }),
+    crossOrg ? InsurerService.options(ctx) : Promise.resolve([]),
+    crossOrg ? TpaService.options(ctx) : Promise.resolve([]),
+    crossOrg ? OrganizationRepository.options(ctx.db, ["hospital"]) : Promise.resolve([]),
+  ]);
   // Only when this view is empty: are there any requests at all? (decides the empty-state wording)
   const anyPreauths = data.total > 0 || (await PreauthService.list(ctx, { page: 1, pageSize: 1 }, {})).total > 0;
   const isHospital = ctx.principal.orgType === "hospital" && ctx.principal.roleKey !== "patient";
@@ -36,12 +56,42 @@ export default async function PreauthListPage({ searchParams }: { searchParams: 
     <>
       <PageHeader
         title="Pre-authorizations"
-        description={isHospital ? "Cashless requests raised by your hospital." : ctx.principal.orgType === "hospital" ? "Your cashless requests." : "Requests submitted to your organization."}
+        description={isHospital ? "Cashless requests raised by your hospital." : ctx.principal.orgType === "hospital" ? "Your cashless requests." : crossOrg ? "Submitted requests across insurers and TPAs." : "Requests submitted to your organization."}
         actions={isHospital && <ButtonLink href="/pre-authorizations/new">New pre-authorization</ButtonLink>}
       />
-      <Segmented current={viewKey} items={Object.entries(VIEWS).map(([k, v]) => ({ key: k, label: v.label, href: `/pre-authorizations?view=${k}` }))} />
+      <Segmented
+        current={viewKey}
+        items={Object.entries(VIEWS).map(([k, v]) => ({
+          key: k,
+          label: v.label,
+          href: `/pre-authorizations?${new URLSearchParams({ view: k, ...Object.fromEntries(Object.entries(filterQs).filter(([, x]) => x)) } as Record<string, string>).toString()}`,
+        }))}
+      />
       <Card padded={false}>
-        <FilterBar basePath="/pre-authorizations" q={q.q} searchLabel="Reference or patient name">
+        <FilterBar
+          basePath="/pre-authorizations"
+          q={q.q}
+          searchLabel="Reference or patient name"
+          moreActive={crossOrg ? Object.values(filterQs).filter(Boolean).length : 0}
+          more={
+            crossOrg ? (
+              <>
+                <SelectField label="Insurer" name="insurer" defaultValue={filters.insurerId ?? ""}>
+                  <option value="">Any insurer</option>
+                  {insurers.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </SelectField>
+                <SelectField label="TPA" name="tpa" defaultValue={filters.tpaId ?? ""}>
+                  <option value="">Any TPA</option>
+                  {tpas.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </SelectField>
+                <SelectField label="Hospital" name="hospital" defaultValue={filters.hospitalId ?? ""}>
+                  <option value="">Any hospital</option>
+                  {hospitals.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </SelectField>
+              </>
+            ) : undefined
+          }
+        >
           <input type="hidden" name="view" value={viewKey} />
         </FilterBar>
         <DataTable
@@ -67,7 +117,7 @@ export default async function PreauthListPage({ searchParams }: { searchParams: 
             { key: "u", header: "Updated", nowrap: true, cell: (r) => formatDateTime(r.updatedAt) },
           ]}
         />
-        {data.total > 0 && <Pagination basePath="/pre-authorizations" params={{ q: q.q, view: viewKey }} page={q.page} pageSize={q.pageSize} total={data.total} />}
+        {data.total > 0 && <Pagination basePath="/pre-authorizations" params={{ q: q.q, view: viewKey, ...filterQs }} page={q.page} pageSize={q.pageSize} total={data.total} />}
       </Card>
     </>
   );

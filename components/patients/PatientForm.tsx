@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ActionResult } from "@/lib/action-result";
@@ -26,10 +28,43 @@ export function PatientForm({ action, defaults, hospitals, cancelHref, submitLab
   });
   const { formError, apply } = useServerResult(setError);
   const e = formState.errors;
+  // Existing records the server found with the same name and date of birth (a warning the user can confirm).
+  const [duplicates, setDuplicates] = useState<{ id: string; patientNo: string }[]>([]);
+
+  const submit = (confirmDuplicate: boolean) =>
+    handleSubmit(async (v) => {
+      const r = await action(confirmDuplicate ? { ...v, confirmDuplicate: true } : v);
+      const found = !r.ok ? r.fieldErrors?._duplicate : undefined;
+      if (found?.length) {
+        setDuplicates(found.map((x) => ({ id: x.split("|")[0]!, patientNo: x.split("|")[1] ?? "" })));
+        return;
+      }
+      setDuplicates([]);
+      apply(r);
+    });
 
   return (
-    <form className={formStyles.form} onSubmit={handleSubmit(async (v) => apply(await action(v)))} noValidate>
+    <form className={formStyles.form} onSubmit={submit(false)} noValidate>
       {formError && <Alert tone="danger">{formError}</Alert>}
+      {duplicates.length > 0 && (
+        <Alert tone="warning" title="This patient may already be registered">
+          <p>
+            A patient with the same name and date of birth is already registered at this hospital:{" "}
+            {duplicates.map((d, i) => (
+              <span key={d.id}>
+                {i > 0 && ", "}
+                <Link href={`/patients/${d.id}`} target="_blank" rel="noopener noreferrer">{d.patientNo}</Link>
+              </span>
+            ))}
+            . Open the existing record to avoid a duplicate, or register this person as a separate patient if they are not the same individual.
+          </p>
+          <FormActions>
+            <Button type="button" variant="secondary" loading={formState.isSubmitting} onClick={() => void submit(true)()}>
+              Register as a new patient anyway
+            </Button>
+          </FormActions>
+        </Alert>
+      )}
       <FormSection title="Patient details" hint="Use the name exactly as it appears on the ID proof and insurance card to avoid mismatch queries.">
         <FormGrid>
           <TextField label="Full name" required autoComplete="off" error={e.fullName?.message} {...register("fullName")} />
