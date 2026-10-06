@@ -7,7 +7,6 @@ import { AuditService, type RequestMeta } from "@/modules/audit/audit.service";
 import { issuePasswordSetup } from "./password-setup";
 import { AuthRepository } from "./auth.repository";
 import { INSURANCE_CONTEXT_PERMISSION, InsuranceContext, type ContextOption, type ContextSelection, type ResolvedContext } from "./insurance-context";
-import { isPortal, PORTALS, portalFor } from "@/lib/portals";
 import { changePasswordSchema, forgotPasswordSchema, loginSchema, resetPasswordSchema } from "./auth.validation";
 
 export const SESSION_POLICY = {
@@ -98,9 +97,6 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
       const parsed = loginSchema.safeParse(input);
       if (!parsed.success) throw new ValidationError("Enter your email and password.");
       const { email, password } = parsed.data;
-      // Optional portal chosen on the sign-in form; the account's own role always decides access.
-      const requested = (input as { portal?: unknown } | null)?.portal;
-      if (requested !== undefined && requested !== "" && !isPortal(requested)) throw new ValidationError("Choose how you are signing in.");
       const emailHash = keyed(email);
       const ipHash = keyed(meta.ipAddress ?? "unknown");
       const since = new Date(Date.now() - SESSION_POLICY.lockout.windowMs);
@@ -129,19 +125,6 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
         });
         // Same message for unknown email, wrong password and disabled account.
         throw new UnauthorizedError("Incorrect email or password.");
-      }
-
-      // Only after the password is verified: the account must belong to the chosen portal.
-      const portal = portalFor(user.orgType);
-      if (isPortal(requested) && requested !== portal) {
-        await AuditService.record(db, {
-          action: "auth.login_wrong_portal",
-          actorUserId: user.id,
-          organizationId: user.organizationId,
-          meta,
-          newState: { requested, portal },
-        });
-        throw new UnauthorizedError(`This account signs in as ${PORTALS[portal].role}. Choose "${PORTALS[portal].role}" and sign in again.`);
       }
 
       const token = randomToken();

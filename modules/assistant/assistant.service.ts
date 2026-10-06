@@ -15,6 +15,7 @@ import { STATUS_LABEL, type PreauthStatus } from "@/modules/preauth/preauth.work
 import { HistoryRepository } from "@/modules/workflow/history.repository";
 import { answer, type Answer, type AssistantContext } from "./answer";
 import { classify, INTENTS, type Intent } from "./intents";
+import { guideChat, type GuideReply } from "./guide";
 import { getAssistantLlm } from "./llm";
 
 const askSchema = z.object({
@@ -22,6 +23,11 @@ const askSchema = z.object({
   subjectId: z.string(),
   question: z.string().trim().min(3, "Type a question.").max(500, "Keep the question under 500 characters."),
   intent: z.enum(Object.keys(INTENTS) as [Intent, ...Intent[]]).optional(),
+});
+
+const guideSchema = z.object({
+  question: z.string().trim().min(2, "Type a question.").max(500, "Keep the question under 500 characters."),
+  history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(3000) })).max(12).default([]),
 });
 
 const reviewSchema = z.object({
@@ -84,14 +90,23 @@ async function payerDecisions(ctx: ServiceContext, type: "preauth" | "claim", id
 }
 
 export const AssistantService = {
+  /** Answers a question about the Claimix application itself (navigation, workflows, roles); no request records are read. */
+  async guide(ctx: ServiceContext, input: unknown): Promise<GuideReply> {
+    requirePermission(ctx.principal, "assistant:use");
+    const d = parseOrThrow(guideSchema, input);
+    return guideChat(ctx.principal, d.question, d.history);
+  },
+
   /** Answers from records only; every question and answer is stored and audited. */
-  async ask(ctx: ServiceContext, input: unknown): Promise<Answer & { interactionId: string; explanation: string | null }> {
+  async ask(ctx: ServiceContext, input: unknown): Promise<Answer & { interactionId: string; explanation: string | null; llmNotice: string | null }> {
     requirePermission(ctx.principal, "assistant:use");
     const d = parseOrThrow(askSchema, input);
     const context = await loadContext(ctx, d.subjectType, requireId(d.subjectId, "Request"));
     const intent = d.intent ?? classify(d.question);
     const result = answer(intent, d.question, context);
-    const explanation = await getAssistantLlm().explain(result);
+    const llm = await getAssistantLlm().explain(result);
+    const explanation = llm?.ok ? llm.text : null;
+    const llmNotice = llm && !llm.ok ? llm.message : null;
 
     return ctx.db.transaction(async (tx) => {
       const [row] = await tx
@@ -114,7 +129,7 @@ export const AssistantService = {
         resourceId: d.subjectId,
         newState: { interactionId: row!.id, intent, status: result.status },
       });
-      return { ...result, interactionId: row!.id, explanation };
+      return { ...result, interactionId: row!.id, explanation, llmNotice };
     });
   },
 

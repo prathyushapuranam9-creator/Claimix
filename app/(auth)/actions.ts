@@ -22,7 +22,7 @@ export async function loginAction(_prev: ActionResult<{ next: string }> | null, 
   const field = (k: string) => (typeof form.get(k) === "string" ? (form.get(k) as string) : "");
   const next = safeNext(field("next"));
   const result = await runAction("auth.login", async () => {
-    const { token, expiresAt } = await authService().login({ email: field("email"), password: field("password"), portal: field("portal") }, await requestMeta());
+    const { token, expiresAt } = await authService().login({ email: field("email"), password: field("password") }, await requestMeta());
     await setSessionCookie(token, expiresAt);
     await clearContextCookie(); // a new sign-in always starts without a testing context
     return { next };

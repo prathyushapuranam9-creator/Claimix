@@ -172,14 +172,10 @@ test("01 login and dashboard identity", async ({ page, context }) => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  await check("Login", "wrong portal is refused after a correct password", async () => {
+  await check("Login", "the sign-in page has no role selector", async () => {
     await page.goto("/login");
-    await page.getByRole("radio", { name: "Admin" }).check();
-    await page.getByLabel("Email").fill(STAFF);
-    await page.locator("#password").fill(PASSWORD);
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "signs in as Hospital Staff" })).toBeVisible();
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page.getByRole("radio")).toHaveCount(0);
+    await expect(page.getByLabel("Email")).toBeVisible();
   });
 
   await check("Login", "empty form shows validation, nothing submitted", async () => {
@@ -1123,7 +1119,7 @@ test("13 assistant and human review", async ({ page, browser }) => {
   await signIn(page, STAFF);
 
   await check("Assistant", "page loads; request dropdown lists pre-auths and claims", async () => {
-    await page.goto("/assistant");
+    await page.goto("/assistant?mode=request");
     await expect(page.getByRole("heading", { name: "Insurance Assistant", level: 1 })).toBeVisible();
     const opts = await page.getByLabel("About which request?").locator("option").allInnerTexts();
     expect(opts.some((o) => o.startsWith("Pre-auth"))).toBe(true);

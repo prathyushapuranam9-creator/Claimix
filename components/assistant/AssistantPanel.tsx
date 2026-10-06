@@ -10,7 +10,7 @@ import { Alert, Badge, Card, Stack, type Tone } from "@/components/ui/Surface";
 import styles from "./AssistantPanel.module.css";
 
 type Subject = { type: "preauth" | "claim"; id: string; label: string };
-type Result = Answer & { interactionId: string; explanation: string | null };
+type Result = Answer & { interactionId: string; explanation: string | null; llmNotice: string | null };
 
 const SOURCE: Record<Source, { label: string; tone: Tone }> = {
   rules: { label: "Policy rules", tone: "info" },
@@ -93,6 +93,7 @@ export function AssistantPanel({
           <div className={styles.answer} aria-live="polite">
             <p className={styles.headline}>{result.headline}</p>
             {result.explanation && <p>{result.explanation}</p>}
+            {result.llmNotice && <Alert tone="info">{result.llmNotice}</Alert>}
             {result.facts.length > 0 && (
               <ul className={styles.facts}>
                 {result.facts.map((f, i) => (

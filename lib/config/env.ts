@@ -8,6 +8,8 @@ const schema = z.object({
   STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
   STORAGE_LOCAL_DIR: z.string().default("./.storage"),
   LLM_ASSISTANT_ENABLED: z.enum(["true", "false"]).default("false"),
+  OPENROUTER_API_KEY: z.string().optional(),
+  OPENROUTER_MODEL: z.string().default("openrouter/auto"),
   /** Reverse proxies in front of the app that append to X-Forwarded-For (Next itself sets it when absent). */
   TRUSTED_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(1),
 }).superRefine((e, ctx) => {

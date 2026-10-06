@@ -9,16 +9,9 @@ export const IDS = {
   patientB1: "00000000-0000-4000-8000-0000000001b1",
 };
 
-/** The "Sign in as" option for a fixture account (its portal comes from its organization). */
-export function portalRoleFor(email: string): "Hospital Staff" | "Insurance Reviewer" | "Admin" {
-  if (/^(insurer|tpa)./.test(email)) return "Insurance Reviewer";
-  if (/^(admin|readonly)@/.test(email)) return "Admin";
-  return "Hospital Staff";
-}
-
+/** Signs in with email and password only; the account decides its own portal. */
 export async function signIn(page: Page, email: string, password = PASSWORD) {
   await page.goto("/login");
-  await page.getByRole("radio", { name: portalRoleFor(email) }).check();
   await page.getByLabel("Email").fill(email);
   await page.locator("#password").fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();

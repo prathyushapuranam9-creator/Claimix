@@ -5,10 +5,15 @@ import { actionContext } from "@/lib/auth/context";
 import { runAction, type ActionResult } from "@/lib/actions";
 import type { Answer } from "@/modules/assistant/answer";
 import { AssistantService } from "@/modules/assistant/assistant.service";
+import type { GuideReply } from "@/modules/assistant/guide";
 import type { Intent } from "@/modules/assistant/intents";
 
-export async function askAction(input: { subjectType: "preauth" | "claim"; subjectId: string; question: string; intent?: Intent }): Promise<ActionResult<Answer & { interactionId: string; explanation: string | null }>> {
+export async function askAction(input: { subjectType: "preauth" | "claim"; subjectId: string; question: string; intent?: Intent }): Promise<ActionResult<Answer & { interactionId: string; explanation: string | null; llmNotice: string | null }>> {
   return runAction("assistant.ask", async () => AssistantService.ask(await actionContext(), input));
+}
+
+export async function guideAction(input: { question: string; history: { role: "user" | "assistant"; content: string }[] }): Promise<ActionResult<GuideReply>> {
+  return runAction("assistant.guide", async () => AssistantService.guide(await actionContext(), input));
 }
 
 export async function requestReviewAction(input: { interactionId: string; note?: string }): Promise<ActionResult> {

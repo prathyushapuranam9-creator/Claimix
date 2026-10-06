@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { IDS, PASSWORD, portalRoleFor, signIn } from "./helpers";
+import { IDS, PASSWORD, signIn } from "./helpers";
 
 const taskbar = (page: Page) => page.locator("header").first();
 const section = (page: Page) => page.getByRole("navigation", { name: "Current section" });
@@ -57,38 +57,19 @@ test("opened directly, Back falls back to the parent section", async ({ page }) 
   await expect(page).toHaveURL(/\/patients$/);
 });
 
-test("sign-in offers the three roles and refuses a portal the account doesn't belong to", async ({ page }) => {
+test("sign-in is by credentials only: no role choice, and the account decides the portal", async ({ page }) => {
   await page.goto("/login");
-  const group = page.getByRole("group", { name: "Sign in as" });
-  for (const r of ["Hospital Staff", "Insurance Reviewer", "Admin"]) await expect(group.getByRole("radio", { name: r })).toBeVisible();
-  await expect(group.getByRole("radio", { name: "Hospital Staff" })).toBeChecked();
+  await expect(page.getByRole("group", { name: "Sign in as" })).toHaveCount(0);
+  await expect(page.getByRole("radio")).toHaveCount(0);
+  await expect(page.getByLabel("Email")).toBeVisible();
+  await expect(page.locator("#password")).toBeVisible();
 
-  // An insurer account trying the Hospital Staff portal: refused, with no session.
-  await page.locator("#email").fill("insurer.b@demo.claimix.invalid");
-  await page.locator("#password").fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "This account signs in as" })).toContainText('Choose "Insurance Reviewer"');
-  await expect(page).toHaveURL(/\/login/);
-  await page.goto("/dashboard");
-  await expect(page).toHaveURL(/\/login/);
-
-  // Choosing the right role signs in, and the choice is remembered on this device.
-  await page.getByRole("radio", { name: portalRoleFor("insurer.b@demo.claimix.invalid") }).check();
+  // An insurer account signs in with just its email and password and lands in its own portal.
   await page.locator("#email").fill("insurer.b@demo.claimix.invalid");
   await page.locator("#password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/dashboard/);
   await expect(taskbar(page)).toContainText("Insurer Reviewer");
-  await page.context().clearCookies();
-  await page.goto("/login");
-  await expect(page.getByRole("radio", { name: "Insurance Reviewer" })).toBeChecked();
-});
-
-test("keyboard users can choose the role with the arrow keys", async ({ page }) => {
-  await page.goto("/login");
-  await page.getByRole("radio", { name: "Hospital Staff" }).focus();
-  await page.keyboard.press("ArrowRight");
-  await expect(page.getByRole("radio", { name: "Insurance Reviewer" })).toBeChecked();
 });
 
 test.describe("collapsing the sidebar", () => {
