@@ -1,18 +1,22 @@
+/* One calm row of section links; scrolls sideways on narrow screens instead of wrapping. */
 .tabs {
   display: flex;
   gap: var(--sp-1);
   overflow-x: auto;
   margin-bottom: var(--sp-5);
+  padding: 0 var(--sp-1);
   border-bottom: 1px solid var(--c-border);
   scrollbar-width: thin;
+  scroll-snap-type: x proximity;
 }
 
 .tab {
   flex: 0 0 auto;
+  scroll-snap-align: start;
   display: inline-flex;
   align-items: center;
   min-height: var(--tap);
-  padding: 0 var(--sp-3);
+  padding: 0 var(--sp-2);
   border-bottom: 3px solid transparent;
   color: var(--c-text-muted);
   font-size: var(--fs-sm);
@@ -21,13 +25,14 @@
   white-space: nowrap;
 }
 
-.tab:hover { color: var(--c-text); }
+.tab:hover { color: var(--c-text); border-bottom-color: var(--c-border-strong); }
+.tab:focus-visible { outline: 2px solid var(--c-focus); outline-offset: -2px; border-radius: var(--radius-sm); }
 
+/* Active section: stronger text and a slim accent underline (no filled block). */
 .tab[aria-current="page"] {
-  background: var(--c-accent);
-  color: var(--c-on-accent);
-  border-bottom-color: var(--c-text);
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  color: var(--c-text);
+  font-weight: 700;
+  border-bottom-color: var(--c-primary);
 }
 
 .segmented {

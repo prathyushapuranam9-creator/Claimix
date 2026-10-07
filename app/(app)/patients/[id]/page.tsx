@@ -279,6 +279,7 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
     <EligibilityCheckProvider
       key={p.id}
       patientId={p.id}
+      patient={{ name: p.fullName, department: departmentLabel(p.department), visitReason: p.visitReason ?? NO_VISIT_REASON }}
       coverage={PatientEligibilityService.checkable(ctx.principal, coverage).map((c) => ({ id: c.id, policyName: c.policyName, memberId: c.memberId }))}
       addCoverageHref={canWrite ? "#add-coverage" : null}
       next={{

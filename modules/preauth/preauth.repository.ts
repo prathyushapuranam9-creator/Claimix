@@ -19,6 +19,7 @@ export const PREAUTH_SCOPE: ScopeColumns = {
   insurerId: submittedTo(preAuthorizations.insurerId),
   tpaId: submittedTo(preAuthorizations.tpaId),
   patientId: preAuthorizations.patientId,
+  policyId: preAuthorizations.policyId,
 };
 
 

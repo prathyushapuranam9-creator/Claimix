@@ -1,0 +1,42 @@
+/* Hospitals & network list: filter panel, department tags, verification mark. */
+.filterCard > section { box-shadow: var(--shadow-md); }
+.filterCard form { border-bottom: 0; }
+
+.name a { font-weight: 650; }
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-width: 22rem;
+}
+
+.tag,
+.more {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.tag {
+  background: var(--c-neutral-bg);
+  color: var(--c-text);
+  border: 1px solid var(--c-border);
+}
+
+.more { color: var(--c-text-muted); }
+
+.verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.verified svg { color: var(--c-success); flex: none; }
+
+.muted { color: var(--c-text-muted); }

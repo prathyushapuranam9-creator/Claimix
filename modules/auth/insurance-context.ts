@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
-import { organizations, roles } from "@/db/schema";
+import { organizations, policies, roles } from "@/db/schema";
 import { roleFitsOrg } from "@/lib/permissions/catalog";
 import { hmacHex, safeEqualHex } from "@/lib/security/crypto";
 
@@ -17,6 +17,8 @@ type PayerType = "insurer" | "tpa";
 export interface ContextSelection {
   organizationId: string;
   roleKey: string;
+  /** Optional: narrow everything to one of that company's policies. */
+  policyId?: string | null;
 }
 
 export interface ContextOption {
@@ -35,6 +37,8 @@ export interface ResolvedContext {
   roleId: string;
   roleKey: string;
   roleName: string;
+  policyId: string | null;
+  policyName: string | null;
 }
 
 const b64 = (s: string) => Buffer.from(s, "utf8").toString("base64url");
@@ -74,12 +78,24 @@ export const InsuranceContext = {
     if (!org || (org.type !== "insurer" && org.type !== "tpa")) return null;
     const [role] = await db.select({ id: roles.id, key: roles.key, name: roles.name, orgType: roles.orgType }).from(roles).where(eq(roles.key, sel.roleKey)).limit(1);
     if (!role || !roleFitsOrg(role, org.type)) return null;
-    return { organizationId: org.id, organizationName: org.name, orgType: org.type, roleId: role.id, roleKey: role.key, roleName: role.name };
+    let policy: { id: string; name: string } | null = null;
+    if (sel.policyId) {
+      // Only an active policy of THAT company (its own product, or one it administers as TPA).
+      if (!/^[0-9a-f-]{36}$/i.test(sel.policyId)) return null;
+      const [p] = await db
+        .select({ id: policies.id, name: policies.name, insurerId: policies.insurerId, tpaId: policies.tpaId })
+        .from(policies)
+        .where(and(eq(policies.id, sel.policyId), isNull(policies.deletedAt), eq(policies.isActive, true)))
+        .limit(1);
+      if (!p || (org.type === "insurer" ? p.insurerId !== org.id : p.tpaId !== org.id)) return null;
+      policy = { id: p.id, name: p.name };
+    }
+    return { organizationId: org.id, organizationName: org.name, orgType: org.type, roleId: role.id, roleKey: role.key, roleName: role.name, policyId: policy?.id ?? null, policyName: policy?.name ?? null };
   },
 
   /** Signed cookie value for this session and selection. */
   sign(secret: string, sessionId: string, sel: ContextSelection): string {
-    const payload = b64(JSON.stringify({ s: sessionId, o: sel.organizationId, r: sel.roleKey }));
+    const payload = b64(JSON.stringify({ s: sessionId, o: sel.organizationId, r: sel.roleKey, p: sel.policyId ?? null }));
     return `${payload}.${hmacHex(payload, secret)}`;
   },
 
@@ -90,9 +106,9 @@ export const InsuranceContext = {
     if (!payload || !sig || !/^[0-9a-f]{64}$/i.test(sig)) return null;
     if (!safeEqualHex(hmacHex(payload, secret), sig)) return null;
     try {
-      const j = JSON.parse(unb64(payload)) as { s?: unknown; o?: unknown; r?: unknown };
+      const j = JSON.parse(unb64(payload)) as { s?: unknown; o?: unknown; r?: unknown; p?: unknown };
       if (j.s !== sessionId || typeof j.o !== "string" || typeof j.r !== "string") return null;
-      return { organizationId: j.o, roleKey: j.r };
+      return { organizationId: j.o, roleKey: j.r, policyId: typeof j.p === "string" ? j.p : null };
     } catch {
       return null;
     }

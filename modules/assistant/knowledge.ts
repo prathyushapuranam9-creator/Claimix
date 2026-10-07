@@ -1,6 +1,6 @@
 import { PERMISSIONS, ROLES, type PermissionKey } from "@/lib/permissions/catalog";
 import { can, type Principal } from "@/lib/permissions/principal";
-import { hasDashboard, NAV_ITEMS } from "@/lib/navigation";
+import { hasDashboard, visibleNav } from "@/lib/navigation";
 import { CLAIM_STATUS_LABEL } from "@/modules/claims/claims.workflow";
 import { allowedTransitions, PREAUTH_STATUSES, STATUS_LABEL } from "@/modules/preauth/preauth.workflow";
 import { allowedClaimTransitions, CLAIM_STATUSES } from "@/modules/claims/claims.workflow";
@@ -66,7 +66,8 @@ export function reach(w: Who, page: "preauth" | "claim" | "eligibility" | "patie
 
 /** Sidebar entries this user actually sees. */
 export function sidebar(w: Who) {
-  return NAV_ITEMS.filter((i) => !i.hidden && w.p.permissions.has(i.permission) && i.href !== "/knowledge" && (i.href !== "/dashboard" || w.dashboard));
+  // The same entries and labels the user's own sidebar shows (e.g. "Insurer/Provider" for insurer reviewers).
+  return visibleNav(w.p).filter((i) => !i.hidden && i.href !== "/knowledge" && (i.href !== "/dashboard" || w.dashboard));
 }
 
 export const STATUS_HELP: Record<string, { label: string; meaning: string }> = {

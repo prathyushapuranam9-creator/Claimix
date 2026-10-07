@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { pageContext } from "@/lib/auth/context";
 import { authService, sessionToken } from "@/lib/auth/session";
 import { ContextSwitcher } from "@/components/insurance/ContextSwitcher";
+import { CompanyPolicyService } from "@/modules/policies/company-policies.service";
 import { exitContextAction, switchContextAction } from "../context/actions";
 import { formatDateTime, formatINR } from "@/lib/india";
 import { hasDashboard, landingPath } from "@/lib/navigation";
@@ -304,21 +305,29 @@ export default async function DashboardPage() {
   const ctx = await pageContext("dashboard:view");
   if (!ctx.user.canSwitchContext) return <DashboardContent />;
   const options = await authService().contextOptions(await sessionToken());
+  // Insurance Company → Policy: each company the account may use, with that company's own policies to narrow to.
+  const policies = Object.fromEntries(
+    await Promise.all(options.filter((o) => o.selectable).map(async (o) => [o.id, await CompanyPolicyService.list(ctx, ctx.user, o.id)] as const)),
+  );
   // Shown with the payer / administrator dashboard it switches; preselected to the company and role currently in use.
   const inUse = ctx.principal.acting || ctx.principal.orgType === "insurer" || ctx.principal.orgType === "tpa";
   return (
     <DashboardContent
       switcher={
-        <ContextSwitcher
-          // Re-initialise the form whenever the server-side context changes, so it always shows what is really in use.
-          key={`${inUse ? ctx.principal.organizationId : "all"}:${ctx.principal.roleKey}:${ctx.principal.acting ? "ctx" : "own"}`}
-          options={options}
-          allowAll={ctx.user.homeIsAllInsurers}
-          current={inUse ? { organizationId: ctx.principal.organizationId, roleKey: ctx.principal.roleKey } : null}
-          active={!!ctx.principal.acting}
-          switchAction={switchContextAction}
-          exitAction={exitContextAction}
-        />
+        <>
+          <ContextSwitcher
+            // Re-initialise the form whenever the server-side context changes, so it always shows what is really in use.
+            key={`${inUse ? ctx.principal.organizationId : "all"}:${ctx.principal.roleKey}:${ctx.principal.acting ? "ctx" : "own"}:${ctx.principal.policyId ?? ""}`}
+            options={options}
+            allowAll={ctx.user.homeIsAllInsurers}
+            current={inUse ? { organizationId: ctx.principal.organizationId, roleKey: ctx.principal.roleKey } : null}
+            active={!!ctx.principal.acting}
+            switchAction={switchContextAction}
+            exitAction={exitContextAction}
+            policies={Object.fromEntries(Object.entries(policies).map(([k, v]) => [k, v.map((p) => ({ id: p.id, name: p.name }))]))}
+            currentPolicyId={ctx.principal.policyId ?? null}
+          />
+        </>
       }
     />
   );

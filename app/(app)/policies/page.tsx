@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { pageContext } from "@/lib/auth/context";
 import { formatINR } from "@/lib/india";
+import { isPayerPortal, PAYER_POLICIES_LABEL } from "@/lib/navigation";
 import { param, parseListQuery } from "@/lib/pagination";
 import { can } from "@/lib/permissions/principal";
 import { PolicyService } from "@/modules/policies/policies.service";
@@ -28,7 +29,7 @@ export default async function PoliciesPage({ searchParams }: { searchParams: SP 
   return (
     <>
       <PageHeader
-        title="Policies & schemes"
+        title={isPayerPortal(ctx.principal) ? PAYER_POLICIES_LABEL : "Policies & schemes"}
         description="Each policy carries its own rules. Rules from one insurer or scheme are never applied to another."
         actions={can(ctx.principal, "policy:manage") && <ButtonLink href="/policies/new">Add policy</ButtonLink>}
       />

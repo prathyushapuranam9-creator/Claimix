@@ -16,6 +16,7 @@
     "db:migrate": "tsx db/migrate.ts",
     "db:setup": "tsx db/setup/index.ts",
     "admin:create": "tsx --conditions=react-server scripts/create-admin.ts",
+    "demo:accounts": "tsx --conditions=react-server scripts/demo-accounts.ts",
     "worker": "tsx --conditions=react-server scripts/worker.ts"
   },
   "dependencies": {

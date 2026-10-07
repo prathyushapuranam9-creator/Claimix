@@ -187,7 +187,7 @@
   cursor: pointer;
 }
 
-.profileBtn:hover,
+/* No hover style on the profile icon; it only shows the open state (and keyboard focus) below. */
 .profileBtn[aria-expanded="true"] { background: var(--c-accent); color: var(--c-text); }
 
 .profileName {
@@ -201,7 +201,7 @@
   text-overflow: ellipsis;
 }
 
-/* Hover / keyboard-focus hint: name + role. Hidden while the details panel is open. */
+/* Keyboard-focus hint: name + role. Hidden while the details panel is open. */
 .profileTip {
   position: absolute;
   top: calc(100% + var(--sp-1));
@@ -225,7 +225,7 @@
 .profileTip span { display: block; overflow-wrap: anywhere; }
 .profileTip strong { color: var(--c-text); font-size: var(--fs-sm); }
 
-.profileBtn:hover + .profileTip,
+/* No hover effect on the profile icon: the name + role hint shows for keyboard focus only. */
 .profileBtn:focus-visible + .profileTip { display: block; }
 
 .profileCard {

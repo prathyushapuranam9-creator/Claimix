@@ -26,6 +26,12 @@
 
 .actions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 
+/* Policy of the chosen company: its own row, the width of one selector. */
+.policyRow {
+  display: grid;
+  grid-template-columns: minmax(0, 40rem);
+}
+
 .banner {
   display: flex;
   flex-wrap: wrap;

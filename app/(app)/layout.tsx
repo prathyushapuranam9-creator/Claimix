@@ -39,7 +39,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       logout={logoutAction}
       unread={unread}
     >
-      {acting && <ContextBanner organizationName={acting.organizationName} roleName={acting.roleName} switcher={switcher} />}
+      {acting && <ContextBanner organizationName={acting.organizationName} roleName={acting.roleName} policyName={acting.policyName} switcher={switcher} />}
       {children}
     </AppShell>
   );

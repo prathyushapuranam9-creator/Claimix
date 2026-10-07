@@ -16,6 +16,8 @@ export interface ScopeColumns {
   insurerId?: ScopeRef;
   tpaId?: ScopeRef;
   patientId?: ScopeRef;
+  /** How rows tie to a policy, used when the principal is narrowed to one policy (see Principal.policyId). */
+  policyId?: ScopeRef;
 }
 
 const NOTHING: SQL = sql`false`;
@@ -30,6 +32,12 @@ function match(ref: ScopeRef | undefined, id: string): SQL {
  * Fails closed: an unknown org/scope combination matches no rows.
  */
 export function scopePredicate(principal: Principal, scope: Scope, cols: ScopeColumns): SQL | undefined {
+  const base = tenantPredicate(principal, scope, cols);
+  // Narrowed to one policy: rows must also belong to it (a resource with no policy link matches nothing).
+  return principal.policyId ? andAll(base ?? undefined, match(cols.policyId, principal.policyId)) : base;
+}
+
+function tenantPredicate(principal: Principal, scope: Scope, cols: ScopeColumns): SQL | undefined {
   if (scope === "all") {
     // Only platform users may hold "all"; anyone else with it is a misconfiguration.
     if (principal.orgType !== "platform") throw new ForbiddenError();

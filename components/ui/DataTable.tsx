@@ -128,6 +128,7 @@ export function FilterBar({
   children,
   more,
   moreActive = 0,
+  searchIcon = false,
 }: {
   basePath: string;
   q?: string;
@@ -137,11 +138,19 @@ export function FilterBar({
   /** Secondary filters, collapsed behind "More filters" (opened when any is active). */
   more?: ReactNode;
   moreActive?: number;
+  /** Show a magnifier inside the search field. */
+  searchIcon?: boolean;
 }) {
   return (
     <form className={styles.filters} method="get" action={basePath} role="search">
-      <div className={styles.search}>
+      <div className={searchIcon ? `${styles.search} ${styles.searchWithIcon}` : styles.search}>
         <TextField label={searchLabel} name="q" type="search" defaultValue={q} placeholder={searchPlaceholder} maxLength={100} />
+        {searchIcon && (
+          <svg className={styles.searchIcon} width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+        )}
       </div>
       {children}
       {more && (

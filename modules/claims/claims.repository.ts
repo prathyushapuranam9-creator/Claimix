@@ -17,6 +17,7 @@ export const CLAIM_SCOPE: ScopeColumns = {
   insurerId: submittedTo(claims.insurerId),
   tpaId: submittedTo(claims.tpaId),
   patientId: claims.patientId,
+  policyId: claims.policyId,
 };
 
 export interface ClaimFilters {

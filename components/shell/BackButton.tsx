@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import styles from "./BackButton.module.css";
+import { markReplace } from "./useBackHistory";
 
 interface Props {
   /** Where to go when the user landed here directly (no in-app history to return to). */
@@ -13,6 +14,8 @@ interface Props {
 /**
  * Returns to the page the user actually came from. history.back() restores the previous URL
  * (filters, search and tab live in the query string) and the browser/Next restore its scroll position.
+ * Opened directly (no earlier Claimix page in this tab), it goes to the parent page instead, replacing
+ * this entry so the parent's own Back never comes back here.
  */
 export function BackButton({ fallback, hasHistory }: Props) {
   const router = useRouter();
@@ -22,7 +25,11 @@ export function BackButton({ fallback, hasHistory }: Props) {
       className={styles.back}
       aria-label="Back"
       data-tip="Back"
-      onClick={() => (hasHistory ? router.back() : router.push(fallback))}
+      onClick={() => {
+        if (hasHistory) return router.back();
+        markReplace();
+        router.replace(fallback);
+      }}
     >
       <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M19 12H5" />

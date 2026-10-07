@@ -7,7 +7,11 @@ import { andAll } from "@/lib/permissions/scope";
 
 /** Reference data (insurer:read covers insurers and TPAs). */
 export const TpaRepository = {
-  async list(db: DbOrTx, q: ListQuery) {
+  /**
+   * `countFor` limits "policies serviced" to the products the viewer may see: an insurer counts only its
+   * own policies run by each TPA, a TPA only its own; administrators and hospitals count all.
+   */
+  async list(db: DbOrTx, q: ListQuery, countFor: { insurerId?: string; tpaId?: string } = {}) {
     const where = andAll(
       isNull(tpas.deletedAt),
       q.q ? or(ilike(organizations.name, likeContains(q.q)), ilike(tpas.code, likeContains(q.q))) : undefined,
@@ -21,7 +25,9 @@ export const TpaRepository = {
           phone: tpas.phone,
           isActive: organizations.isActive,
           isDemo: organizations.isDemo,
-          policyCount: sql<number>`(select count(*)::int from ${policies} p where p.tpa_id = ${tpas.id} and p.deleted_at is null)`,
+          policyCount: sql<number>`(select count(*)::int from ${policies} p where p.tpa_id = ${tpas.id} and p.deleted_at is null
+            ${countFor.insurerId ? sql`and p.insurer_id = ${countFor.insurerId}` : sql``}
+            ${countFor.tpaId ? sql`and p.tpa_id = ${countFor.tpaId}` : sql``})`,
         })
         .from(tpas)
         .innerJoin(organizations, eq(organizations.id, tpas.id))

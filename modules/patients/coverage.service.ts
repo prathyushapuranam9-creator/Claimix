@@ -47,7 +47,9 @@ export const CoverageService = {
     const scope = requirePermission(ctx.principal, "patient:read");
     const p = await PatientRepository.findScoped(ctx.db, ctx.principal, scope, requireId(patientId, "Patient"));
     if (!p) throw new NotFoundError("Patient not found.");
-    return CoverageRepository.forPatient(ctx.db, patientId);
+    const rows = await CoverageRepository.forPatient(ctx.db, patientId);
+    // Narrowed to one policy (insurance testing context): only that policy's coverage.
+    return ctx.principal.policyId ? rows.filter((r) => r.policyId === ctx.principal.policyId) : rows;
   },
 
   async get(ctx: ServiceContext, beneficiaryId: string) {

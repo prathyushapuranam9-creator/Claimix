@@ -8,7 +8,7 @@ import { authService, clearContextCookie, requestMeta, sessionToken, setContextC
  * Switch the insurance-portal testing context. Authorization happens in AuthService: only an account that holds
  * `insurance:context` may do this, and only to an existing insurer / TPA with one of its own roles.
  */
-export async function switchContextAction(input: { organizationId: string; roleKey: string }): Promise<ActionResult> {
+export async function switchContextAction(input: { organizationId: string; roleKey: string; policyId?: string | null }): Promise<ActionResult> {
   return runAction("context.switch", async () => {
     const { contextToken } = await authService().switchContext(await sessionToken(), input, await requestMeta());
     await setContextCookie(contextToken);
