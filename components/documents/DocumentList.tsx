@@ -1,9 +1,11 @@
+import type { ReactNode } from "react";
 import { formatDateTime } from "@/lib/india";
 import type { ActionResult } from "@/lib/action-result";
 import { documentLabel } from "@/modules/documents/document-types";
 import type { DocumentReviewInput } from "@/modules/documents/documents.validation";
 import { Badge, EmptyState, type Tone } from "@/components/ui/Surface";
 import { DataTable, CellText } from "@/components/ui/DataTable";
+import { DocumentDeleteButton } from "./DocumentDeleteButton";
 import { DocumentReview } from "./DocumentReview";
 import { DocumentViewButton } from "./DocumentViewer";
 
@@ -31,15 +33,31 @@ const kb = (n: number) => (n > 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB
 
 /**
  * Document list. Downloads go through the authorized /api/documents route only.
- * When `review` is given (the assigned payer), each row gets a review control.
+ * When `review` is given (the assigned payer), each row gets a review control; `actions` adds a
+ * further per-document control (the patient's insurance documents offer "Review details" there).
  */
-export function DocumentList({ docs, review }: { docs: Doc[]; review?: (docId: string, i: DocumentReviewInput) => Promise<ActionResult<unknown>> }) {
+export function DocumentList({
+  docs,
+  review,
+  actions,
+  remove,
+  caption = "Documents",
+  empty,
+}: {
+  docs: Doc[];
+  review?: (docId: string, i: DocumentReviewInput) => Promise<ActionResult<unknown>>;
+  actions?: (doc: Doc) => ReactNode;
+  /** When given (hospital staff on an editable record), each uploaded document gets a Delete control. */
+  remove?: (docId: string) => Promise<ActionResult<unknown>>;
+  caption?: string;
+  empty?: ReactNode;
+}) {
   return (
     <DataTable
-      caption="Documents"
+      caption={caption}
       rows={docs}
       rowKey={(d) => d.id}
-      empty={<EmptyState title="No documents yet" />}
+      empty={empty ?? <EmptyState title="No documents yet" />}
       columns={[
         { key: "t", header: "Document", cell: (d) => <CellText sub={`${d.originalName} · ${kb(d.sizeBytes)}`}>{documentLabel(d.docType)}</CellText> },
         { key: "s", header: "Status", cell: (d) => <CellText sub={d.statusNote}><Badge tone={DOC_STATUS[d.status]?.tone ?? "neutral"}>{DOC_STATUS[d.status]?.label ?? d.status}</Badge></CellText> },
@@ -53,6 +71,10 @@ export function DocumentList({ docs, review }: { docs: Doc[]; review?: (docId: s
         ...(review
           ? [{ key: "r", header: "Review", cell: (d: Doc) => (d.scanStatus === "clean" ? <DocumentReview action={review.bind(null, d.id)} current={d.status} /> : null) }]
           : []),
+        ...(remove
+          ? [{ key: "del", header: "", cell: (d: Doc) => (d.status === "verified" ? null : <DocumentDeleteButton name={d.originalName} remove={remove.bind(null, d.id)} />) }]
+          : []),
+        ...(actions ? [{ key: "x", header: "", cell: (d: Doc) => actions(d) }] : []),
       ]}
     />
   );

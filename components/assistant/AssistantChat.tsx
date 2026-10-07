@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Fragment, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import type { ActionResult } from "@/lib/action-result";
-import type { GuideReply } from "@/modules/assistant/guide";
+import type { Focus, GuideReply } from "@/modules/assistant/guide";
 import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Surface";
 import styles from "./AssistantChat.module.css";
@@ -50,10 +50,12 @@ function Markdown({ text }: { text: string }) {
   return <>{out}</>;
 }
 
-export function AssistantChat({ roleName, prompts, guide }: { roleName: string; prompts: string[]; guide: (i: { question: string; history: Turn[] }) => Promise<ActionResult<GuideReply>> }) {
+export function AssistantChat({ roleName, prompts, guide }: { roleName: string; prompts: string[]; guide: (i: { question: string; history: Turn[]; focusId?: string | null }) => Promise<ActionResult<GuideReply & { focus: Focus | null }>> }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // The record the conversation is about (set when an identifier is recognised); cleared by New conversation.
+  const [focus, setFocus] = useState<Focus | null>(null);
   const [pending, start] = useTransition();
   const end = useRef<HTMLDivElement>(null);
   const loaded = useRef(false);
@@ -62,16 +64,21 @@ export function AssistantChat({ roleName, prompts, guide }: { roleName: string; 
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem(STORE);
+      const savedFocus = sessionStorage.getItem(STORE + ".focus");
       // Restoring browser-only state after hydration; reading it during render would not match the server HTML.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (saved) setMsgs(JSON.parse(saved) as Msg[]);
+      if (savedFocus) setFocus(JSON.parse(savedFocus) as Focus);
     } catch {}
     loaded.current = true;
   }, []);
   useEffect(() => {
     if (!loaded.current) return;
-    try { sessionStorage.setItem(STORE, JSON.stringify(msgs.slice(-30))); } catch {}
-  }, [msgs]);
+    try {
+      sessionStorage.setItem(STORE, JSON.stringify(msgs.slice(-30)));
+      sessionStorage.setItem(STORE + ".focus", JSON.stringify(focus));
+    } catch {}
+  }, [msgs, focus]);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [msgs, pending]);
 
   const send = (q: string) => {
@@ -82,7 +89,8 @@ export function AssistantChat({ roleName, prompts, guide }: { roleName: string; 
     setText("");
     setError(null);
     start(async () => {
-      const r = await guide({ question, history });
+      const r = await guide({ question, history, focusId: focus?.id ?? null });
+      if (r.ok) setFocus(r.data.focus);
       if (r.ok) setMsgs((m) => [...m, { role: "assistant", content: r.data.markdown, links: r.data.links, notice: r.data.notice }]);
       else setError(r.fieldErrors?.question?.[0] ?? r.error);
     });
@@ -95,7 +103,7 @@ export function AssistantChat({ roleName, prompts, guide }: { roleName: string; 
           <h2>Ask Claimix</h2>
           <p>Where things are, how workflows run, and what {roleName} can do.</p>
         </div>
-        <Button variant="secondary" size="sm" disabled={pending || msgs.length === 0} onClick={() => { setMsgs([]); setError(null); }}>New conversation</Button>
+        <Button variant="secondary" size="sm" disabled={pending || msgs.length === 0} onClick={() => { setMsgs([]); setFocus(null); setError(null); }}>New conversation</Button>
       </div>
 
       <div className={styles.thread} role="log" aria-live="polite" aria-relevant="additions">

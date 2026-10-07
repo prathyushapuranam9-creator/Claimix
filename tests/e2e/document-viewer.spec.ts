@@ -86,7 +86,8 @@ test.describe("Document viewer popup", () => {
     const preauth = page.locator("main table a[href^='/pre-authorizations/']").first();
     await preauth.click();
     await page.waitForURL(/\/pre-authorizations\/[0-9a-f-]{36}$/);
-    const docs = page.locator("main section").filter({ has: page.getByRole("heading", { name: "Documents", exact: true }) }).getByRole("table");
+    const docs = page.locator("main section").filter({ has: page.getByRole("heading", { name: "Treatment & supporting documents", exact: true }) }).getByRole("table");
+    await expect(docs).toHaveCount(1);
     if (await docs.locator("tbody tr").count()) await checkRows(page, docs, 2);
 
     await page.goto("/claims");

@@ -11,10 +11,11 @@ import { sha256Hex } from "@/lib/security/crypto";
 import { parseOrThrow, requireId } from "@/lib/validation";
 import { actorOf, AuditService } from "@/modules/audit/audit.service";
 import { PreauthRepository } from "@/modules/preauth/preauth.repository";
-import { DOCUMENTS_ALLOWED, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
+import { DOCUMENTS_ALLOWED, HOSPITAL_EDITABLE, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
 import { ClaimRepository } from "@/modules/claims/claims.repository";
-import { CLAIM_DOCUMENTS_ALLOWED, type ClaimStatus } from "@/modules/claims/claims.workflow";
-import { documentLabel, DOCUMENT_TYPES } from "./document-types";
+import { CLAIM_DOCUMENTS_ALLOWED, CLAIM_EDITABLE, type ClaimStatus } from "@/modules/claims/claims.workflow";
+import { PatientRepository } from "@/modules/patients/patients.repository";
+import { documentLabel, DOCUMENT_TYPES, INSURANCE_DOCUMENT_TYPES, isInsuranceDocumentType } from "./document-types";
 import { documentReviewSchema } from "./documents.validation";
 import { NotificationService } from "@/modules/notifications/notifications.service";
 import { JobQueue } from "@/modules/jobs/job-queue";
@@ -24,11 +25,23 @@ import { DocumentRepository } from "./documents.repository";
 import { basicScanner, type Scanner } from "./scanner";
 import { getStorage } from "./storage";
 
+export interface UploadFile {
+  name: string;
+  size: number;
+  bytes: Uint8Array;
+}
+
 export interface UploadInput {
   subjectType: "preauth" | "claim";
   subjectId: string;
   docType: string;
-  file: { name: string; size: number; bytes: Uint8Array };
+  file: UploadFile;
+}
+
+/** Stage A: an insurance / coverage document filed against the patient, not against a request. */
+export interface InsuranceUploadInput {
+  docType: string;
+  file: UploadFile;
 }
 
 let scanner: Scanner = basicScanner;
@@ -67,6 +80,35 @@ async function resolveSubject(ctx: ServiceContext, type: UploadInput["subjectTyp
   };
 }
 
+/**
+ * Validate size, extension and real content type, scan, generate a safe key and store privately.
+ * Shared by both upload paths, so a coverage document goes through exactly the same checks as a
+ * treatment document. `blockedOn` only names the resource an upload-blocked audit entry points at.
+ */
+async function checkScanAndStore(ctx: ServiceContext, docType: string, f: UploadFile, blockedOn: { resourceType: string; resourceId: string }) {
+  const check = validateUpload(f);
+  if (!check.ok) throw new ValidationError(check.error, { file: [check.error] });
+
+  const verdict = await scanner.scan(f.bytes, check.kind);
+  if (verdict.status === "infected") {
+    await AuditService.record(ctx.db, { ...actorOf(ctx), action: "document.upload_blocked", ...blockedOn, newState: { reason: verdict.reason, docType } });
+    throw new ValidationError(`This file was blocked by the security scan: ${verdict.reason}`, { file: ["Blocked by security scan."] });
+  }
+
+  const storageKey = `${randomUUID()}.${check.ext}`;
+  await getStorage().put(storageKey, f.bytes, check.mime);
+  return {
+    status: "uploaded" as const,
+    scanStatus: "clean" as const,
+    originalName: check.displayName,
+    storageKey,
+    mimeType: check.mime,
+    sizeBytes: f.bytes.length,
+    sha256: sha256Hex(Buffer.from(f.bytes)),
+    uploadedBy: ctx.principal.userId,
+  };
+}
+
 export const DocumentService = {
   /**
    * Upload pipeline: authenticate (ctx) → authorize (permission + subject scope) →
@@ -83,17 +125,7 @@ export const DocumentService = {
     if (scope !== "all" && (ctx.principal.orgType !== "hospital" || subject.hospitalId !== ctx.principal.organizationId)) throw new ForbiddenError();
     if (!subject.acceptsDocuments) throw new ValidationError("Documents can't be added in the current status.");
 
-    const check = validateUpload(input.file);
-    if (!check.ok) throw new ValidationError(check.error, { file: [check.error] });
-
-    const verdict = await scanner.scan(input.file.bytes, check.kind);
-    if (verdict.status === "infected") {
-      await AuditService.record(ctx.db, { ...actorOf(ctx), action: "document.upload_blocked", resourceType: subject.type, resourceId: subject.id, newState: { reason: verdict.reason, docType: input.docType } });
-      throw new ValidationError(`This file was blocked by the security scan: ${verdict.reason}`, { file: ["Blocked by security scan."] });
-    }
-
-    const storageKey = `${randomUUID()}.${check.ext}`;
-    await getStorage().put(storageKey, input.file.bytes, check.mime);
+    const stored = await checkScanAndStore(ctx, input.docType, input.file, { resourceType: subject.type, resourceId: subject.id });
 
     return ctx.db.transaction(async (tx) => {
       const row = await DocumentRepository.insert(tx, {
@@ -103,14 +135,7 @@ export const DocumentService = {
         subjectId: subject.id,
         category: docDef.category,
         docType: input.docType,
-        status: "uploaded",
-        scanStatus: "clean",
-        originalName: check.displayName,
-        storageKey,
-        mimeType: check.mime,
-        sizeBytes: input.file.bytes.length,
-        sha256: sha256Hex(Buffer.from(input.file.bytes)),
-        uploadedBy: ctx.principal.userId,
+        ...stored,
       });
       // New evidence invalidates a draft's rules check (it feeds the checklist). After
       // submission, the evaluation the request was submitted with is kept as the record.
@@ -128,11 +153,97 @@ export const DocumentService = {
     });
   },
 
+  /**
+   * Stage A: an insurance card, policy copy or scheme enrolment document for one patient. It is filed
+   * against the patient alone (no pre-auth or claim), so it can be collected before any request
+   * exists, and it is never required in order to record coverage - it only helps fill and confirm it.
+   *
+   * The patient is resolved inside the caller's own scope and decides the owning hospital, so a
+   * document can never land on another hospital's or another patient's record.
+   */
+  async uploadInsuranceDocument(ctx: ServiceContext, patientId: string, input: InsuranceUploadInput) {
+    const scope = requirePermission(ctx.principal, "document:upload");
+    requirePermission(ctx.principal, "patient:write");
+    if (!isInsuranceDocumentType(input.docType)) {
+      throw new ValidationError("Choose an insurance document type.", { docType: [`Choose one of: ${INSURANCE_DOCUMENT_TYPES.map(documentLabel).join(", ")}.`] });
+    }
+    const found = await PatientRepository.findScoped(ctx.db, ctx.principal, requirePermission(ctx.principal, "patient:read"), requireId(patientId, "Patient"));
+    if (!found) throw new NotFoundError("Patient not found.");
+    const patient = found.patient;
+    if (scope !== "all" && (ctx.principal.orgType !== "hospital" || patient.hospitalId !== ctx.principal.organizationId)) throw new ForbiddenError();
+
+    const stored = await checkScanAndStore(ctx, input.docType, input.file, { resourceType: "patient", resourceId: patient.id });
+
+    return ctx.db.transaction(async (tx) => {
+      const row = await DocumentRepository.insert(tx, {
+        organizationId: patient.hospitalId,
+        patientId: patient.id,
+        subjectType: null,
+        subjectId: null,
+        category: DOCUMENT_TYPES[input.docType]!.category,
+        docType: input.docType,
+        ...stored,
+      });
+      await JobQueue.enqueue(tx, "document.scan", { documentId: row.id });
+      await AuditService.record(tx, {
+        ...actorOf(ctx),
+        action: "document.uploaded",
+        resourceType: "document",
+        resourceId: row.id,
+        newState: { stage: "insurance", patientId: patient.id, docType: input.docType, sizeBytes: row.sizeBytes, sha256: row.sha256 },
+      });
+      return row;
+    });
+  },
+
+  /** The patient's insurance / coverage documents (Stage A), inside the caller's patient scope. */
+  async insuranceDocuments(ctx: ServiceContext, patientId: string) {
+    requirePermission(ctx.principal, "document:read");
+    const found = await PatientRepository.findScoped(ctx.db, ctx.principal, requirePermission(ctx.principal, "patient:read"), requireId(patientId, "Patient"));
+    if (!found) throw new NotFoundError("Patient not found.");
+    return DocumentRepository.insuranceForPatient(ctx.db, found.patient.id);
+  },
+
   async forPreauth(ctx: ServiceContext, preauthId: string) {
     requirePermission(ctx.principal, "document:read");
     const subject = await PreauthRepository.findScoped(ctx.db, ctx.principal, requirePermission(ctx.principal, "preauth:read"), requireId(preauthId, "Pre-authorization"));
     if (!subject) throw new NotFoundError("Pre-authorization not found.");
     return DocumentRepository.forSubject(ctx.db, "preauth", preauthId);
+  },
+
+  /**
+   * Hospital staff remove a document they uploaded by mistake. Only the owning hospital can, only while the
+   * request is still the hospital's to edit (a draft, or a query waiting for its answer), never once the payer
+   * has verified the document, and never a document a recorded coverage was filled from.
+   */
+  async remove(ctx: ServiceContext, id: string) {
+    const scope = requirePermission(ctx.principal, "document:upload");
+    const doc = await DocumentRepository.findScoped(ctx.db, ctx.principal, scope, requireId(id, "Document"));
+    if (!doc) throw new NotFoundError("Document not found.");
+    if (scope !== "all" && (ctx.principal.orgType !== "hospital" || doc.organizationId !== ctx.principal.organizationId)) throw new ForbiddenError();
+    if (doc.status === "verified") throw new ValidationError("A document the payer has verified can't be deleted.");
+
+    let invalidate: ((tx: DbOrTx) => Promise<unknown>) | null = null;
+    if (doc.subjectType === "preauth" || doc.subjectType === "claim") {
+      const subject = await resolveSubject(ctx, doc.subjectType, doc.subjectId!);
+      const editable = doc.subjectType === "claim" ? CLAIM_EDITABLE.has(subject.status as ClaimStatus) : HOSPITAL_EDITABLE.has(subject.status as PreauthStatus);
+      if (!editable) throw new ValidationError("Documents can't be deleted once the request has been sent to the payer. Upload a corrected document instead.");
+      invalidate = subject.invalidate;
+    } else if (await DocumentRepository.usedByCoverage(ctx.db, doc.id)) {
+      throw new ValidationError("This document was used to fill in a coverage, so it can't be deleted.");
+    }
+
+    return ctx.db.transaction(async (tx) => {
+      await DocumentRepository.softDelete(tx, doc.id);
+      if (invalidate) await invalidate(tx);
+      await AuditService.record(tx, {
+        ...actorOf(ctx),
+        action: "document.deleted",
+        resourceType: "document",
+        resourceId: doc.id,
+        previousState: { docType: doc.docType, name: doc.originalName, status: doc.status, subjectType: doc.subjectType, subjectId: doc.subjectId },
+      });
+    });
   },
 
   /** Authorized, audited download. Only files that passed scanning are served. */

@@ -5,6 +5,7 @@ import { can, scopeFor, type Principal } from "@/lib/permissions/principal";
 import { parseOrThrow, todayIso } from "@/lib/validation";
 import type { Outcome } from "@/modules/rules/engine/types";
 import { CoverageService } from "@/modules/patients/coverage.service";
+import { coverPeriodStatus, type CoverPeriodStatus } from "@/modules/patients/coverage.validation";
 import { PatientService } from "@/modules/patients/patients.service";
 import { resolveHospital, runEligibility } from "./eligibility.service";
 import { failureReasons } from "./eligibility.sections";
@@ -12,7 +13,7 @@ import { eligibilityInputSchema } from "./eligibility.validation";
 
 /** Statuses this check can actually produce. "Pending" is not one: the check runs synchronously. */
 export type PatientEligibilityStatus = "eligible" | "not_eligible" | "expired" | "unable_to_verify";
-export type CoverageStatus = "in_force" | "expired" | "not_started";
+export type CoverageStatus = CoverPeriodStatus;
 
 export interface PatientEligibilityResult {
   patientId: string;
@@ -25,7 +26,14 @@ export interface PatientEligibilityResult {
   coverStart: string;
   coverEnd: string;
   coverageStatus: CoverageStatus;
+  /** Whether the recorded details have been checked against the insurance document. */
+  verificationStatus: "verified" | "requires_verification";
   status: PatientEligibilityStatus;
+  /**
+   * What the hospital can do next with this coverage: a pre-authorization or claim may only be
+   * started while the cover period is in force. Computed here so the page cannot offer more.
+   */
+  canStartRequest: boolean;
   outcome: Outcome;
   /** Facts the rules needed but the record doesn't hold. */
   missingInformation: string[];
@@ -79,7 +87,7 @@ export const PatientEligibilityService = {
     // Hospital staff: their own hospital; admins and payer reviewers: the patient's registering hospital.
     const out = await runEligibility(ctx, d, async () => (scope ? resolveHospital(ctx, scope, patient.hospitalId) : patient.hospitalId));
 
-    const coverageStatus: CoverageStatus = cov.coverEnd < today ? "expired" : cov.coverStart > today ? "not_started" : "in_force";
+    const coverageStatus = coverPeriodStatus(cov, today);
     const overall = out.evaluation.overall;
     return {
       patientId: patient.id,
@@ -92,8 +100,10 @@ export const PatientEligibilityService = {
       coverStart: cov.coverStart,
       coverEnd: cov.coverEnd,
       coverageStatus,
+      verificationStatus: cov.verificationStatus,
       // An expired cover is reported as such rather than a generic "not eligible".
       status: coverageStatus === "expired" && overall !== "PASS" ? "expired" : STATUS[overall],
+      canStartRequest: coverageStatus === "in_force" && overall !== "FAIL",
       outcome: overall,
       missingInformation: out.evaluation.missingInformation,
       reasons: failureReasons(out.evaluation.results),

@@ -29,7 +29,7 @@ async function submitPreauth(page: Page, policy: string) {
   await page.getByLabel("Full name").fill(patientName);
   await page.getByLabel("Date of birth").fill("1984-05-05");
   await page.getByRole("button", { name: "Register patient" }).click();
-  await page.waitForURL(/\/patients\/[0-9a-f-]{36}$/);
+  await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
   await page.getByRole("button", { name: "Add coverage" }).click();
   await page.getByLabel("Policy / scheme").selectOption({ label: policy });
   await page.getByLabel("Member / beneficiary ID").fill(`CTX-${suffix}`.toUpperCase());

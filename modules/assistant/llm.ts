@@ -17,7 +17,9 @@ export interface AssistantLlm {
   explain(answer: Answer): Promise<LlmOutcome | null>;
 }
 
-const BASE_URL = "https://openrouter.ai/api/v1";
+/** OpenRouter's API. OPENROUTER_BASE_URL (server-side only) may point at a proxy or, in tests, a stand-in server. */
+const DEFAULT_BASE_URL = "https://openrouter.ai/api/v1";
+const baseUrl = () => (process.env.OPENROUTER_BASE_URL?.trim() || DEFAULT_BASE_URL).replace(/\/+$/, "");
 const TIMEOUT_MS = 20_000;
 
 const SYSTEM = [
@@ -37,7 +39,7 @@ export async function completeWithOpenRouter(messages: { role: "system" | "user"
 
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}/chat/completions`, {
+    res = await fetch(`${baseUrl()}/chat/completions`, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", "X-Title": "Claimix Insurance Assistant" },
       body: JSON.stringify({ model, max_tokens: maxTokens, temperature: 0.2, messages }),

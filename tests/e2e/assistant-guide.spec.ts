@@ -1,7 +1,34 @@
+import { createServer, type Server } from "node:http";
 import { expect, test, type Page } from "@playwright/test";
 import { signIn } from "./helpers";
 
-const OUT = "I'm the Claimix Insurance Assistant. I can only help with the Claimix application";
+const OUT = "I can help only with the Claimix application, its workflows, navigation, statuses, records, and available actions.";
+
+/** A stand-in for OpenRouter. It describes what the Claimix backend sent, so the tests can see the full path. */
+let stub: Server;
+test.beforeAll(async () => {
+  stub = createServer((req, res) => {
+    let raw = "";
+    req.on("data", (c) => (raw += c));
+    req.on("end", () => {
+      const body = JSON.parse(raw) as { model: string; messages: { role: string; content: string }[] };
+      const sys = body.messages[0]!.content;
+      const last = body.messages.at(-1)!.content;
+      if (/force-error/.test(last)) { res.writeHead(429); res.end("{}"); return; }
+      const found = /RECORDS FOUND \(visible/.test(sys);
+      const notFound = /\nNOT FOUND\n/.test(sys);
+      const turns = body.messages.filter((m) => m.role !== "system").length;
+      // Like a model told to keep verified guidance as is: it repeats it, then adds what it was sent.
+      const NL = String.fromCharCode(10);
+      const guidance = sys.split("VERIFIED GUIDANCE for the latest question" + NL)[1];
+      const content = `${guidance ? guidance + NL + NL : ""}Stub model reply. key=${req.headers.authorization === "Bearer sk-or-e2e-stub-key" ? "ok" : "bad"} model=${body.model} found=${found} notFound=${notFound} turns=${turns} role=${/Role: ([A-Za-z ]+) \(/.exec(sys)?.[1] ?? "?"}`;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ choices: [{ message: { content } }] }));
+    });
+  });
+  await new Promise<void>((r) => stub.listen(3199, "127.0.0.1", r));
+});
+test.afterAll(async () => { await new Promise<void>((r) => stub.close(() => r())); });
 
 async function openAssistant(page: Page) {
   await page.getByRole("link", { name: "Insurance Assistant" }).first().click();
@@ -72,7 +99,7 @@ test.describe("Insurance Assistant: Claimix guide", () => {
 
     // The navigation the assistant gave really exists: follow its link and land on the screen.
     m = await ask(page, "Where can I find policies?");
-    await m.getByRole("link", { name: "Open Policies" }).click();
+    await m.getByRole("link", { name: "Open Insurers / Providers" }).click();
     await expect(page).toHaveURL(/\/policies$/);
     await expect(page.getByRole("heading", { name: "Policies", level: 1 })).toBeVisible();
     await page.goBack();
@@ -137,5 +164,44 @@ test.describe("Insurance Assistant: Claimix guide", () => {
     const m = await ask(page, "Why can't I see this Aarogya pre-auth?");
     await expect(m).toContainText("Navjeevan General Insurance");
     await expect(m).toContainText("Switch Context");
+  });
+
+  test("pasted application ids and follow-ups go through the backend to the model with the user's own records only", async ({ page }) => {
+    test.setTimeout(120_000);
+    await signIn(page, "staff.a@demo.claimix.invalid");
+    // A real patient number copied from the Patients screen.
+    await page.goto("/patients");
+    const patientNo = (await page.locator("tbody tr").first().locator(".mono").first().innerText()).trim();
+    expect(patientNo).toMatch(/^PT-/);
+    await openAssistant(page);
+
+    let m = await ask(page, `${patientNo} what this mean?`);
+    await expect(m).toContainText("Stub model reply. key=ok model=openrouter/auto found=true notFound=false");
+    await expect(m).toContainText("role=Hospital Staff");
+    await expect(m.getByRole("link", { name: `Open ${patientNo}` })).toBeVisible();
+
+    // A made-up number is reported as not found to the model.
+    m = await ask(page, "PT-NOPE0000 what is this?");
+    await expect(m).toContainText("found=false notFound=true");
+
+    // Follow-ups carry the conversation: this is the 3rd exchange, so earlier turns are sent too.
+    m = await ask(page, "Where can I find pre-auths?");
+    await expect(m).toContainText("turns=");
+    const turns = Number((await m.innerText()).match(/turns=(\d+)/)![1]);
+    expect(turns).toBeGreaterThanOrEqual(5);
+    // New conversation starts again from nothing.
+    await page.getByRole("button", { name: "New conversation" }).click();
+    m = await ask(page, "What happens after I submit one?");
+    await expect(m).toContainText("turns=1");
+  });
+
+  test("an AI service failure is explained plainly, with no secrets, and Claimix keeps answering", async ({ page }) => {
+    await signIn(page, "staff.a@demo.claimix.invalid");
+    await openAssistant(page);
+    const m = await ask(page, "Where can I find claims? force-error");
+    await expect(m).toContainText("rate limit");
+    const text = await m.innerText();
+    expect(text).not.toMatch(/sk-or|Bearer|stack|at \w+\.\w+ \(/i);
+    expect(await paths(m)).toContain("Dashboard → Claims needing action"); // the application's own answer still shows
   });
 });

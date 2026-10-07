@@ -5,12 +5,13 @@ import { ConflictError, ForbiddenError, InvalidTransitionError, NotFoundError, V
 import type { ListQuery } from "@/lib/pagination";
 import { requirePermission, scopeFor, type Principal } from "@/lib/permissions/principal";
 import { randomToken } from "@/lib/security/crypto";
-import { parseOrThrow, requireId } from "@/lib/validation";
+import { parseOrThrow, requireId, todayIso } from "@/lib/validation";
 import { actorOf, AuditService } from "@/modules/audit/audit.service";
 import { DocumentRepository } from "@/modules/documents/documents.repository";
 import { documentLabel } from "@/modules/documents/document-types";
 import { applyTransition, type TransitionDetails, type WorkflowConfig } from "@/modules/workflow/transition";
 import { CoverageRepository } from "@/modules/patients/coverage.repository";
+import { coverPeriodStatus } from "@/modules/patients/coverage.validation";
 import { PolicyRepository } from "@/modules/policies/policies.repository";
 import { ClaimRepository } from "@/modules/claims/claims.repository";
 import { evaluateAndRecord, loadEvaluation } from "@/modules/rules/rules.service";
@@ -177,6 +178,18 @@ export const PreauthService = {
       const cov = await CoverageRepository.findScoped(tx, ctx.principal, requirePermission(ctx.principal, "patient:read"), d.beneficiaryId);
       if (!cov) throw new NotFoundError("Coverage not found.");
       if (cov.patient.hospitalId !== ctx.principal.organizationId) throw new NotFoundError("Coverage not found.");
+      // A pre-authorization asks the payer to cover an admission now, so the cover period must be
+      // current. Expired or not-yet-started cover is a record problem to fix (or a different cover to
+      // add) rather than something to send to the payer; the rules engine judges everything else.
+      const period = coverPeriodStatus(cov, todayIso());
+      if (period !== "in_force") {
+        throw new ValidationError(
+          period === "expired"
+            ? `This cover ended on ${cov.coverEnd}, so a pre-authorization can't be raised on it. Record the patient's current coverage (upload the insurance document or add it manually) and check eligibility again.`
+            : `This cover starts on ${cov.coverStart}, so a pre-authorization can't be raised on it yet. Record the coverage the patient is insured under today.`,
+          { beneficiaryId: ["The cover period is not current."] },
+        );
+      }
       const policy = await PolicyRepository.get(tx, cov.policyId!);
       if (!policy) throw new ValidationError("The patient's policy is no longer available.");
       const cols = detailsToColumns(d);

@@ -20,31 +20,30 @@ function caseSummary(c: EligibilityHistoryItem["case"]) {
 }
 
 /**
- * Previously recorded eligibility checks for a coverage, newest first. The latest one is open when the page
- * loads (so it is still there after a refresh); once a new check has been run in this session the live result
- * is shown above instead, and everything here stays collapsed. Details are rendered only when opened.
+ * Previously recorded eligibility checks for a coverage, newest first. Each one is a single line (outcome, time,
+ * policy) and its details are rendered only after "View details", so every check stays listed without repeating
+ * the result shown above. The heading never carries a count.
  */
-export function EligibilityHistory({ items, liveId }: { items: EligibilityHistoryItem[]; liveId: string | null }) {
+export function EligibilityHistory({ items }: { items: EligibilityHistoryItem[] }) {
   const [toggled, setToggled] = useState<Record<string, boolean>>({});
-  const isOpen = (id: string, index: number) => toggled[id] ?? (liveId === null && index === 0);
+  const isOpen = (id: string) => toggled[id] ?? false;
 
   return (
     <section id="previous-checks" aria-label="Previous eligibility checks">
-      <Card title={`Previous eligibility checks${items.length ? ` (${items.length})` : ""}`}>
+      <Card title="Previous eligibility checks">
         {items.length === 0 ? (
           <p className={styles.empty}>No eligibility check has been recorded for this coverage yet.</p>
         ) : (
           <ol className={styles.list}>
             {items.map((it, i) => {
-              const open = isOpen(it.id, i);
+              const open = isOpen(it.id);
               const details = caseSummary(it.case);
               return (
                 <li key={it.id} className={styles.item}>
                   <div className={styles.head}>
                     <Badge tone={OUTCOME_TONE[it.overall]}>{OVERALL_LABEL[it.overall].title}</Badge>
                     <span className={styles.when}>{formatDateTime(it.evaluatedAt)}</span>
-                    {it.id === liveId && <Badge tone="info">Just checked</Badge>}
-                    {i === 0 && it.id !== liveId && <span className={styles.latest}>Latest</span>}
+                    {i === 0 && <span className={styles.latest}>Latest</span>}
                     <Button
                       type="button"
                       size="sm"

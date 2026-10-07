@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { assistantInteractions, auditLogs, notifications, reviewRequests } from "@/db/schema";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
@@ -14,11 +14,14 @@ let c: Awaited<ReturnType<typeof codes>>;
 const as = (k: keyof typeof who) => svc(ctx.db, who[k]);
 
 beforeAll(async () => {
+  // These tests are about the records-based answers: never call a real AI service, whatever .env.local holds.
+  vi.stubEnv("LLM_ASSISTANT_ENABLED", "false");
   useTempStorage();
   who = await demoPrincipals(ctx.auth, ctx.demoPassword);
   c = await codes(ctx.db);
 });
 afterAll(async () => {
+  vi.unstubAllEnvs();
   setStorageForTests(undefined);
   await ctx.close();
 });

@@ -140,8 +140,8 @@ test.describe("Patient profile: Policy Check", () => {
     await page.getByLabel("Full name").fill(name);
     await page.getByLabel("Date of birth").fill("1990-01-01");
     await page.getByRole("button", { name: "Register patient" }).click();
-    await page.waitForURL(/\/patients\/[0-9a-f-]{36}$/);
-    const newId = page.url().split("/").pop()!;
+    await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
+    const newId = new URL(page.url()).pathname.split("/").pop()!;
 
     await expect(block(page)).toHaveAttribute("data-patient-id", newId);
     // Another patient opens collapsed too.

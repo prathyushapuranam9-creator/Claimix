@@ -39,3 +39,9 @@
   padding: var(--sp-3) 0;
   font-weight: 650;
 }
+
+.hint {
+  margin: 0 0 var(--sp-3);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}

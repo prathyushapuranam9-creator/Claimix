@@ -15,7 +15,7 @@ import { ClaimForm } from "@/components/claims/ClaimForm";
 import { RejectionReasonCard } from "@/components/claims/RejectionReasonCard";
 import { SettlementForm } from "@/components/claims/SettlementForm";
 import { DocumentList } from "@/components/documents/DocumentList";
-import { reviewDocumentAction } from "@/app/(app)/documents/actions";
+import { deleteDocumentAction, reviewDocumentAction } from "@/app/(app)/documents/actions";
 import { DocumentUploader } from "@/components/documents/DocumentUploader";
 import { EligibilityResult } from "@/components/eligibility/EligibilityResult";
 import { ChecklistPanel } from "@/components/preauth/ChecklistPanel";
@@ -168,7 +168,7 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
                     <DocumentUploader upload={uploadClaimDocumentAction.bind(null, c.id)} suggested={suggestedDocs} />
                   </div>
                 )}
-                <DocumentList docs={w.documents} review={w.side === "payer" ? reviewDocumentAction : undefined} />
+                <DocumentList docs={w.documents} review={w.side === "payer" ? reviewDocumentAction : undefined} remove={w.side === "hospital" && ["draft", "query"].includes(status) ? deleteDocumentAction : undefined} />
                 {w.preauthDocuments.length > 0 && (
                   <details className={local.sub}>
                     <summary>Documents from the pre-authorization ({w.preauthDocuments.length})</summary>

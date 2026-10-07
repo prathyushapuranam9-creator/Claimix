@@ -51,3 +51,38 @@ export function workflowSteps(input: { evaluation?: Evaluation | null; preauthSt
   ];
   return steps;
 }
+
+/**
+ * The first half of the hospital workflow, as shown on a patient's page: registration → insurance
+ * document → coverage → eligibility → request. The insurance document step is marked optional
+ * because coverage can always be recorded by hand; it never blocks the steps after it.
+ */
+export function coverageWorkflowSteps(input: {
+  hasInsuranceDocument: boolean;
+  coverageCount: number;
+  /** Outcome of the most recent recorded eligibility check on any of this patient's coverage. */
+  lastCheck?: Outcome | null;
+  requestCount: number;
+}): WorkflowStep[] {
+  const hasCover = input.coverageCount > 0;
+  return [
+    { key: "patient", label: "Patient registered", state: "done" },
+    {
+      key: "document",
+      label: "Insurance document",
+      state: input.hasInsuranceDocument ? "done" : hasCover ? "upcoming" : "current",
+      hint: input.hasInsuranceDocument ? undefined : "Optional — coverage can also be added manually",
+    },
+    { key: "coverage", label: "Coverage recorded", state: hasCover ? "done" : "current" },
+    {
+      key: "eligibility",
+      label: "Eligibility checked",
+      state: !hasCover ? "upcoming" : input.lastCheck ? fromOutcome(input.lastCheck) : "current",
+    },
+    {
+      key: "request",
+      label: "Pre-authorization / claim",
+      state: input.requestCount > 0 ? "done" : input.lastCheck === "PASS" ? "current" : "upcoming",
+    },
+  ];
+}

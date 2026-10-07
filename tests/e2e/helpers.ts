@@ -39,7 +39,7 @@ export async function freshPatientWithCover(page: Page, balance = "400000") {
   await page.getByLabel("Full name").fill(`Journey Patient ${suffix}`);
   await page.getByLabel("Date of birth").fill("1984-05-05");
   await page.getByRole("button", { name: "Register patient" }).click();
-  await page.waitForURL(/\/patients\/[0-9a-f-]{36}$/);
+  await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
   await page.getByRole("button", { name: "Add coverage" }).click();
   await page.getByLabel("Policy / scheme").selectOption({ label: "Aarogya Family Floater Plus (DEMO DATA)" });
   await page.getByLabel("Member / beneficiary ID").fill(`E2E-${suffix}`.toUpperCase());
