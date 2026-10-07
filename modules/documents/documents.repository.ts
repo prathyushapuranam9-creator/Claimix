@@ -20,6 +20,11 @@ export const DOCUMENT_SCOPE: ScopeColumns = {
   patientId: documents.patientId,
   insurerId: viaSubject("insurer_id"),
   tpaId: viaSubject("tpa_id"),
+  // The document's pre-auth or claim is under that policy.
+  policyId: (policyId) => sql`(
+    (${documents.subjectType} = 'preauth' and exists (select 1 from ${preAuthorizations} p where p.id = ${documents.subjectId} and p.policy_id = ${policyId}))
+    or (${documents.subjectType} = 'claim' and exists (select 1 from ${claims} c where c.id = ${documents.subjectId} and c.policy_id = ${policyId}))
+  )`,
 };
 
 export const DocumentRepository = {

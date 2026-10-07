@@ -65,3 +65,25 @@
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation-duration: 2s; }
 }
+
+/* Panel header: "Check again" and the close (×) icon. */
+.headActions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.close {
+  display: inline-grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-text-muted);
+  cursor: pointer;
+}
+
+.close:hover { background: var(--c-accent); color: var(--c-text); }
+.close:focus-visible { outline: 2px solid var(--c-focus); outline-offset: 2px; }

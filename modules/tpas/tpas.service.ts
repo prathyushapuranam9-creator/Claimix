@@ -13,7 +13,10 @@ import { TpaRepository } from "./tpas.repository";
 export const TpaService = {
   async list(ctx: ServiceContext, q: ListQuery) {
     requirePermission(ctx.principal, "insurer:read");
-    return TpaRepository.list(ctx.db, q);
+    // Payers only ever see their own products, so "policies serviced" counts only those (same rule as the policy scope).
+    const p = ctx.principal;
+    const countFor = p.orgType === "insurer" ? { insurerId: p.organizationId } : p.orgType === "tpa" ? { tpaId: p.organizationId } : {};
+    return TpaRepository.list(ctx.db, q, countFor);
   },
 
   async get(ctx: ServiceContext, id: string) {

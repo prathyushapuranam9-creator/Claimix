@@ -1,4 +1,5 @@
 import "server-only";
+import { isPayerPortal, PAYER_POLICIES_LABEL } from "@/lib/navigation";
 import { ROLES } from "@/lib/permissions/catalog";
 import { completeWithOpenRouter, llmEnabled } from "./llm";
 import { knowledgeText, NOT_SURE, OUT_OF_SCOPE, pathBlock, reach, STATUS_HELP, whoIs, type Link, type Who } from "./knowledge";
@@ -72,6 +73,8 @@ const featureReply = (w: Who, f: Feature): GuideReply => {
   if (!w.can(f.permission)) {
     return guide(`**${f.label}** is not available to your role (${w.roleName}), so it will not appear for you. If you need it, ask an administrator of your organization.`);
   }
+  // Insurer reviewers know the Policies menu as "Insurer/Provider".
+  if (f.href === "/policies" && isPayerPortal(w.p)) return featureAnswer({ label: PAYER_POLICIES_LABEL, what: f.what, href: f.href, steps: side(PAYER_POLICIES_LABEL), note: f.note?.(w) });
   return featureAnswer({ label: f.label, what: f.what, href: f.href, steps: f.steps?.(w) ?? [], note: f.note?.(w) });
 };
 

@@ -52,6 +52,15 @@ export function landingPath(p: Principal): string {
   return p.patientId ? "/patients" : "/hospitals";
 }
 
+/** Insurer Reviewer portal (insurer or TPA users): "Policies" is called "Insurer/Provider". */
+export const PAYER_POLICIES_LABEL = "Insurer/Provider";
+
+export function isPayerPortal(p: Pick<Principal, "orgType">): boolean {
+  return p.orgType === "insurer" || p.orgType === "tpa";
+}
+
 export function visibleNav(p: Principal): NavItem[] {
-  return NAV_ITEMS.filter((i) => p.permissions.has(i.permission) && (i.href !== "/dashboard" || hasDashboard(p)));
+  return NAV_ITEMS.filter((i) => p.permissions.has(i.permission) && (i.href !== "/dashboard" || hasDashboard(p))).map((i) =>
+    i.href === "/policies" && isPayerPortal(p) ? { ...i, label: PAYER_POLICIES_LABEL, title: PAYER_POLICIES_LABEL } : i,
+  );
 }

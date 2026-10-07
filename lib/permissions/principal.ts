@@ -16,7 +16,12 @@ export interface Principal {
    * and role. Everything else on the principal is then that organization's and that role's (real authorization),
    * while `userId` stays the real signed-in account so changes and audit entries are traceable to it.
    */
-  acting?: { organizationName: string; roleName: string };
+  acting?: { organizationName: string; roleName: string; policyName?: string };
+  /**
+   * Set only while the insurance testing context is narrowed to one policy (Insurance Company + Policy on the
+   * dashboard): every scoped query then also matches that policy. Never widens anything.
+   */
+  policyId?: string | null;
 }
 
 const RANK: Record<Scope, number> = { own: 1, organization: 2, all: 3 };

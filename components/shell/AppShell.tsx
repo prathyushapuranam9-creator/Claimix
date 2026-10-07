@@ -7,6 +7,7 @@ import { LogoMark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import type { NavItem } from "@/lib/navigation";
 import { BackButton } from "./BackButton";
+import { useBackHistory } from "./useBackHistory";
 import styles from "./AppShell.module.css";
 
 /** Pages that already carry their own working "Back to …" control. */
@@ -72,12 +73,8 @@ export function AppShell({ nav, portal, portalKey, user, logout, unread, childre
   }
   const crumb = current?.hidden && trail.from && trail.from.href !== current.href ? trail.from : undefined;
 
-  // Becomes true after the first in-app route change, i.e. once there is app history to return to.
-  const [hasHistory, setHasHistory] = useState(false);
-  const firstPath = useRef(pathname);
-  useEffect(() => {
-    if (pathname !== firstPath.current) setHasHistory(true);
-  }, [pathname]);
+  // True only when the previous history entry is another Claimix page (not a tab of this one, not outside the app).
+  const hasHistory = useBackHistory(pathname);
 
   // Sidebar landing pages are the roots; everything else (detail, new, edit, and pages reached only by links) gets a Back control.
   const showBack = pathname !== "/dashboard" && !nav.some((n) => n.href === pathname && !n.hidden) && !HAS_OWN_BACK.some((r) => r.test(pathname));

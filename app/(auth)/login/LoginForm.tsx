@@ -39,8 +39,9 @@ export function LoginForm({ next }: { next?: string }) {
 
   useEffect(() => {
     try {
-      // Clean up the account list an earlier version kept in this browser (emails only).
+      // Clean up what earlier versions kept in this browser (an email list; the last portal chosen).
       localStorage.removeItem("claimix.rememberedAccounts");
+      localStorage.removeItem("claimix.lastPortal");
     } catch {
       // Storage unavailable: nothing to clean up.
     }

@@ -28,12 +28,23 @@ test.describe("Taskbar: signed-in user profile", () => {
       const label = await profileBtn(page).getByText(me.name).boundingBox();
       expect(label!.y).toBeGreaterThanOrEqual(icon!.y + icon!.height - 1);
 
-      // Hover: name + role.
+      // Hover: no visual change at all (no tooltip, background or colour change).
+      await page.mouse.move(5, 500);
+      const look = () => profileBtn(page).evaluate((el) => { const s = getComputedStyle(el); return [s.backgroundColor, s.color, s.boxShadow, s.opacity, s.transform, s.borderColor].join("|"); });
+      const before = await look();
       await profileBtn(page).hover();
+      await page.waitForTimeout(250);
+      expect(await look()).toBe(before);
       const tip = page.getByRole("tooltip");
+      await expect(tip).toBeHidden();
+      // Keyboard focus still gives the name + role hint.
+      await profileBtn(page).focus();
+      await page.keyboard.press("Shift+Tab");
+      await page.keyboard.press("Tab");
       await expect(tip).toBeVisible();
       await expect(tip).toContainText(me.name);
       await expect(tip).toContainText(me.role);
+      await page.mouse.move(5, 500);
 
       // Click: the menu on the same page.
       await profileBtn(page).click();

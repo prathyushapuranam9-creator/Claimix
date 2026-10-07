@@ -105,6 +105,17 @@
 
 .search { flex: 2 1 260px !important; }
 
+/* Optional magnifier inside the search field (aligned with the input, which sits at the bottom). */
+.searchWithIcon { position: relative; }
+.searchWithIcon input { padding-left: 2.4rem; }
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  bottom: calc((var(--tap) - 18px) / 2);
+  color: var(--c-text-muted);
+  pointer-events: none;
+}
+
 /* Secondary filters */
 .filters > .more {
   flex: 1 1 100%;

@@ -195,7 +195,8 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
             patientId: null,
             sessionId: row.sessionId,
             permissions: await AuthRepository.loadPermissions(db, acting.roleId),
-            acting: { organizationName: acting.organizationName, roleName: acting.roleName },
+            acting: { organizationName: acting.organizationName, roleName: acting.roleName, policyName: acting.policyName ?? undefined },
+            policyId: acting.policyId,
           },
           fullName: row.fullName,
           email: row.email,
@@ -247,20 +248,20 @@ export function createAuthService(db: Db, cfg: AuthConfig) {
       const sel = input as Partial<ContextSelection> | null;
       const info =
         typeof sel?.organizationId === "string" && typeof sel?.roleKey === "string"
-          ? await InsuranceContext.resolve(db, { organizationId: sel.organizationId, roleKey: sel.roleKey })
+          ? await InsuranceContext.resolve(db, { organizationId: sel.organizationId, roleKey: sel.roleKey, policyId: typeof sel.policyId === "string" && sel.policyId ? sel.policyId : null })
           : null;
-      if (!info) throw new ValidationError("Choose an insurance company and one of its roles.");
+      if (!info) throw new ValidationError("Choose an insurance company, one of its roles, and (optionally) one of its policies.");
       if (!contextAllowed(real, info.organizationId)) throw new ForbiddenError("You can only test your own insurance company.");
       await AuditService.record(db, {
         action: "context.switched",
         actorUserId: real.principal.userId,
         organizationId: real.principal.organizationId,
         sessionId: real.principal.sessionId,
-        newState: { organizationId: info.organizationId, organizationName: info.organizationName, roleKey: info.roleKey },
+        newState: { organizationId: info.organizationId, organizationName: info.organizationName, roleKey: info.roleKey, policyId: info.policyId },
         meta,
       });
       return {
-        contextToken: InsuranceContext.sign(cfg.secret, real.principal.sessionId, { organizationId: info.organizationId, roleKey: info.roleKey }),
+        contextToken: InsuranceContext.sign(cfg.secret, real.principal.sessionId, { organizationId: info.organizationId, roleKey: info.roleKey, policyId: info.policyId }),
         info,
       };
     },

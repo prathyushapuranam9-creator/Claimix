@@ -22,6 +22,11 @@ export const PATIENT_SCOPE: ScopeColumns = {
     exists (select 1 from ${claims} where ${claims.patientId} = ${patients.id} and ${claims.tpaId} = ${orgId} and ${claims.submittedAt} is not null)
     or exists (select 1 from ${preAuthorizations} where ${preAuthorizations.patientId} = ${patients.id} and ${preAuthorizations.tpaId} = ${orgId} and ${preAuthorizations.submittedAt} is not null)
   )`,
+  // Narrowed to one policy: patients with a submitted pre-auth or claim under it.
+  policyId: (policyId) => sql`(
+    exists (select 1 from ${claims} where ${claims.patientId} = ${patients.id} and ${claims.policyId} = ${policyId} and ${claims.submittedAt} is not null)
+    or exists (select 1 from ${preAuthorizations} where ${preAuthorizations.patientId} = ${patients.id} and ${preAuthorizations.policyId} = ${policyId} and ${preAuthorizations.submittedAt} is not null)
+  )`,
 };
 
 const listColumns = {

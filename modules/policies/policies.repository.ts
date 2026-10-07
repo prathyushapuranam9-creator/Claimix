@@ -16,6 +16,7 @@ export const POLICY_SCOPE: ScopeColumns = {
   insurerId: policies.insurerId,
   tpaId: policies.tpaId,
   patientId: (pid) => sql`exists (select 1 from ${beneficiaries} b where b.policy_id = ${policies.id} and b.patient_id = ${pid} and b.deleted_at is null)`,
+  policyId: policies.id,
 };
 
 /**
@@ -39,6 +40,8 @@ const activeVersionNo = sql<number | null>`(
 export interface PolicyFilters {
   category?: "private" | "government";
   insurerId?: string;
+  /** Policies a TPA administers. */
+  tpaId?: string;
   schemeId?: string;
   productType?: string;
 }
@@ -50,6 +53,7 @@ export const PolicyRepository = {
       policyScope(principal, scope),
       f.category ? eq(policies.category, f.category) : undefined,
       f.insurerId ? eq(policies.insurerId, f.insurerId) : undefined,
+      f.tpaId ? eq(policies.tpaId, f.tpaId) : undefined,
       f.schemeId ? eq(policies.schemeId, f.schemeId) : undefined,
       f.productType ? eq(policies.productType, f.productType) : undefined,
       q.q ? ilike(policies.name, likeContains(q.q)) : undefined,

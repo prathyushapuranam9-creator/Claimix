@@ -19,7 +19,16 @@ export interface EligibilityCoverageOption {
 /** What the panel shows for the selected policy. */
 type Status = "idle" | "checking" | "error";
 
+/** The patient as shown in Patient Details (already labelled, with empty values filled in by the page). */
+export interface EligibilityPatientInfo {
+  name: string;
+  department: string;
+  visitReason: string;
+}
+
 interface Ctx {
+  patient: EligibilityPatientInfo;
+  close: () => void;
   coverage: EligibilityCoverageOption[];
   addCoverageHref: string | null;
   open: boolean;
@@ -49,11 +58,13 @@ const ERROR = "Unable to verify eligibility. Please try again.";
  */
 export function EligibilityCheckProvider({
   patientId,
+  patient,
   coverage,
   addCoverageHref,
   children,
 }: {
   patientId: string;
+  patient: EligibilityPatientInfo;
   coverage: EligibilityCoverageOption[];
   addCoverageHref: string | null;
   children: ReactNode;
@@ -115,6 +126,8 @@ export function EligibilityCheckProvider({
   };
 
   const ctx: Ctx = {
+    patient,
+    close: () => setOpen(false),
     coverage,
     addCoverageHref,
     open,
@@ -154,7 +167,7 @@ const COVERAGE: Record<CoverageStatus, { label: string; tone: Tone }> = {
 
 /** The collapsible "Eligibility Result" panel; hidden until the header toggle opens it. */
 export function EligibilityResultCard() {
-  const { coverage, addCoverageHref, open, selected, select, status, result, recheck } = useEligibility();
+  const { patient, close, coverage, addCoverageHref, open, selected, select, status, result, recheck } = useEligibility();
   const checking = status === "checking";
 
   return (
@@ -163,14 +176,32 @@ export function EligibilityResultCard() {
         <Card
           title="Eligibility Result"
           actions={
-            selected && (
-              <Button type="button" size="sm" variant="secondary" loading={checking} onClick={recheck}>
-                Check again
-              </Button>
-            )
+            <div className={styles.headActions}>
+              {selected && (
+                <Button type="button" size="sm" variant="secondary" loading={checking} onClick={recheck}>
+                  Check again
+                </Button>
+              )}
+              <button type="button" className={styles.close} aria-label="Close eligibility result" title="Close" aria-controls={PANEL_ID} onClick={close}>
+                <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           }
         >
           <div aria-live="polite" className={styles.body}>
+            {/* The same values as Patient Details and Policy Check for this patient. */}
+            <div data-testid="eligibility-patient">
+              <Details
+                columns={3}
+                items={[
+                  ["Name", patient.name],
+                  ["Department", patient.department],
+                  ["Reason for Join", patient.visitReason],
+                ]}
+              />
+            </div>
             {coverage.length > 1 && (
               <div className={styles.picker}>
                 <SelectField label="Policy" value={selected ?? ""} disabled={checking} onChange={(e) => select(e.target.value)}>
