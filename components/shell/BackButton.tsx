@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import styles from "./BackButton.module.css";
-import { markReplace } from "./useBackHistory";
+import { goBackToPreviousPage, markReplace } from "./useBackHistory";
 
 interface Props {
   /** Where to go when the user landed here directly (no in-app history to return to). */
@@ -26,7 +26,7 @@ export function BackButton({ fallback, hasHistory }: Props) {
       aria-label="Back"
       data-tip="Back"
       onClick={() => {
-        if (hasHistory) return router.back();
+        if (hasHistory) return goBackToPreviousPage();
         markReplace();
         router.replace(fallback);
       }}

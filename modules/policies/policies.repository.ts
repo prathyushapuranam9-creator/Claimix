@@ -42,6 +42,8 @@ export interface PolicyFilters {
   insurerId?: string;
   /** Policies a TPA administers. */
   tpaId?: string;
+  /** Only policies currently offered (not withdrawn). */
+  activeOnly?: boolean;
   schemeId?: string;
   productType?: string;
 }
@@ -54,6 +56,7 @@ export const PolicyRepository = {
       f.category ? eq(policies.category, f.category) : undefined,
       f.insurerId ? eq(policies.insurerId, f.insurerId) : undefined,
       f.tpaId ? eq(policies.tpaId, f.tpaId) : undefined,
+      f.activeOnly ? eq(policies.isActive, true) : undefined,
       f.schemeId ? eq(policies.schemeId, f.schemeId) : undefined,
       f.productType ? eq(policies.productType, f.productType) : undefined,
       q.q ? ilike(policies.name, likeContains(q.q)) : undefined,

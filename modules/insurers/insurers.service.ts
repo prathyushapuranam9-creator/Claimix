@@ -13,7 +13,15 @@ import { insurerInputSchema } from "./insurers.validation";
 export const InsurerService = {
   async list(ctx: ServiceContext, q: ListQuery) {
     requirePermission(ctx.principal, "insurer:read");
-    return InsurerRepository.list(ctx.db, q);
+    // Payers only ever see their own products, so the policy count follows the same rule as the policy scope.
+    const p = ctx.principal;
+    const countFor = p.orgType === "insurer" ? { insurerId: p.organizationId } : p.orgType === "tpa" ? { tpaId: p.organizationId } : {};
+    return InsurerRepository.list(ctx.db, q, countFor);
+  },
+
+  async networkHospitalCount(ctx: ServiceContext, id: string) {
+    requirePermission(ctx.principal, "insurer:read");
+    return InsurerRepository.networkHospitalCount(ctx.db, requireId(id, "Insurer"));
   },
 
   async get(ctx: ServiceContext, id: string) {

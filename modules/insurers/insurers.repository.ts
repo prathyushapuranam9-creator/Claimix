@@ -7,7 +7,8 @@ import { andAll } from "@/lib/permissions/scope";
 
 /** Reference data (insurer:read). */
 export const InsurerRepository = {
-  async list(db: DbOrTx, q: ListQuery) {
+  /** `countFor` limits "policies" to products the viewer may see (an insurer: its own; a TPA: those it administers). */
+  async list(db: DbOrTx, q: ListQuery, countFor: { insurerId?: string; tpaId?: string } = {}) {
     const where = andAll(
       isNull(insurers.deletedAt),
       q.q ? or(ilike(organizations.name, likeContains(q.q)), ilike(insurers.code, likeContains(q.q))) : undefined,
@@ -21,7 +22,9 @@ export const InsurerRepository = {
           claimsPhone: insurers.claimsPhone,
           isActive: organizations.isActive,
           isDemo: organizations.isDemo,
-          policyCount: sql<number>`(select count(*)::int from ${policies} p where p.insurer_id = ${insurers.id} and p.deleted_at is null)`,
+          policyCount: sql<number>`(select count(*)::int from ${policies} p where p.insurer_id = ${insurers.id} and p.deleted_at is null
+            ${countFor.insurerId ? sql`and p.insurer_id = ${countFor.insurerId}` : sql``}
+            ${countFor.tpaId ? sql`and p.tpa_id = ${countFor.tpaId}` : sql``})`,
           networkCount: sql<number>`(select count(*)::int from ${hospitalNetworks} hn where hn.insurer_id = ${insurers.id} and hn.status = 'network')`,
         })
         .from(insurers)
@@ -33,6 +36,12 @@ export const InsurerRepository = {
       db.select({ n: count() }).from(insurers).innerJoin(organizations, eq(organizations.id, insurers.id)).where(where),
     ]);
     return { rows, total: total?.n ?? 0, page: q.page, pageSize: q.pageSize };
+  },
+
+  /** Hospitals in this insurer's network (status "network"); reference data, like the hospital list. */
+  async networkHospitalCount(db: DbOrTx, id: string) {
+    const [r] = await db.select({ n: count() }).from(hospitalNetworks).where(and(eq(hospitalNetworks.insurerId, id), eq(hospitalNetworks.status, "network")));
+    return r?.n ?? 0;
   },
 
   async get(db: DbOrTx, id: string) {

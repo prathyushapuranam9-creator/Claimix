@@ -1,0 +1,10 @@
+/* "Showing policies of <insurer>" note above the filters. */
+.scopeNote {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-info-bg);
+  color: var(--c-text);
+  font-size: var(--fs-sm);
+}
+
+.scopeNote a { margin-left: var(--sp-2); font-weight: 600; }

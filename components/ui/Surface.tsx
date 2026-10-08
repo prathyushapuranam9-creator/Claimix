@@ -50,13 +50,24 @@ export function LoadingState({ label = "Loading…" }: { label?: string }) {
   );
 }
 
-export function PageHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {
+export function PageHeader({ title, description, actions, leading }: { title: string; description?: ReactNode; actions?: ReactNode; leading?: ReactNode }) {
+  const text = (
+    <div>
+      <h1>{title}</h1>
+      {description && <p>{description}</p>}
+    </div>
+  );
   return (
     <div className={styles.pageHeader}>
-      <div>
-        <h1>{title}</h1>
-        {description && <p>{description}</p>}
-      </div>
+      {leading ? (
+        // Optional mark before the title (e.g. an organization's initials).
+        <div className={styles.pageLead}>
+          {leading}
+          {text}
+        </div>
+      ) : (
+        text
+      )}
       {actions && <div className={styles.pageActions}>{actions}</div>}
     </div>
   );

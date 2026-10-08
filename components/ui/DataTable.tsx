@@ -1,8 +1,9 @@
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Button, ButtonLink } from "./Button";
 import { TextField } from "./Field";
 import { EmptyState } from "./Surface";
+import { RemountOnUrlChange } from "./RemountOnUrlChange";
 import styles from "./DataTable.module.css";
 
 export interface Column<T> {
@@ -141,7 +142,7 @@ export function FilterBar({
   /** Show a magnifier inside the search field. */
   searchIcon?: boolean;
 }) {
-  return (
+  const form = (
     <form className={styles.filters} method="get" action={basePath} role="search">
       <div className={searchIcon ? `${styles.search} ${styles.searchWithIcon}` : styles.search}>
         <TextField label={searchLabel} name="q" type="search" defaultValue={q} placeholder={searchPlaceholder} maxLength={100} />
@@ -164,5 +165,11 @@ export function FilterBar({
         <ButtonLink href={basePath} variant="ghost">Clear</ButtonLink>
       </div>
     </form>
+  );
+  // Clear (or any link to this list) must show every field as the new address says, not the old selections.
+  return (
+    <Suspense fallback={form}>
+      <RemountOnUrlChange>{form}</RemountOnUrlChange>
+    </Suspense>
   );
 }

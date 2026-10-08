@@ -7,7 +7,7 @@ import { LogoMark } from "@/components/brand/Logo";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import type { NavItem } from "@/lib/navigation";
 import { BackButton } from "./BackButton";
-import { useBackHistory } from "./useBackHistory";
+import { markSidebarNav, useBackHistory } from "./useBackHistory";
 import styles from "./AppShell.module.css";
 
 /** Pages that already carry their own working "Back to …" control. */
@@ -74,10 +74,13 @@ export function AppShell({ nav, portal, portalKey, user, logout, unread, childre
   const crumb = current?.hidden && trail.from && trail.from.href !== current.href ? trail.from : undefined;
 
   // True only when the previous history entry is another Claimix page (not a tab of this one, not outside the app).
-  const hasHistory = useBackHistory(pathname);
+  const { canGoBack: hasHistory, fromSidebar } = useBackHistory(pathname);
 
   // Sidebar landing pages are the roots; everything else (detail, new, edit, and pages reached only by links) gets a Back control.
-  const showBack = pathname !== "/dashboard" && !nav.some((n) => n.href === pathname && !n.hidden) && !HAS_OWN_BACK.some((r) => r.test(pathname));
+  const isRoot = (path: string) => path === "/dashboard" || nav.some((n) => n.href === path && !n.hidden);
+  // Detail, new and edit pages always get Back. A top-level page gets it only when it was opened by a link on another
+  // page (a card, pill or button, e.g. "View network hospitals"), never from the sidebar or a direct visit.
+  const showBack = !HAS_OWN_BACK.some((r) => r.test(pathname)) && (!isRoot(pathname) || (hasHistory && !fromSidebar));
   const backFallback = pathname.slice(0, pathname.lastIndexOf("/")) || "/dashboard";
 
   return (
@@ -85,7 +88,7 @@ export function AppShell({ nav, portal, portalKey, user, logout, unread, childre
       <a href="#main" className="skip-link">Skip to content</a>
       {open && <button className={styles.scrim} aria-label="Close menu" onClick={() => setOpen(false)} />}
       <aside id="app-sidebar" className={styles.sidebar} data-open={open} aria-label="Main navigation">
-        <Link href="/dashboard" className={styles.brand}>
+        <Link href="/dashboard" className={styles.brand} onClick={() => pathname !== "/dashboard" && markSidebarNav()}>
           <LogoMark /> <span className={styles.label}>Claimix</span>
         </Link>
         <nav className={styles.nav}>
@@ -97,6 +100,7 @@ export function AppShell({ nav, portal, portalKey, user, logout, unread, childre
                   key={n.href}
                   href={n.href}
                   className={styles.link}
+                  onClick={() => pathname !== n.href && markSidebarNav()}
                   title={collapsed ? n.label : undefined}
                   aria-label={collapsed ? n.label : undefined}
                   aria-current={current?.href === n.href ? "page" : undefined}
