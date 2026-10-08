@@ -100,7 +100,7 @@ test.describe("Patient profile: Eligibility Check (expand / collapse)", () => {
     await page.getByLabel("Full name").fill(name);
     await page.getByLabel("Date of birth").fill("1990-01-01");
     await page.getByRole("button", { name: "Register patient" }).click();
-    await page.waitForURL(/\/patients\/[0-9a-f-]{36}$/);
+    await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
 
     // The new patient's profile starts collapsed, with nothing from the previous patient.
     await expect(toggle(page)).toHaveAttribute("aria-expanded", "false");

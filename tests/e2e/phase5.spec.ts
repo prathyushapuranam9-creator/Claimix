@@ -36,9 +36,10 @@ test("eligibility from recorded coverage → Eligible, with a path to pre-auth",
   await fillCase(page);
   await page.getByRole("button", { name: "Check eligibility" }).click();
   await expect(page.getByRole("heading", { name: "Eligible" })).toBeVisible();
+  await page.locator("#eligibility-result").getByRole("button", { name: "View details" }).click(); // details open on request
   await expect(page.getByText("Pre-authorization: required before admission")).toBeVisible();
   await expect(page.getByText(/does not guarantee claim approval/)).toBeVisible();
-  await expect(page.getByRole("link", { name: "Start pre-authorization with these details" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "New pre-authorization" })).toBeVisible();
 });
 
 test("insufficient information → Needs verification, never Eligible", async ({ page }) => {
@@ -56,7 +57,7 @@ test("full pre-authorization journey: draft → checklist → submit → query �
   await page.goto(`/eligibility?beneficiary=${A1_FLOATER}`);
   await fillCase(page);
   await page.getByRole("button", { name: "Check eligibility" }).click();
-  await page.getByRole("link", { name: "Start pre-authorization with these details" }).click();
+  await page.getByRole("link", { name: "New pre-authorization" }).click();
   await expect(page.getByLabel("Estimated cost (₹)")).toHaveValue("95000");
   await page.getByRole("button", { name: "Create draft" }).click();
   await expect(page).toHaveURL(/\/pre-authorizations\/[0-9a-f-]{36}$/);

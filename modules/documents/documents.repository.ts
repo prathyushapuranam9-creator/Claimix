@@ -1,7 +1,7 @@
 import "server-only";
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
-import { claims, documents, preAuthorizations, users } from "@/db/schema";
+import { beneficiaries, claims, documents, preAuthorizations, users } from "@/db/schema";
 import type { Scope } from "@/lib/permissions/catalog";
 import type { Principal } from "@/lib/permissions/principal";
 import { scopePredicate, type ScopeColumns } from "@/lib/permissions/scope";
@@ -40,6 +40,31 @@ export const DocumentRepository = {
       .where(and(eq(documents.id, id), isNull(documents.deletedAt), scopePredicate(principal, scope, DOCUMENT_SCOPE)))
       .limit(1);
     return row;
+  },
+
+  /**
+   * The patient's coverage-stage (insurance) documents: filed against the patient with no pre-auth or
+   * claim subject. These are the documents the coverage form reads; treatment documents never appear here.
+   */
+  async insuranceForPatient(db: DbOrTx, patientId: string) {
+    return db
+      .select({
+        id: documents.id,
+        docType: documents.docType,
+        category: documents.category,
+        status: documents.status,
+        scanStatus: documents.scanStatus,
+        originalName: documents.originalName,
+        mimeType: documents.mimeType,
+        sizeBytes: documents.sizeBytes,
+        statusNote: documents.statusNote,
+        createdAt: documents.createdAt,
+        uploadedByName: users.fullName,
+      })
+      .from(documents)
+      .leftJoin(users, eq(users.id, documents.uploadedBy))
+      .where(and(eq(documents.patientId, patientId), isNull(documents.subjectId), isNull(documents.deletedAt)))
+      .orderBy(desc(documents.createdAt));
   },
 
   async forSubject(db: DbOrTx, subjectType: "preauth" | "claim", subjectId: string) {
@@ -96,6 +121,17 @@ export const DocumentRepository = {
     const t = subjectType === "claim" ? claims : preAuthorizations;
     const [row] = await db.select({ status: t.status }).from(t).where(eq(t.id, id)).limit(1);
     return row?.status;
+  },
+
+  /** Removes the document from every view (the stored file is kept for the audit trail and is no longer reachable). */
+  async softDelete(db: DbOrTx, id: string) {
+    await db.update(documents).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(documents.id, id));
+  },
+
+  /** Whether a recorded coverage was filled from this document. */
+  async usedByCoverage(db: DbOrTx, id: string) {
+    const [row] = await db.select({ id: beneficiaries.id }).from(beneficiaries).where(eq(beneficiaries.sourceDocumentId, id)).limit(1);
+    return !!row;
   },
 
   async get(db: DbOrTx, id: string) {

@@ -9,13 +9,14 @@ import { PreauthService } from "@/modules/preauth/preauth.service";
 import type { PreauthDetailsInput } from "@/modules/preauth/preauth.validation";
 import { STATUS_LABEL, STATUS_TONE, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
 import { DocumentList } from "@/components/documents/DocumentList";
-import { reviewDocumentAction } from "@/app/(app)/documents/actions";
+import { deleteDocumentAction, reviewDocumentAction } from "@/app/(app)/documents/actions";
 import { DocumentUploader } from "@/components/documents/DocumentUploader";
 import { EligibilityResult } from "@/components/eligibility/EligibilityResult";
 import { ChecklistPanel } from "@/components/preauth/ChecklistPanel";
 import { DecisionPanel } from "@/components/preauth/DecisionPanel";
 import { PreauthForm } from "@/components/preauth/PreauthForm";
 import { SimpleMessageForm } from "@/components/preauth/SimpleMessageForm";
+import { SubmissionReview } from "@/components/preauth/SubmissionReview";
 import Link from "next/link";
 import { ButtonLink } from "@/components/ui/Button";
 import { Details } from "@/components/ui/Form";
@@ -82,6 +83,18 @@ export default async function PreauthPage({ params }: { params: Promise<{ id: st
         }
       />
       <Stack>
+        {w.side === "hospital" && (status === "submitted" || status === "pending") && (
+          <Alert tone="success" title="Submitted — awaiting payer">
+            <p>
+              The request is with {p.insurerId ? w.insurerName ?? "the insurer" : w.schemeName ?? "the scheme"}
+              {w.tpaName ? ` via ${w.tpaName}` : ""}. Nothing is needed from you until they respond; if they raise a query it appears under{" "}
+              <Link href="/pre-authorizations?view=action">Needs action</Link>.
+            </p>
+            <p>
+              <ButtonLink href="/pre-authorizations?view=review" variant="secondary">Open Awaiting payer</ButtonLink>
+            </p>
+          </Alert>
+        )}
         {w.claim ? (
           <Alert tone="info" title="Final claim">
             Claim <Link href={`/claims/${w.claim.id}`} className="mono">{w.claim.reference}</Link> is linked to this pre-authorization.
@@ -173,14 +186,49 @@ export default async function PreauthPage({ params }: { params: Promise<{ id: st
                 </Card>
               )}
 
-              <Card title="Documents" padded={false}>
+              <Card title="Treatment & supporting documents" padded={false}>
                 {isHospitalView && w.side === "hospital" && !["rejected", "cancelled", "settled", "final_approved"].includes(status) && (
                   <div className={styles.pad}>
+                    <p className={styles.hint}>
+                      Documents for this request: estimates, reports, clinical notes and the signed pre-authorization form. The patient&apos;s insurance
+                      card and policy document are kept on{" "}
+                      <Link href={`/patients/${p.patientId}#insurance-documents`}>the patient&apos;s record</Link>.
+                    </p>
                     <DocumentUploader upload={uploadDocumentAction.bind(null, p.id)} suggested={suggestedDocs} />
                   </div>
                 )}
-                <DocumentList docs={w.documents} review={w.side === "payer" ? reviewDocumentAction : undefined} />
+                <DocumentList docs={w.documents} review={w.side === "payer" ? reviewDocumentAction : undefined} remove={isHospitalView && w.side === "hospital" && ["draft", "query"].includes(status) ? deleteDocumentAction : undefined} />
               </Card>
+
+              {w.side === "hospital" && status === "draft" && (
+                <SubmissionReview
+                  reference={p.reference}
+                  patient={{ fullName: w.patient.fullName, patientNo: w.patient.patientNo, dob: w.patient.dob }}
+                  hospitalName={w.hospitalName}
+                  payerLabel={w.policy.category === "government" ? "Scheme" : "Insurance company"}
+                  payerName={w.policy.category === "government" ? w.schemeName : w.insurerName}
+                  tpaName={w.tpaName}
+                  policyName={w.policy.name}
+                  beneficiary={{
+                    memberId: w.beneficiary.memberId,
+                    relationship: w.beneficiary.relationship,
+                    coverStart: w.beneficiary.coverStart,
+                    coverEnd: w.beneficiary.coverEnd,
+                    verificationStatus: w.beneficiary.verificationStatus,
+                  }}
+                  treatment={{
+                    diagnosis: w.diagnosisCode ? `${w.diagnosisCode} — ${w.diagnosisName}` : null,
+                    procedure: w.procedureName,
+                    claimType: p.claimType,
+                    admission: p.expectedAdmission,
+                    stayDays: p.expectedStayDays,
+                    room: [p.roomCategory, p.roomRentPerDay ? `${formatINR(p.roomRentPerDay)}/day` : null].filter(Boolean).join(" · ") || null,
+                  }}
+                  money={{ estimatedCost: p.estimatedCost, requested: p.expectedInsuranceAmount, patientContribution: p.patientContribution }}
+                  evaluation={w.evaluation ? { evaluation: w.evaluation.evaluation, ruleVersion: w.evaluation.ruleVersion } : null}
+                  documents={w.documents.map((d) => ({ docType: d.docType, status: d.status }))}
+                />
+              )}
 
               {w.side === "hospital" && status === "draft" && (
                 <Card title="Pre-authorization checklist">

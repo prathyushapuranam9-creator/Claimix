@@ -21,6 +21,8 @@ export const claimType = pgEnum("claim_type", ["cashless", "reimbursement"]);
 export const documentStatus = pgEnum("document_status", ["missing", "uploaded", "verified", "rejected", "requires_reupload"]);
 export const documentScanStatus = pgEnum("document_scan_status", ["pending", "clean", "infected", "failed"]);
 export const documentCategory = pgEnum("document_category", ["patient", "medical", "hospital", "final_claim"]);
+/** Whether recorded coverage has been checked against the insurance card / policy document. */
+export const coverageVerification = pgEnum("coverage_verification", ["verified", "requires_verification"]);
 export const payerDecision = pgEnum("payer_decision", ["approved", "partially_approved", "rejected", "query", "pending"]);
 export const queryStatus = pgEnum("query_status", ["open", "responded", "closed"]);
 export const settlementStatus = pgEnum("settlement_status", ["pending", "processing", "paid", "failed"]);

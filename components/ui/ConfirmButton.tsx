@@ -12,6 +12,7 @@ import styles from "./ConfirmButton.module.css";
  */
 export function ConfirmButton({
   label,
+  icon,
   title,
   body,
   confirmLabel,
@@ -20,6 +21,8 @@ export function ConfirmButton({
   onDone,
 }: {
   label: string;
+  /** When given, the trigger is this icon alone (the label stays as its accessible name and tooltip). */
+  icon?: ReactNode;
   title: string;
   body: ReactNode;
   confirmLabel: string;
@@ -34,9 +37,15 @@ export function ConfirmButton({
 
   return (
     <>
-      <Button type="button" variant="secondary" onClick={() => { setError(null); ref.current?.showModal(); }}>
-        {label}
-      </Button>
+      {icon ? (
+        <button type="button" className={`${styles.iconTrigger} ${tone === "danger" ? styles.iconDanger : ""}`} aria-label={label} title={label} aria-haspopup="dialog" onClick={() => { setError(null); ref.current?.showModal(); }}>
+          {icon}
+        </button>
+      ) : (
+        <Button type="button" variant="secondary" onClick={() => { setError(null); ref.current?.showModal(); }}>
+          {label}
+        </Button>
+      )}
       <dialog ref={ref} className={styles.dialog} aria-labelledby={titleId}>
         <h2 id={titleId} className={styles.title}>{title}</h2>
         <div className={styles.body}>{body}</div>

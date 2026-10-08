@@ -111,7 +111,7 @@ test("a pre-auth routed to an insurer with no reviewer account: hospital staff a
   await page.getByLabel("Full name").fill(`Orphan Payer ${suffix}`);
   await page.getByLabel("Date of birth").fill("1980-02-02");
   await page.getByRole("button", { name: "Register patient" }).click();
-  await page.waitForURL(/\/patients\/[0-9a-f-]{36}$/);
+  await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
   await page.getByRole("button", { name: "Add coverage" }).click();
   await page.getByLabel("Policy / scheme").selectOption({ label: "Navjeevan Super Top-Up 10L (DEMO DATA)" });
   await page.getByLabel("Member / beneficiary ID").fill(`NJV-${suffix}`.toUpperCase());

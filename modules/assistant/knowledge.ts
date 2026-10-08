@@ -2,7 +2,8 @@ import { PERMISSIONS, ROLES, type PermissionKey } from "@/lib/permissions/catalo
 import { can, type Principal } from "@/lib/permissions/principal";
 import { hasDashboard, visibleNav } from "@/lib/navigation";
 import { CLAIM_STATUS_LABEL } from "@/modules/claims/claims.workflow";
-import { STATUS_LABEL } from "@/modules/preauth/preauth.workflow";
+import { allowedTransitions, PREAUTH_STATUSES, STATUS_LABEL } from "@/modules/preauth/preauth.workflow";
+import { allowedClaimTransitions, CLAIM_STATUSES } from "@/modules/claims/claims.workflow";
 
 /**
  * What the Claimix Insurance Assistant knows about the application. Navigation, roles, permissions and status names
@@ -41,7 +42,13 @@ export const pathBlock = (...steps: string[]) => "```path\n" + steps.join("\n→
 export type Link = { label: string; href: string };
 
 /** Pages that are not in the sidebar, and how a user of this role reaches them from the dashboard. */
-export function reach(w: Who, page: "preauth" | "claim" | "eligibility"): { steps: string[]; href: string; label: string } {
+export function reach(w: Who, page: "preauth" | "claim" | "eligibility" | "patient" | "coverage" | "insurance_document"): { steps: string[]; href: string; label: string } {
+  if (page === "patient") return { label: "Patients", href: "/patients", steps: ["Sidebar", "Patients"] };
+  // Coverage and the insurance documents are sections of one patient's page, not screens of their own.
+  if (page === "coverage")
+    return { label: "Insurance & scheme coverage", href: "/patients", steps: ["Sidebar", "Patients", "Select the patient", "Insurance & scheme coverage", "Add coverage"] };
+  if (page === "insurance_document")
+    return { label: "Insurance documents", href: "/patients", steps: ["Sidebar", "Patients", "Select the patient", "Insurance documents", "Upload insurance document"] };
   if (page === "eligibility")
     return { label: "Eligibility checker", href: "/eligibility", steps: w.dashboard ? ["Dashboard", "Check eligibility"] : ["Patients", "Select the patient", "Check eligibility beside the coverage"] };
   if (page === "preauth")
@@ -77,6 +84,19 @@ export const STATUS_HELP: Record<string, { label: string; meaning: string }> = {
   cancelled: { label: "Cancelled", meaning: "The request was cancelled and is closed." },
   "final approved": { label: "Final approved", meaning: "The payer gave the final approval after discharge, so the claim can be settled." },
   settled: { label: "Settled", meaning: "The insurer has recorded the payment. On the dashboard this is the 'Settled (paid)' card, which opens Claims → Settled." },
+  "requires verification": {
+    label: "Requires verification",
+    meaning:
+      "Coverage recorded without the insurance card or policy document to check it against. It does not block anything - eligibility checks, pre-authorizations and claims all work - it only marks the record as still unconfirmed. Upload the insurance document on the patient's page and use Edit on the coverage to confirm the details; the coverage then shows Verified.",
+  },
+  "coverage verification": {
+    label: "Coverage verification",
+    meaning:
+      "Each recorded coverage shows either Verified (the details were checked against the patient's insurance card or policy document) or Requires verification (recorded without the document). It is a note on the coverage record, not a payer decision, and it blocks nothing.",
+  },
+  "in force": { label: "In force", meaning: "Today falls inside the recorded cover period, so a pre-authorization or claim can be raised on this coverage." },
+  expired: { label: "Expired", meaning: "The recorded cover period has ended. Eligibility can still be checked, but a pre-authorization cannot be raised on it - record the cover the patient is insured under today." },
+  "not started": { label: "Not started", meaning: "The recorded cover period begins in the future, so a pre-authorization cannot be raised on it yet." },
   decided: { label: "Decided", meaning: "'Decided' is a tab on Pre-authorizations, not a status. It lists requests the payer has decided: Approved, Partially approved, Final approved, Rejected and Settled." },
 };
 
@@ -86,8 +106,7 @@ export const STATUS_NAMES = {
   claim: Object.values(CLAIM_STATUS_LABEL),
 };
 
-export const OUT_OF_SCOPE =
-  "I'm the Claimix Insurance Assistant. I can only help with the Claimix application, its features, workflows, navigation, and insurance-related actions available in Claimix.";
+export const OUT_OF_SCOPE = "I can help only with the Claimix application, its workflows, navigation, statuses, records, and available actions.";
 
 export const NOT_SURE = "I don't have enough information to confirm that feature in the current Claimix application.";
 
@@ -95,7 +114,16 @@ export const QUICK_PROMPTS = (w: Who): string[] => {
   if (w.payer)
     return ["How do I review a pre-authorization?", "Where are the pre-authorizations awaiting decision?", "How do I raise a query?", "Where can I find reports?", "Explain my dashboard", "What should I do next?"];
   if (w.hospital)
-    return ["How do I create a pre-authorization?", "Where can I find my claims?", "Check my pre-auth status", "How do I upload documents?", "Where can I find policies?", "How do I check eligibility?", "Explain my dashboard", "What should I do next?"];
+    return [
+      "I registered a new patient. What do I do next?",
+      "Where do I add coverage?",
+      "Do I have to upload the insurance card?",
+      "How do I check eligibility?",
+      "How do I create a pre-authorization?",
+      "Where can I find my claims?",
+      "How do I upload documents?",
+      "Explain my dashboard",
+    ];
   return ["What can I do in Claimix?", "Where can I find reports?", "Where can I find policies?", "Explain my dashboard"];
 };
 
@@ -114,12 +142,47 @@ export function knowledgeText(w: Who): string {
   lines.push(`Eligibility checker path: ${reach(w, "eligibility").steps.join(" → ")}.`);
   lines.push(`Pre-authorization statuses: ${STATUS_NAMES.preauth.join(", ")}. Claim statuses: ${STATUS_NAMES.claim.join(", ")}. 'Awaiting payer' and 'Decided' are list tabs, not statuses.`);
   lines.push(
-    "HOSPITAL STAFF WORKFLOW: Patients → Register patient; open the patient and use Add coverage; Check eligibility; New pre-authorization (steps Medical, Financial, Clinical notes, then Create draft); on the request upload documents (Document type, File, Upload), Run checks, Confirm each checklist item, Submit Pre-Authorization; it becomes Submitted and waits for the payer; the payer approves, rejects or raises a query; the hospital answers a query with Respond to query → Send response; after discharge a claim is raised with New claim (cashless claims start from an approved pre-authorization; reimbursement claims from the patient's coverage); the insurer records settlement (Record settlement).",
+    "HOSPITAL STAFF WORKFLOW: Patients → Register patient (it saves only the patient; no insurance is assumed) → the patient's page opens with 'Patient registered successfully.' and the next step → record insurance coverage → Check eligibility → New pre-authorization or New claim → add the treatment documents on the request → Review before submitting → Submit → Awaiting payer. Then the payer approves, rejects or raises a query; the hospital answers a query with Respond to query → Send response; after discharge a claim is raised with New claim (cashless claims start from an approved pre-authorization; reimbursement claims from the patient's coverage); the insurer records settlement (Record settlement).",
+  );
+  lines.push(
+    "RECORDING COVERAGE - TWO WAYS, BOTH ON THE PATIENT'S PAGE. The insurance document is NEVER required to save coverage. (A) With the document: Insurance documents card → choose the document type (Insurance / health card, Policy copy / member ID, Scheme beneficiary ID / enrolment, Other insurance document) → choose the File → Upload insurance document → 'Review extracted details' on that document → the Add coverage form opens pre-filled with what could be read and the message 'Details extracted from the uploaded document. Please verify before saving.' → every value can be edited, anything the document did not state is listed as still to enter → Save coverage. (B) Without the document: Insurance & scheme coverage → Add coverage manually → fill Policy / scheme, Member / beneficiary ID, Relationship to policyholder, Cover start, Cover end, Sum insured, Available balance, First inception date and Verification → Save coverage. Verification has two values: 'Verified against the insurance document' and 'Requires verification'; 'Requires verification' is a note on the record and blocks nothing. The document can be uploaded later and the coverage confirmed with Edit beside it.",
+  );
+  lines.push(
+    "DOCUMENTS - TWO SEPARATE STAGES. Insurance / coverage documents (insurance card, policy copy, scheme enrolment) belong to the PATIENT and live in the 'Insurance documents' card on the patient's page; they establish or confirm the cover. Treatment / supporting documents (treatment estimate, clinical notes, investigation reports, medical reports, signed pre-authorization form, and after discharge the final bill and discharge summary) belong to ONE pre-authorization or claim and live in the 'Treatment & supporting documents' card on that request. They are never mixed: uploading an insurance card on a patient does not attach it to a request, and a request's documents do not change the recorded coverage.",
+  );
+  lines.push(
+    "COVER PERIOD RULE: a pre-authorization can only be raised on coverage whose cover period includes today (shown as 'In force'). On expired or not-yet-started cover Claimix refuses it and offers 'Review / edit coverage', 'Open patient' and 'Add another coverage' instead. Eligibility can still be checked on such coverage, and reimbursement claims are judged on the admission date.",
   );
   lines.push(
     "PAYER REVIEWER WORKFLOW: Dashboard → Pre-auths awaiting decision → View → open the request → review Patient & policy, Case details, Medical & financial, Documents (Record verification) and the checklist → in the Decision card choose Mark as under review, Raise a query, Approve, Partially approve or Reject. Claims work the same way and the insurer records settlement. A payer only sees requests addressed to their own insurer or TPA.",
   );
   lines.push("INSURER ISOLATION: an insurer/TPA user only sees their own organization's requests. A designated testing account can switch insurer and role on the Dashboard (Insurance portal testing → Insurance Company + Role → Switch Context) and then sees that insurer's data; a banner shows the active context and Exit returns to the real account.");
+  lines.push(workflowText());
+  lines.push(
+    "PATIENT PAGE SECTIONS (exact card titles): Insurance workflow (the step tracker: Patient registered, Insurance document, Coverage recorded, Eligibility checked, Pre-authorization / claim), Details, Eligibility Result (opens from the 'Eligibility Check' button in the page header), Insurance documents, Insurance & scheme coverage (with Check eligibility and Edit beside each coverage), Treatment request, Policy check, Add coverage. Registering a patient never creates coverage.",
+  );
+  lines.push(
+    "DUPLICATE PATIENTS: Register patient warns 'This patient may already be registered' when the same name and date of birth exist at this hospital, links the existing patient number, and offers 'Register as a new patient anyway'. An existing patient is reused for new visits, new coverage, new pre-authorizations and new claims - that is not the same thing as an existing pre-authorization.",
+  );
   lines.push("DASHBOARD (hospital): cards Awaiting payer → Pre-authorizations → Awaiting payer tab; Pre-auths approved → Pre-authorizations → Approved tab; Settled (paid) → Claims → Settled tab. Drafts and Queries to answer are information only.");
   return lines.join(nl);
+}
+
+/** The real status machines, who may make each change, written out for the model. Generated from the workflow definitions. */
+export function workflowText(): string {
+  const NL = String.fromCharCode(10);
+  const side = (s: "hospital" | "payer", from: string, claim: boolean) =>
+    claim
+      ? allowedClaimTransitions(from as never, s).map((t) => CLAIM_STATUS_LABEL[t])
+      : allowedTransitions(from as never, s).map((t) => STATUS_LABEL[t]);
+  const rows = (claim: boolean) =>
+    (claim ? CLAIM_STATUSES : PREAUTH_STATUSES)
+      .map((st) => {
+        const label = claim ? CLAIM_STATUS_LABEL[st as keyof typeof CLAIM_STATUS_LABEL] : STATUS_LABEL[st as keyof typeof STATUS_LABEL];
+        const h = side("hospital", st, claim);
+        const p = side("payer", st, claim);
+        return `- ${label}: hospital can move it to ${h.join(", ") || "nothing"}; payer can move it to ${p.join(", ") || "nothing"}.`;
+      })
+      .join(NL);
+  return [`PRE-AUTHORIZATION STATUS CHANGES (from the application's workflow):`, rows(false), `CLAIM STATUS CHANGES:`, rows(true)].join(NL);
 }

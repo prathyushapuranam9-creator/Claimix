@@ -1,8 +1,9 @@
 import { boolean, check, date, index, integer, jsonb, numeric, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { id, softDelete, timestamps } from "./_common";
-import { policyCategory, ruleCategory, ruleResult, ruleSetStatus } from "./enums";
+import { coverageVerification, policyCategory, ruleCategory, ruleResult, ruleSetStatus } from "./enums";
 import { organizations, users } from "./identity";
+import { documents } from "./ops";
 import { governmentSchemes, insurers, patients, tpas } from "./parties";
 
 export const policies = pgTable("policies", {
@@ -45,6 +46,14 @@ export const beneficiaries = pgTable("beneficiaries", {
   inceptionDate: date("inception_date"),
   sumInsured: numeric("sum_insured", { precision: 14, scale: 2 }),
   sumInsuredAvailable: numeric("sum_insured_available", { precision: 14, scale: 2 }),
+  /**
+   * Whether the recorded details were checked against the insurance card / policy document.
+   * Coverage entered before the document is available stays "requires_verification"; it does not
+   * block eligibility checks or requests, it only tells staff the record is still unconfirmed.
+   */
+  verificationStatus: coverageVerification("verification_status").notNull().default("requires_verification"),
+  /** The patient-level insurance document the details were taken from (null: entered manually). */
+  sourceDocumentId: uuid("source_document_id").references(() => documents.id),
   isDemo: boolean("is_demo").notNull().default(false),
   ...timestamps,
   ...softDelete,

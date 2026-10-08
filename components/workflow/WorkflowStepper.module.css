@@ -5,7 +5,8 @@
 }
 
 .steps {
-  --cols: 13;
+  /* One column per step, so any number of steps fills the card width evenly. */
+  --cols: var(--n, 13);
   display: grid;
   grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
   row-gap: var(--sp-4);
@@ -24,22 +25,25 @@
   text-align: center;
 }
 
-/* Fewer columns on narrower cards; the connector is dropped at the end of each row. */
+/* Long trackers (8+ steps) wrap into rows on narrower cards; short ones keep a single row for longer.
+   The connector is dropped at the end of each row. */
 @container (max-width: 1040px) {
-  .steps { --cols: 7; }
-  .step:nth-child(7n)::after { display: none; }
+  .steps[data-size="l"] { --cols: 7; }
+  .steps[data-size="l"] .step:nth-child(7n)::after { display: none; }
 }
 
 @container (max-width: 600px) {
-  .steps { --cols: 4; }
-  .step:nth-child(7n)::after { display: block; }
-  .step:nth-child(4n)::after { display: none; }
+  .steps[data-size="l"],
+  .steps[data-size="m"] { --cols: 4; }
+  .steps[data-size="l"] .step:nth-child(7n)::after { display: block; }
+  .steps[data-size="l"] .step:nth-child(4n)::after,
+  .steps[data-size="m"] .step:nth-child(4n)::after { display: none; }
 }
 
 @container (max-width: 380px) {
   .steps { --cols: 3; }
-  .step:nth-child(4n)::after { display: block; }
-  .step:nth-child(3n)::after { display: none; }
+  .steps .step:nth-child(4n)::after { display: block; }
+  .steps .step:nth-child(3n)::after { display: none; }
 }
 
 /* Connector line to the next step. */

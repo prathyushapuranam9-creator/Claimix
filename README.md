@@ -53,6 +53,24 @@ a missing fact, an unknown/misconfigured rule, or a policy with no rules for a r
 Versions move `draft → active → retired`; rules of published versions can't be changed (DB trigger).
 Every evaluation is recorded with policy, rule set, version, per-rule results, missing information and an input snapshot.
 
+## Patient coverage
+
+The hospital workflow starts on a patient's page: register the patient, record the cover, check eligibility, then
+raise a pre-authorization or claim. Coverage can be recorded two ways and the insurance document is never required:
+
+- **With the document** — upload the insurance card / policy copy / scheme enrolment in **Insurance documents**, then
+  **Review extracted details**. `modules/documents/insurance-extraction.ts` reads the file's own text (PDF content
+  streams, inflated when Flate-encoded; no OCR, so a photograph yields nothing) and takes only labelled values;
+  `matchPolicy()` selects a policy only on a single clear name match, because the policy decides the payer. The form
+  opens pre-filled, every value stays editable, and only what staff submit is saved.
+- **Manually** — **Add coverage manually**; it is then recorded as `requires_verification`, which blocks nothing. The
+  document can arrive later and confirm the record through **Edit**.
+
+A pre-authorization can only be raised on cover whose period includes today; eligibility can be checked on any
+recorded cover. Database triggers (migration `0013`) keep the chain correct whatever writes it: a request's coverage
+must be its patient's and under its policy, its patient must be the hospital's, a document filed against a request
+must be that patient's, and coverage may only cite its own patient's insurance document.
+
 ## Pre-authorization
 
 `modules/preauth/preauth.workflow.ts` is the only definition of allowed status changes (`canTransition()`);
@@ -65,6 +83,11 @@ Government-scheme decisions are recorded by the hospital's scheme desk with the 
 Uploads: authorize → size → extension → magic-byte content check → scan (`modules/documents/scanner.ts`,
 pluggable) → server-generated key → private storage (`STORAGE_LOCAL_DIR`, S3 adapter stub) → audit.
 Downloads only via `/api/documents/[id]` (authorized, scoped, audited, `attachment`, sandboxed).
+
+Two stages, never mixed: **insurance / coverage documents** belong to the patient (`documents.subject_id IS NULL`,
+types in `INSURANCE_DOCUMENT_TYPES`) and establish the cover; **treatment / supporting documents** belong to one
+pre-authorization or claim and are its evidence. Both go through the same pipeline; `/documents` lists the
+request-level ones.
 
 ## Claims
 

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { formatINR } from "@/lib/india";
 import { groupResults, OVERALL_LABEL } from "@/modules/eligibility/eligibility.sections";
 import type { Evaluation, Outcome } from "@/modules/rules/engine/types";
@@ -8,35 +9,49 @@ import styles from "./EligibilityResult.module.css";
 export const OUTCOME_TONE: Record<Outcome, Tone> = { PASS: "success", FAIL: "danger", NEEDS_VERIFICATION: "warning" };
 export const OUTCOME_TEXT: Record<Outcome, string> = { PASS: "Passed", FAIL: "Failed", NEEDS_VERIFICATION: "Needs verification" };
 
-/** Presentation of a rules-engine evaluation. Every line comes from a rule result. */
-export function EligibilityResult({
-  evaluation,
-  policyName,
-  ruleVersion,
-  evaluationId,
-  hospitalName,
-}: {
+type ResultProps = {
   evaluation: Evaluation;
   policyName: string;
   ruleVersion: number | null;
   evaluationId: string | null;
   hospitalName?: string;
-}) {
+};
+
+/** The outcome at a glance (Eligible / Not eligible / Needs verification); `actions` sit beside it. */
+export function EligibilityBanner({ evaluation, policyName, ruleVersion, evaluationId, hospitalName, actions }: ResultProps & { actions?: ReactNode }) {
   const overall = OVERALL_LABEL[evaluation.overall];
+  return (
+    <section className={`${styles.banner} ${styles[evaluation.overall]}`} aria-live="polite">
+      <p className={styles.bannerLabel}>Eligibility result</p>
+      <div className={styles.bannerRow}>
+        <h2 className={styles.bannerTitle}>{overall.title}</h2>
+        {actions && <div className={styles.bannerActions}>{actions}</div>}
+      </div>
+      <p>{overall.detail}</p>
+      <p className={styles.ref}>
+        {policyName}
+        {hospitalName ? ` · ${hospitalName}` : ""} · {ruleVersion ? `rules v${ruleVersion}` : "no published rules"}
+        {evaluationId && <> · ref <span className="mono">{evaluationId.slice(0, 8)}</span></>}
+      </p>
+    </section>
+  );
+}
+
+/** Presentation of a rules-engine evaluation. Every line comes from a rule result. */
+export function EligibilityResult(props: ResultProps) {
+  return (
+    <Stack>
+      <EligibilityBanner {...props} />
+      <EligibilityDetails evaluation={props.evaluation} />
+    </Stack>
+  );
+}
+
+/** Everything behind the outcome: the checks by section, what to verify, the admission estimate and documents. */
+export function EligibilityDetails({ evaluation }: { evaluation: Evaluation }) {
   const sections = groupResults(evaluation.results);
   return (
     <Stack>
-      <section className={`${styles.banner} ${styles[evaluation.overall]}`} aria-live="polite">
-        <p className={styles.bannerLabel}>Eligibility result</p>
-        <h2 className={styles.bannerTitle}>{overall.title}</h2>
-        <p>{overall.detail}</p>
-        <p className={styles.ref}>
-          {policyName}
-          {hospitalName ? ` · ${hospitalName}` : ""} · {ruleVersion ? `rules v${ruleVersion}` : "no published rules"}
-          {evaluationId && <> · ref <span className="mono">{evaluationId.slice(0, 8)}</span></>}
-        </p>
-      </section>
-
       {evaluation.missingInformation.length > 0 && (
         <Alert tone="warning" title="Additional verification required">
           <ul className={styles.list}>
@@ -92,8 +107,9 @@ export function EligibilityResult({
           <ul className={styles.docs}>
             {evaluation.requiredDocuments.map((d) => (
               <li key={`${d.stage}-${d.type}`}>
-                {d.label} {d.mandatory ? <Badge tone="info">Mandatory</Badge> : <Badge tone="neutral">If applicable</Badge>}{" "}
-                <span className={styles.fine}>{d.stage === "preauth" ? "pre-auth" : "final claim"}</span>
+                <span className={styles.docName}>{d.label}</span>
+                {d.mandatory ? <Badge tone="info">Mandatory</Badge> : <Badge tone="neutral">If applicable</Badge>}
+                <span className={styles.docStage}>{d.stage === "preauth" ? "Pre-auth" : "Final claim"}</span>
               </li>
             ))}
           </ul>

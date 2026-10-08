@@ -27,7 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/assistant", label: "Insurance Assistant", icon: "✦", permission: "assistant:use", section: "Workspace" },
   { href: "/notifications", label: "Notifications", icon: "◔", permission: "notification:read", section: "Workspace", hidden: true },
   { href: "/reports", label: "Reports", icon: "▥", permission: "report:view", section: "Workspace" },
-  { href: "/policies", label: "Policies", icon: "❏", permission: "policy:read", section: "Reference" },
+  { href: "/policies", label: "Insurers / Providers", icon: "❏", permission: "policy:read", section: "Reference" },
   { href: "/schemes", label: "Government schemes", icon: "⚑", permission: "policy:read", section: "Reference" },
   { href: "/rejection-reasons", label: "Query & rejection reasons", icon: "?", permission: "policy:read", section: "Reference" },
   { href: "/hospitals", label: "Hospitals & network", icon: "✚", permission: "hospital:read", section: "Reference" },

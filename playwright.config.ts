@@ -26,7 +26,13 @@ export default defineConfig({
     // Runs the production build against the dedicated E2E database (never the dev data).
     // Prepares (creates if missing, migrates, seeds) the E2E database first.
     command: `npx tsx tests/e2e/prepare-db.ts && npx next start -p ${PORT}`,
-    env: { DATABASE_URL: process.env.E2E_DATABASE_URL ?? "" },
+    env: {
+      DATABASE_URL: process.env.E2E_DATABASE_URL ?? "",
+      // The assistant talks to a stand-in for OpenRouter that the assistant spec starts on this port, never to the real service.
+      LLM_ASSISTANT_ENABLED: "true",
+      OPENROUTER_API_KEY: "sk-or-e2e-stub-key",
+      OPENROUTER_BASE_URL: "http://127.0.0.1:3199",
+    },
     url: `http://localhost:${PORT}/api/health`,
     reuseExistingServer: false,
     timeout: 120_000,

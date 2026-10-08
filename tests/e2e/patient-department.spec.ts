@@ -14,8 +14,8 @@ async function register(page: Page, name: string, dept?: string, reason?: string
   if (dept) await page.getByLabel("Department").selectOption({ label: dept });
   if (reason) await page.getByLabel("Reason for visit").fill(reason);
   await page.getByRole("button", { name: "Register patient" }).click();
-  await page.waitForURL(/\/patients\/[0-9a-f-]{36}$/);
-  return page.url().split("/").pop()!;
+  await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
+  return new URL(page.url()).pathname.split("/").pop()!;
 }
 
 test.describe("Patients: Department and Reason for Visit", () => {
@@ -74,7 +74,7 @@ test("Back icon: exactly one tooltip, \"Back\", in light and dark mode", async (
   await signIn(page, "staff.a@demo.claimix.invalid");
   await page.goto("/patients");
   await page.getByRole("table", { name: "Patients" }).getByRole("link").first().click();
-  await page.waitForURL(/\/patients\/[0-9a-f-]{36}$/);
+  await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
   const back = page.getByRole("button", { name: "Back" });
   // No native title tooltip — only the styled one.
   await expect(back).not.toHaveAttribute("title");

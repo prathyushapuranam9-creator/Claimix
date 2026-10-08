@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { formatDate, formatDateTime } from "@/lib/india";
 import type { PatientEligibilityResult, PatientEligibilityStatus, CoverageStatus } from "@/modules/eligibility/patient-eligibility.service";
 import { checkPatientEligibilityAction } from "@/app/(app)/patients/actions";
-import { Button } from "@/components/ui/Button";
+import { Button, ButtonLink } from "@/components/ui/Button";
 import { SelectField } from "@/components/ui/Field";
 import { Details } from "@/components/ui/Form";
 import { Alert, Badge, Card, EmptyState, type Tone } from "@/components/ui/Surface";
@@ -14,6 +14,19 @@ export interface EligibilityCoverageOption {
   id: string;
   policyName: string;
   memberId: string;
+}
+
+/**
+ * What this user may do once a result is in. The hrefs are built per coverage, so the next step always
+ * carries the patient and the policy that was actually checked. The server decides again on every
+ * action; these only decide what is offered.
+ */
+export interface EligibilityNextSteps {
+  preauth: boolean;
+  claim: boolean;
+  /** `/patients/<id>/coverage` — the coverage id and `/edit` are appended. */
+  coverageEditBase: string | null;
+  uploadDocumentHref: string | null;
 }
 
 /** What the panel shows for the selected policy. */
@@ -31,6 +44,7 @@ interface Ctx {
   close: () => void;
   coverage: EligibilityCoverageOption[];
   addCoverageHref: string | null;
+  next: EligibilityNextSteps;
   open: boolean;
   toggle: () => void;
   selected: string | null;
@@ -61,12 +75,14 @@ export function EligibilityCheckProvider({
   patient,
   coverage,
   addCoverageHref,
+  next,
   children,
 }: {
   patientId: string;
   patient: EligibilityPatientInfo;
   coverage: EligibilityCoverageOption[];
   addCoverageHref: string | null;
+  next: EligibilityNextSteps;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -130,6 +146,7 @@ export function EligibilityCheckProvider({
     close: () => setOpen(false),
     coverage,
     addCoverageHref,
+    next,
     open,
     toggle,
     selected,
@@ -167,7 +184,7 @@ const COVERAGE: Record<CoverageStatus, { label: string; tone: Tone }> = {
 
 /** The collapsible "Eligibility Result" panel; hidden until the header toggle opens it. */
 export function EligibilityResultCard() {
-  const { patient, close, coverage, addCoverageHref, open, selected, select, status, result, recheck } = useEligibility();
+  const { patient, close, coverage, addCoverageHref, next, open, selected, select, status, result, recheck } = useEligibility();
   const checking = status === "checking";
 
   return (
@@ -226,7 +243,12 @@ export function EligibilityResultCard() {
             )}
             {status === "error" && <Alert tone="danger">{ERROR}</Alert>}
             {selected && !checking && status !== "error" && !result && <EmptyState title="No eligibility information available for this patient." />}
-            {result && <ResultDetails r={result} stale={checking} />}
+            {result && (
+              <>
+                <ResultDetails r={result} stale={checking} />
+                <NextSteps r={result} next={next} />
+              </>
+            )}
           </div>
         </Card>
       )}
@@ -272,6 +294,47 @@ function ResultDetails({ r, stale }: { r: PatientEligibilityResult; stale: boole
       <p className={styles.basis}>
         Checked against the recorded coverage for a cashless admission today. This is a rules check, not a payer decision or a guarantee of approval.
       </p>
+    </div>
+  );
+}
+
+/**
+ * The step after a result, and only the step the result allows: a request can be started when the
+ * cover is in force and no rule failed, otherwise the actions lead back to fixing or replacing the
+ * coverage. The pre-auth and claim links carry the coverage that was checked, so the request is
+ * raised against that policy and payer.
+ */
+function NextSteps({ r, next }: { r: PatientEligibilityResult; next: EligibilityNextSteps }) {
+  const editHref = next.coverageEditBase ? `${next.coverageEditBase}/${r.beneficiaryId}/edit` : null;
+  if (r.canStartRequest) {
+    return (
+      <div className={styles.next}>
+        <p className={styles.notesTitle}>Coverage is active. Next step:</p>
+        <div className={styles.actions}>
+          {next.preauth && <ButtonLink size="sm" href={`/pre-authorizations/new?beneficiary=${r.beneficiaryId}`}>New Pre-Authorization</ButtonLink>}
+          {next.claim && <ButtonLink size="sm" variant="secondary" href={`/claims/new?beneficiary=${r.beneficiaryId}`}>New Claim</ButtonLink>}
+          {!next.preauth && !next.claim && <span>Pre-authorizations and claims are raised by the treating hospital&apos;s staff.</span>}
+        </div>
+      </div>
+    );
+  }
+  const why =
+    r.coverageStatus === "expired"
+      ? "This cover has ended, so a pre-authorization or claim can't be raised on it."
+      : r.coverageStatus === "not_started"
+        ? "This cover has not started yet, so a pre-authorization or claim can't be raised on it."
+        : r.outcome === "FAIL"
+          ? "A policy rule failed for this case, so it can't be treated as covered."
+          : "The cover could not be confirmed from the recorded details, so it can't be treated as active.";
+  return (
+    <div className={styles.next}>
+      <p className={styles.notesTitle}>Not ready for a request</p>
+      <p>{why} Check the recorded coverage against the patient&apos;s document, or record the cover they are insured under today.</p>
+      <div className={styles.actions}>
+        {editHref && <ButtonLink size="sm" variant="secondary" href={editHref}>Review / edit coverage</ButtonLink>}
+        {next.uploadDocumentHref && <ButtonLink size="sm" variant="secondary" href={next.uploadDocumentHref}>Upload insurance document</ButtonLink>}
+        {next.coverageEditBase && <ButtonLink size="sm" variant="ghost" href="#add-coverage">Add another coverage</ButtonLink>}
+      </div>
     </div>
   );
 }

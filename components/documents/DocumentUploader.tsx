@@ -12,11 +12,23 @@ import styles from "./DocumentUploader.module.css";
 const ACCEPT = ".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg";
 const MAX = 10 * 1024 * 1024;
 
+interface Props {
+  upload: (fd: FormData) => Promise<ActionResult>;
+  /** Document types the current request's rules ask for; offered first. */
+  suggested: string[];
+  /**
+   * Limits the picker to these document types. Used for the patient's insurance documents, which are
+   * a different stage from a request's treatment documents (see INSURANCE_DOCUMENT_TYPES).
+   */
+  only?: readonly string[];
+  button?: string;
+}
+
 /** Upload control. Client checks are for quick feedback only; the server re-validates and scans every file. */
-export function DocumentUploader({ upload, suggested }: { upload: (fd: FormData) => Promise<ActionResult>; suggested: string[] }) {
+export function DocumentUploader({ upload, suggested, only, button = "Upload" }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [docType, setDocType] = useState(suggested[0] ?? "");
+  const [docType, setDocType] = useState(only?.length === 1 ? only[0]! : (suggested[0] ?? ""));
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [pending, start] = useTransition();
 
@@ -38,21 +50,24 @@ export function DocumentUploader({ upload, suggested }: { upload: (fd: FormData)
     });
   };
 
-  const groups = Object.entries(DOCUMENT_CATEGORIES) as [DocumentCategory, string][];
+  const allowed = (t: string) => !only || only.includes(t);
+  const groups = (Object.entries(DOCUMENT_CATEGORIES) as [DocumentCategory, string][]).filter(([cat]) =>
+    Object.entries(DOCUMENT_TYPES).some(([t, d]) => d.category === cat && allowed(t)),
+  );
   return (
     <div className={styles.wrap}>
       {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
       <div className={styles.row}>
         <SelectField label="Document type" value={docType} onChange={(e) => setDocType(e.target.value)}>
           <option value="">Select…</option>
-          {suggested.length > 0 && (
+          {suggested.filter(allowed).length > 0 && (
             <optgroup label="Required for this request">
-              {suggested.map((t) => <option key={`s-${t}`} value={t}>{DOCUMENT_TYPES[t]?.label ?? t}</option>)}
+              {suggested.filter(allowed).map((t) => <option key={`s-${t}`} value={t}>{DOCUMENT_TYPES[t]?.label ?? t}</option>)}
             </optgroup>
           )}
           {groups.map(([cat, label]) => (
             <optgroup key={cat} label={label}>
-              {Object.entries(DOCUMENT_TYPES).filter(([, d]) => d.category === cat).map(([t, d]) => <option key={t} value={t}>{d.label}</option>)}
+              {Object.entries(DOCUMENT_TYPES).filter(([t, d]) => d.category === cat && allowed(t)).map(([t, d]) => <option key={t} value={t}>{d.label}</option>)}
             </optgroup>
           ))}
         </SelectField>
@@ -60,7 +75,7 @@ export function DocumentUploader({ upload, suggested }: { upload: (fd: FormData)
           <label htmlFor="doc-file" className={styles.label}>File (PDF, PNG or JPG, up to 10 MB)</label>
           <input id="doc-file" ref={fileRef} type="file" accept={ACCEPT} className={styles.input} />
         </div>
-        <Button type="button" onClick={onSubmit} loading={pending}>Upload</Button>
+        <Button type="button" onClick={onSubmit} loading={pending}>{button}</Button>
       </div>
     </div>
   );

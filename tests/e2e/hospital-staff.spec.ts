@@ -327,7 +327,7 @@ test("03 patients: validation, registration, list, persistence, duplicates", asy
     await page.getByLabel("Mobile number").fill("9876543210");
     await page.getByLabel("Email").fill("hs.test@example.test");
     await page.getByRole("button", { name: "Register patient" }).click();
-    await page.waitForURL(/\/patients\/[0-9a-f-]{36}$/);
+    await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
     patientUrl = page.url();
     await expect(page.getByRole("heading", { name: patientName })).toBeVisible();
     await expect(page.getByText(/PT-[A-Z0-9]{6,8}/).first()).toBeVisible();
@@ -374,7 +374,7 @@ test("03 patients: validation, registration, list, persistence, duplicates", asy
     await page.getByLabel("Gender").selectOption({ index: 1 });
     await page.getByRole("button", { name: "Register patient" }).click();
     await page.getByRole("button", { name: "Register as a new patient anyway" }).click();
-    await page.waitForURL(/\/patients\/[0-9a-f-]{36}$/);
+    await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
     expect(page.url()).not.toBe(patientUrl);
     await page.goto(`/patients?q=${encodeURIComponent(patientName)}`);
     await expect(page.getByRole("link", { name: patientName })).toHaveCount(2);
@@ -386,7 +386,7 @@ test("03 patients: validation, registration, list, persistence, duplicates", asy
     await page.getByLabel("Date of birth").fill("1975-03-03");
     await page.getByLabel("Gender").selectOption({ index: 1 });
     await page.getByRole("button", { name: "Register patient" }).click();
-    await page.waitForURL(/\/patients\/[0-9a-f-]{36}$/);
+    await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
     noCoverUrl = page.url();
     await expect(page.getByText("No coverage recorded")).toBeVisible();
     await expect(page.getByRole("link", { name: "Check eligibility" })).toHaveCount(0);
@@ -538,6 +538,9 @@ test("05 eligibility: both entry points, result, persistence", async ({ page, br
     await fillCase();
     await page.getByRole("button", { name: "Check eligibility" }).click();
     await expect(page.getByRole("heading", { name: "Eligible" })).toBeVisible();
+    // Only the outcome is shown until the user asks for the checks behind it.
+    await expect(page.getByText("Pre-authorization: required before admission")).toHaveCount(0);
+    await page.locator("#eligibility-result").getByRole("button", { name: "View details" }).click();
     await expect(page.getByText("Pre-authorization: required before admission")).toBeVisible();
     await expect(page.getByText(/does not guarantee claim approval/)).toBeVisible();
     await shot(page, "eligibility-result");
@@ -559,11 +562,12 @@ test("05 eligibility: both entry points, result, persistence", async ({ page, br
     expect(refMatch).toBeTruthy();
     const ref = refMatch![1]!;
 
-    // 1. Refresh: the same stored result is shown again (latest check open), without running a new check.
+    // 1. Refresh: the stored result is listed again (details on request), without running a new check.
     const before = await evaluationRows();
     await page.reload();
     const history = page.getByRole("region", { name: "Previous eligibility checks" });
     await expect(history).toBeVisible();
+    await history.getByRole("button", { name: "View details" }).first().click();
     await expect(history.getByRole("heading", { name: "Eligible", exact: true })).toBeVisible();
     await expect(history).toContainText(ref);
     expect(await evaluationRows()).toBe(before);
@@ -584,10 +588,10 @@ test("05 eligibility: both entry points, result, persistence", async ({ page, br
     const n = await evaluationRows();
     expect(n).toBeGreaterThanOrEqual(3);
     await expect(history.getByRole("listitem").filter({ has: page.getByRole("button", { name: /View details|Hide details/ }) })).toHaveCount(n);
-    // Only the latest is open; older ones open on demand and show their own stored result.
-    await expect(history.getByRole("button", { name: "Hide details" })).toHaveCount(1);
+    // Every check starts closed and opens on demand, showing its own stored result.
+    await expect(history.getByRole("button", { name: "Hide details" })).toHaveCount(0);
     await history.getByRole("button", { name: "View details" }).last().click();
-    await expect(history.getByRole("button", { name: "Hide details" })).toHaveCount(2);
+    await expect(history.getByRole("button", { name: "Hide details" })).toHaveCount(1);
     await expect(history.getByRole("heading", { name: /Needs verification/ })).toBeVisible(); // the very first check had no case details
   });
 
@@ -616,11 +620,11 @@ test("05 eligibility: both entry points, result, persistence", async ({ page, br
     await expect(page.getByRole("link", { name: "Check eligibility" })).toHaveCount(0);
   });
 
-  await check("Eligibility", "'Start pre-authorization with these details' carries values over", async () => {
+  await check("Eligibility", "the eligibility result starts a pre-authorization with the values carried over", async () => {
     await page.goto(`/eligibility?beneficiary=${beneficiary}`);
     await fillCase();
     await page.getByRole("button", { name: "Check eligibility" }).click();
-    await page.getByRole("link", { name: "Start pre-authorization with these details" }).click();
+    await page.getByRole("link", { name: "New pre-authorization" }).click();
     await expect(page.getByLabel("Estimated cost (₹)")).toHaveValue("95000");
   });
 });
@@ -1236,7 +1240,7 @@ test("14 navigation, routes, back/breadcrumb and refresh", async ({ page }) => {
     const clean = labels.map((l) => l.replace(/^[^\w]+/, "").trim()).filter((l) => l && l !== "Claimix");
     record("Navigation", `INFO: sidebar = ${clean.join(" | ")}`, "PASS");
     expect(clean.join("|")).not.toContain("Eligibility checker"); // hidden by design; reached from the Dashboard button / patient coverage
-    for (const want of ["Dashboard", "Patients", "Documents", "Insurance Assistant", "Reports", "Policies", "Government schemes", "Hospitals & network", "Insurance companies", "TPAs", "Knowledge Center"]) {
+    for (const want of ["Dashboard", "Patients", "Documents", "Insurance Assistant", "Reports", "Insurers / Providers", "Government schemes", "Hospitals & network", "Insurance companies", "TPAs", "Knowledge Center"]) {
       expect(clean.join("|")).toContain(want);
     }
   });

@@ -13,9 +13,10 @@ import { NotificationService } from "@/modules/notifications/notifications.servi
 import { PreauthService } from "@/modules/preauth/preauth.service";
 import { STATUS_LABEL, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
 import { HistoryRepository } from "@/modules/workflow/history.repository";
-import { answer, type Answer, type AssistantContext } from "./answer";
+import { answer, type Answer } from "./answer";
+import { loadContext } from "./records";
 import { classify, INTENTS, type Intent } from "./intents";
-import { guideChat, type GuideReply } from "./guide";
+import { guideChat, type Focus, type GuideReply } from "./guide";
 import { getAssistantLlm } from "./llm";
 
 const askSchema = z.object({
@@ -27,6 +28,8 @@ const askSchema = z.object({
 
 const guideSchema = z.object({
   question: z.string().trim().min(2, "Type a question.").max(500, "Keep the question under 500 characters."),
+  /** The record the conversation is about (re-checked against the caller's access on every turn). */
+  focusId: z.string().max(64).nullish(),
   history: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(3000) })).max(12).default([]),
 });
 
@@ -37,64 +40,12 @@ const reviewSchema = z.object({
 
 const respondSchema = z.object({ response: z.string().trim().min(10, "Write a response (at least 10 characters).").max(4000) });
 
-/**
- * Loads what the assistant may use, through the same scoped workspace services
- * the pages use — the assistant can never see more than the user can.
- */
-async function loadContext(ctx: ServiceContext, type: "preauth" | "claim", id: string): Promise<AssistantContext> {
-  if (type === "preauth") {
-    const w = await PreauthService.workspace(ctx, id);
-    const last = w.history[w.history.length - 1];
-    return {
-      kind: "preauth",
-      reference: w.preauth.reference,
-      status: w.preauth.status,
-      statusLabel: STATUS_LABEL[w.preauth.status as PreauthStatus],
-      claimType: w.preauth.claimType,
-      policyName: w.policy.name,
-      category: w.policy.category,
-      payerName: w.insurerName ?? w.schemeName,
-      evaluation: w.evaluation?.evaluation ?? null,
-      ruleVersion: w.evaluation?.ruleVersion ?? null,
-      documents: w.documents.map((d) => ({ docType: d.docType, status: d.status })),
-      openQueries: w.queries.filter((q) => q.query.status === "open").map((q) => ({ reasonTitle: q.reasonTitle, reasonAction: q.reasonAction, message: q.query.message, requiredDocuments: q.query.requiredDocuments })),
-      decisions: await payerDecisions(ctx, "preauth", id),
-      nextAction: last?.requiredAction ?? null,
-      nextTeam: last?.responsibleTeam ?? null,
-    };
-  }
-  const w = await ClaimService.workspace(ctx, id);
-  const last = w.history[w.history.length - 1];
-  return {
-    kind: "claim",
-    reference: w.claim.reference,
-    status: w.claim.status,
-    statusLabel: CLAIM_STATUS_LABEL[w.claim.status as ClaimStatus],
-    claimType: w.claim.claimType,
-    policyName: w.policy.name,
-    category: w.policy.category,
-    payerName: w.insurerName ?? w.schemeName,
-    evaluation: w.evaluation?.evaluation ?? null,
-    ruleVersion: w.evaluation?.ruleVersion ?? null,
-    documents: [...w.documents, ...w.preauthDocuments].map((d) => ({ docType: d.docType, status: d.status })),
-    openQueries: w.queries.filter((q) => q.query.status === "open").map((q) => ({ reasonTitle: q.reasonTitle, reasonAction: q.reasonAction, message: q.query.message, requiredDocuments: q.query.requiredDocuments })),
-    decisions: w.payerResponses.map((r) => ({ decision: r.decision, reasonTitle: r.reasonTitle, reasonMeaning: r.reasonMeaning, reasonCheck: r.reasonCheck, reasonAction: r.reasonAction, remarks: r.remarks, amount: r.approvedAmount, at: r.createdAt.toISOString() })),
-    nextAction: last?.requiredAction ?? null,
-    nextTeam: last?.responsibleTeam ?? null,
-  };
-}
-
-async function payerDecisions(ctx: ServiceContext, type: "preauth" | "claim", id: string) {
-  const rows = await HistoryRepository.payerResponses(ctx.db, type, id);
-  return rows.map((r) => ({ decision: r.decision, reasonTitle: r.reasonTitle, reasonMeaning: r.reasonMeaning, reasonCheck: r.reasonCheck, reasonAction: r.reasonAction, remarks: r.remarks, amount: r.approvedAmount, at: r.createdAt.toISOString() }));
-}
-
 export const AssistantService = {
-  /** Answers a question about the Claimix application itself (navigation, workflows, roles); no request records are read. */
-  async guide(ctx: ServiceContext, input: unknown): Promise<GuideReply> {
+  /** Answers a question about the Claimix application: navigation, workflows, roles, and records the caller may see (looked up through the scoped services). */
+  async guide(ctx: ServiceContext, input: unknown): Promise<GuideReply & { focus: Focus | null }> {
     requirePermission(ctx.principal, "assistant:use");
     const d = parseOrThrow(guideSchema, input);
-    return guideChat(ctx.principal, d.question, d.history);
+    return guideChat(ctx, d.question, d.history, d.focusId ? { id: d.focusId } : null);
   },
 
   /** Answers from records only; every question and answer is stored and audited. */

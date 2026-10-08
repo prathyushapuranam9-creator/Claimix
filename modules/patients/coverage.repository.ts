@@ -1,8 +1,8 @@
 import "server-only";
-import { aliasedTable, and, asc, desc, eq, ilike, isNull, or } from "drizzle-orm";
+import { aliasedTable, and, asc, desc, eq, ilike, isNull, ne, or } from "drizzle-orm";
 import { likeContains } from "@/lib/pagination";
 import type { DbOrTx } from "@/db/client";
-import { beneficiaries, governmentSchemes, organizations, patients, policies } from "@/db/schema";
+import { beneficiaries, claims, governmentSchemes, organizations, patients, policies, preAuthorizations } from "@/db/schema";
 import type { Scope } from "@/lib/permissions/catalog";
 import type { Principal } from "@/lib/permissions/principal";
 import { scopePredicate } from "@/lib/permissions/scope";
@@ -23,6 +23,8 @@ const coverageColumns = {
   inceptionDate: beneficiaries.inceptionDate,
   sumInsured: beneficiaries.sumInsured,
   sumInsuredAvailable: beneficiaries.sumInsuredAvailable,
+  verificationStatus: beneficiaries.verificationStatus,
+  sourceDocumentId: beneficiaries.sourceDocumentId,
   isDemo: beneficiaries.isDemo,
   policyName: policies.name,
   insurerId: policies.insurerId,
@@ -62,7 +64,17 @@ export const CoverageRepository = {
   async searchForHospital(db: DbOrTx, hospitalId: string, q: string | undefined) {
     const term = q ? likeContains(q) : undefined;
     return db
-      .select({ id: beneficiaries.id, memberId: beneficiaries.memberId, coverEnd: beneficiaries.coverEnd, patientName: patients.fullName, patientNo: patients.patientNo, policyName: policies.name })
+      .select({
+        id: beneficiaries.id,
+        memberId: beneficiaries.memberId,
+        coverStart: beneficiaries.coverStart,
+        coverEnd: beneficiaries.coverEnd,
+        verificationStatus: beneficiaries.verificationStatus,
+        patientId: patients.id,
+        patientName: patients.fullName,
+        patientNo: patients.patientNo,
+        policyName: policies.name,
+      })
       .from(beneficiaries)
       .innerJoin(patients, eq(patients.id, beneficiaries.patientId))
       .innerJoin(policies, eq(policies.id, beneficiaries.policyId))
@@ -76,13 +88,34 @@ export const CoverageRepository = {
       .limit(50);
   },
 
-  async memberIdTaken(db: DbOrTx, category: "private" | "government", memberId: string) {
-    const [row] = await db.select({ id: beneficiaries.id }).from(beneficiaries).where(and(eq(beneficiaries.category, category), eq(beneficiaries.memberId, memberId))).limit(1);
+  async memberIdTaken(db: DbOrTx, category: "private" | "government", memberId: string, exceptId?: string) {
+    const [row] = await db
+      .select({ id: beneficiaries.id })
+      .from(beneficiaries)
+      .where(and(eq(beneficiaries.category, category), eq(beneficiaries.memberId, memberId), exceptId ? ne(beneficiaries.id, exceptId) : undefined))
+      .limit(1);
     return !!row;
   },
 
   async insert(db: DbOrTx, values: typeof beneficiaries.$inferInsert) {
     const [row] = await db.insert(beneficiaries).values(values).returning();
     return row!;
+  },
+
+  async update(db: DbOrTx, id: string, values: Partial<typeof beneficiaries.$inferInsert>) {
+    const [row] = await db.update(beneficiaries).set(values).where(eq(beneficiaries.id, id)).returning();
+    return row!;
+  },
+
+  /**
+   * Pre-authorizations and claims already raised on this coverage. They fix which policy (and so which
+   * payer) the request went to, so the policy of a coverage in use can no longer be changed.
+   */
+  async requestsUsing(db: DbOrTx, beneficiaryId: string) {
+    const [[pre], [cl]] = await Promise.all([
+      db.select({ reference: preAuthorizations.reference }).from(preAuthorizations).where(eq(preAuthorizations.beneficiaryId, beneficiaryId)).limit(1),
+      db.select({ reference: claims.reference }).from(claims).where(eq(claims.beneficiaryId, beneficiaryId)).limit(1),
+    ]);
+    return [pre?.reference, cl?.reference].filter((r): r is string => !!r);
   },
 };

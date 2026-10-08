@@ -24,6 +24,16 @@
   font-size: var(--fs-2xl);
 }
 
+.bannerRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-4);
+}
+
+.bannerActions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+
 .ref {
   font-size: var(--fs-xs);
   color: var(--c-text-muted) !important;
@@ -74,12 +84,30 @@
   padding-left: var(--sp-5);
 }
 
+/* One row per document: name, requirement badge and stage line up in columns. */
 .docs {
   display: grid;
-  gap: var(--sp-2);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.docs li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 8.5rem 6.5rem;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--c-border);
+}
+.docs li:last-child { border-bottom: 0; }
+
+.docName { overflow-wrap: anywhere; }
+.docStage { color: var(--c-text-muted); font-size: var(--fs-sm); }
+
+@media (max-width: 520px) {
+  .docs li { grid-template-columns: minmax(0, 1fr) auto; }
+  .docStage { grid-column: 1 / -1; margin-top: calc(-1 * var(--sp-1)); }
 }
 
 .fine {

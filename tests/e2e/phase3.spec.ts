@@ -18,7 +18,7 @@ test.describe("patients", () => {
 
     await page.getByLabel("Mobile number").fill("+91 98765 43210");
     await page.getByRole("button", { name: "Register patient" }).click();
-    await expect(page).toHaveURL(/\/patients\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/patients\/[0-9a-f-]{36}\?registered=1$/);
     await expect(page.getByRole("heading", { name })).toBeVisible();
     await expect(page.getByText("Sunrise Multispeciality Hospital").first()).toBeVisible();
   });
