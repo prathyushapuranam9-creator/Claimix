@@ -1,9 +1,9 @@
 import { detectKind } from "@/lib/security/file-validation";
 
-/** What the document viewer can show. The same types uploads accept: PDF, PNG (screenshots), JPG/JPEG. */
+/** What the document viewer can show. The same types uploads accept: PDF, PNG (screenshots), JPG/JPEG, WEBP. */
 export type Preview =
   | { kind: "pdf"; mime: "application/pdf" }
-  | { kind: "image"; mime: "image/png" | "image/jpeg" }
+  | { kind: "image"; mime: "image/png" | "image/jpeg" | "image/webp" }
   | { kind: "unsupported" }
   | { kind: "empty_pdf" };
 
@@ -18,6 +18,7 @@ export function previewOf(bytes: Uint8Array): Preview {
   const kind = detectKind(bytes);
   if (kind === "png") return { kind: "image", mime: "image/png" };
   if (kind === "jpg") return { kind: "image", mime: "image/jpeg" };
+  if (kind === "webp") return { kind: "image", mime: "image/webp" };
   if (kind !== "pdf") return { kind: "unsupported" };
   const text = new TextDecoder("latin1").decode(bytes);
   if (!/\/Page\b/.test(text) && !/\/ObjStm\b/.test(text)) return { kind: "empty_pdf" };

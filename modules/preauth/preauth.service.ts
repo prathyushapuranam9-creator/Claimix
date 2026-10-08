@@ -14,12 +14,15 @@ import { CoverageRepository } from "@/modules/patients/coverage.repository";
 import { coverPeriodStatus } from "@/modules/patients/coverage.validation";
 import { PolicyRepository } from "@/modules/policies/policies.repository";
 import { ClaimRepository } from "@/modules/claims/claims.repository";
-import { evaluateAndRecord, loadEvaluation } from "@/modules/rules/rules.service";
+import { evaluateAndRecord, loadEvaluation, requiredDocumentsFor } from "@/modules/rules/rules.service";
+import { NotificationService } from "@/modules/notifications/notifications.service";
 import { CHECKLIST, computePreauthChecklist } from "./preauth.checklist";
 import { buildPreauthFacts } from "./preauth.facts";
-import { PreauthRepository } from "./preauth.repository";
+import { isNewborn, scrutinize, wizardDocuments } from "./preauth.scrutiny";
+import { PreauthRepository, type MemberRow } from "./preauth.repository";
+import { ClinicalRepository } from "@/modules/clinical/clinical.repository";
 import {
-  cancelSchema, CLINICAL_FIELDS, confirmItemSchema, decisionSchema, preauthCreateSchema, preauthDetailsSchema, queryResponseSchema, submitSchema,
+  cancelSchema, CLINICAL_FIELDS, confirmItemSchema, decisionSchema, preauthCreateSchema, preauthDetailsSchema, queryResponseSchema, expectedCost, gapsAcknowledgment, stayDays, submitSchema, wizardClinicalSchema, wizardKycSchema, wizardRaiseSchema, wizardSubmitSchema, type PreauthDetailsInput, type WizardKyc,
 } from "./preauth.validation";
 import { allowedTransitions, canTransition, HOSPITAL_EDITABLE, PAYER_DECISIONS, STATUS_LABEL, TERMINAL, type PreauthStatus, type Side } from "./preauth.workflow";
 
@@ -32,12 +35,33 @@ const money = (n: number | undefined) => (n === undefined ? null : n.toFixed(2))
 
 /** Which side of the workflow the caller acts on for this request (or null: read-only). */
 export function sideOf(p: Principal, r: Row["preauth"]): Side | null {
+  // An insurer / TPA that raised this request on the hospital's behalf prepares it as the hospital desk would,
+  // but only while it is a draft; after submission it is reviewed like any other request.
+  if (isRaiser(p, r) && r.status === "draft") return "hospital";
   if (p.orgType === "insurer" && r.insurerId === p.organizationId && scopeFor(p, "preauth:review")) return "payer";
   if (p.orgType === "tpa" && r.tpaId === p.organizationId && scopeFor(p, "preauth:review")) return "payer";
   if (p.orgType === "hospital" && p.roleKey !== "patient" && r.hospitalId === p.organizationId && scopeFor(p, "preauth:create")) {
     return "hospital";
   }
   return null;
+}
+
+/** The caller's organization raised this request (New Claim wizard) and may still raise requests. */
+export function isRaiser(p: Principal, r: Pick<Row["preauth"], "raisedByOrgId">): boolean {
+  return !!r.raisedByOrgId && r.raisedByOrgId === p.organizationId && (p.orgType === "insurer" || p.orgType === "tpa") && !!scopeFor(p, "preauth:raise");
+}
+
+/** The caller as a payer that may raise requests (insurer / TPA reviewer with preauth:raise), or refused. */
+function raisingPayer(p: Principal): { orgType: "insurer" | "tpa"; orgId: string } {
+  requirePermission(p, "preauth:raise");
+  if (p.orgType !== "insurer" && p.orgType !== "tpa") throw new ForbiddenError("New claims are raised by an insurer or TPA reviewer for their own members.");
+  return { orgType: p.orgType, orgId: p.organizationId };
+}
+
+/** The insurer / TPA chosen at KYC must be the member's own (the case is filed against the policy on record). */
+function assertSamePayer(kyc: WizardKyc, m: MemberRow) {
+  if (kyc.insurerId !== m.insurerId) throw new ValidationError(`This member's policy is with ${m.insurerName ?? "another insurer"}.`, { insurerId: ["Not the member's insurer."] });
+  if (kyc.tpaId && kyc.tpaId !== m.tpaId) throw new ValidationError(`This member's policy is run by ${m.tpaName ?? "no TPA"}.`, { tpaId: ["Not the member's TPA."] });
 }
 
 /** Hospital staff record a government scheme's decision (made in the scheme's own system). */
@@ -56,6 +80,28 @@ function reference() {
 function detailsToColumns(d: ReturnType<typeof preauthDetailsSchema.parse>) {
   const clinical: Record<string, unknown> = { isAccident: d.isAccident ?? "unknown", pedDeclared: d.pedDeclared ?? "unknown", pedRelated: d.pedRelated ?? "unknown" };
   for (const k of CLINICAL_FIELDS) if (d[k]) clinical[k] = d[k];
+  // New Claim wizard extras, kept with the clinical record.
+  if (d.treatmentType) clinical.treatmentType = d.treatmentType;
+  if (d.admissionType) clinical.admissionType = d.admissionType;
+  if (d.icuDays !== undefined) clinical.icuDays = d.icuDays;
+  if (d.ailmentDurationDays !== undefined) clinical.ailmentDurationDays = d.ailmentDurationDays;
+  if (d.chronicIllness?.length) clinical.chronicIllness = d.chronicIllness;
+  if (d.dischargeDate) clinical.dischargeDate = d.dischargeDate;
+  if (d.costItems?.length) clinical.costItems = d.costItems;
+  if (d.packageAmount !== undefined) clinical.packageAmount = d.packageAmount;
+  // All diagnoses, primary first; the primary is the request's diagnosis.
+  if (d.diagnosisIds?.length) {
+    clinical.diagnosisIds = d.diagnosisIds;
+    d = { ...d, diagnosisId: d.diagnosisIds[0] };
+  }
+  // The expected cost is the package amount, or the heads' total; the stay length comes from its start and end.
+  const cost = d.costItems?.length || d.packageAmount !== undefined ? expectedCost(d.costItems, d.packageAmount) : null;
+  if (cost !== null) d = { ...d, estimatedCost: cost };
+  // The room-rent rule reads the per-day room rate: taken from the "Room rent" head when not entered separately.
+  const roomHead = d.costItems?.find((i) => i.head === "Room rent");
+  if (d.roomRentPerDay === undefined && roomHead) d = { ...d, roomRentPerDay: roomHead.perDay };
+  const days = stayDays(d.admissionDate, d.admissionTime, d.dischargeDate, d.dischargeTime);
+  if (days !== null) d = { ...d, expectedStayDays: days };
   return {
     claimType: d.claimType,
     diagnosisId: d.diagnosisId ?? null,
@@ -70,6 +116,50 @@ function detailsToColumns(d: ReturnType<typeof preauthDetailsSchema.parse>) {
     expectedInsuranceAmount: money(d.expectedInsuranceAmount),
     patientContribution: money(d.patientContribution),
   };
+}
+
+/** Cost lines as stored; lines from the earlier itemized table (description × quantity × amount) are read as heads. */
+function storedCostItems(v: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((i: Record<string, unknown>) => ("head" in i ? i : { head: "Other", description: i.description, perDay: i.amount, days: i.quantity }));
+}
+
+/** The stored request as the details form's values (the inverse of detailsToColumns). */
+export function storedDetails(p: Row["preauth"]): PreauthDetailsInput {
+  const c = p.clinical as Record<string, unknown>;
+  const str = (v: unknown) => (typeof v === "string" && v ? v : undefined);
+  const tri = (v: unknown) => (v === "yes" || v === "no" ? v : "unknown");
+  const num = (v: unknown) => (typeof v === "number" ? v : undefined);
+  const out: Record<string, unknown> = {
+    claimType: p.claimType,
+    diagnosisId: p.diagnosisId ?? undefined,
+    diagnosisIds: Array.isArray(c.diagnosisIds) ? c.diagnosisIds : p.diagnosisId ? [p.diagnosisId] : [],
+    procedureId: p.procedureId ?? undefined,
+    admissionDate: p.expectedAdmission ?? undefined,
+    dischargeDate: str(c.dischargeDate),
+    isAccident: tri(c.isAccident),
+    pedDeclared: tri(c.pedDeclared),
+    pedRelated: tri(c.pedRelated),
+    expectedStayDays: p.expectedStayDays ?? undefined,
+    roomCategory: p.roomCategory ?? undefined,
+    roomRentPerDay: p.roomRentPerDay ?? undefined,
+    treatmentType: str(c.treatmentType),
+    admissionType: str(c.admissionType),
+    icuDays: num(c.icuDays),
+    ailmentDurationDays: num(c.ailmentDurationDays),
+    chronicIllness: Array.isArray(c.chronicIllness) ? c.chronicIllness : [],
+    costItems: storedCostItems(c.costItems),
+    packageAmount: c.packageAmount ?? undefined,
+  };
+  if (!Array.isArray(c.costItems) && c.packageAmount === undefined && p.estimatedCost !== null) out.estimatedCost = p.estimatedCost;
+  for (const k of CLINICAL_FIELDS) if (str(c[k])) out[k] = c[k];
+  return out as PreauthDetailsInput;
+}
+
+/** KYC & Policy as recorded on the case (null before it was captured). */
+export function storedKyc(p: Row["preauth"]): WizardKyc | null {
+  const k = (p.clinical as Record<string, unknown>).kyc;
+  return k && typeof k === "object" ? (k as WizardKyc) : null;
 }
 
 /** Non-clinical fields safe for audit state. */
@@ -215,6 +305,218 @@ export const PreauthService = {
     });
   },
 
+  /** New Claim wizard, step 1: the payer's own members matching a UHID / member ID / name (at least 2 characters). */
+  async members(ctx: ServiceContext, q: string) {
+    const payer = raisingPayer(ctx.principal);
+    const term = q.trim();
+    if (term.length < 2) return [];
+    return PreauthRepository.findMembers(ctx.db, payer, term.slice(0, 100));
+  },
+
+  /** New Claim wizard: one of the payer's members (refused if the coverage isn't under its own policies). */
+  async member(ctx: ServiceContext, beneficiaryId: string) {
+    const m = await PreauthRepository.member(ctx.db, raisingPayer(ctx.principal), requireId(beneficiaryId, "Member"));
+    if (!m) throw new NotFoundError("Member not found among your policies.");
+    return m;
+  },
+
+  /** New Claim, KYC & Policy: the Insurer / TPA dropdowns (the payer's own insurers and their TPAs). */
+  async kycOptions(ctx: ServiceContext) {
+    return PreauthRepository.kycOptions(ctx.db, raisingPayer(ctx.principal));
+  },
+
+  /**
+   * New Claim, KYC & Policy → a cashless draft case raised by the insurer / TPA on the patient's hospital's
+   * behalf. Only for a member of its own policies with cover in force today (found with Find, or identified by a
+   * unique member ID); the insurer / TPA chosen must be the member's own. The typed KYC is kept with the case and
+   * compared with the record by the checks. The hospital is the patient's own and is told.
+   */
+  async raise(ctx: ServiceContext, input: unknown) {
+    const payer = raisingPayer(ctx.principal);
+    const d = parseOrThrow(wizardRaiseSchema, input);
+    return ctx.db.transaction(async (tx) => {
+      let m: MemberRow | undefined;
+      if (d.beneficiaryId) m = await PreauthRepository.member(tx, payer, d.beneficiaryId);
+      else if (d.kyc.memberId) {
+        const found = await PreauthRepository.membersByMemberId(tx, payer, d.kyc.memberId);
+        if (found.length === 1) m = found[0];
+      }
+      if (!m) {
+        throw new ValidationError("Find the member first: cases are raised only for members of your policies on record.", { uhid: ["Use Find to pick the member."] });
+      }
+      assertSamePayer(d.kyc, m);
+      const period = coverPeriodStatus({ coverStart: m.coverStart, coverEnd: m.coverEnd }, todayIso());
+      if (period !== "in_force") {
+        throw new ValidationError(
+          period === "expired" ? `This cover ended on ${m.coverEnd}; a cashless case can't be raised on it.` : `This cover starts on ${m.coverStart}; a cashless case can't be raised on it yet.`,
+          { policyTo: ["The cover period is not current."] },
+        );
+      }
+      const policy = await PolicyRepository.get(tx, m.policyId);
+      if (!policy) throw new ValidationError("The member's policy is no longer available.");
+      const cols = detailsToColumns(parseOrThrow(preauthDetailsSchema, { claimType: "cashless" }));
+      const row = await PreauthRepository.insert(tx, {
+        reference: reference(),
+        hospitalId: m.hospitalId,
+        patientId: m.patientId,
+        beneficiaryId: m.beneficiaryId,
+        policyId: policy.id,
+        insurerId: policy.insurerId,
+        tpaId: policy.tpaId,
+        schemeId: policy.schemeId,
+        status: "draft",
+        ...cols,
+        clinical: { ...cols.clinical, kyc: d.kyc },
+        createdBy: ctx.principal.userId,
+        raisedByOrgId: payer.orgId,
+      });
+      await PreauthRepository.insertHistory(tx, {
+        subjectType: "preauth", subjectId: row.id, fromStatus: null, toStatus: "draft",
+        message: "Case raised by the insurer / TPA on the hospital's behalf (New Claim)",
+        requiredAction: "Register the package, add the papers and run the checks, then submit", responsibleTeam: "Insurer / TPA (raised on the hospital's behalf)", actorUserId: ctx.principal.userId,
+      });
+      await AuditService.record(tx, {
+        ...actorOf(ctx), action: "preauth.raised_by_payer", resourceType: "preauth", resourceId: row.id,
+        newState: { reference: row.reference, policyId: policy.id, hospitalId: m.hospitalId, kycMode: d.kyc.mode, ...auditView(row) },
+      });
+      await NotificationService.toOrganizations(tx, [m.hospitalId], {
+        kind: "preauth.raised",
+        title: `Pre-authorization ${row.reference} is being prepared for your patient`,
+        body: "The patient's insurer / TPA started a cashless case on your hospital's behalf.",
+        resourceType: "preauth",
+        resourceId: row.id,
+      }, ctx.principal.userId);
+      return row;
+    });
+  },
+
+  /** New Claim: corrects KYC & Policy on a draft the caller's organization raised. */
+  async saveKyc(ctx: ServiceContext, id: string, input: unknown) {
+    const payer = raisingPayer(ctx.principal);
+    const kyc = parseOrThrow(wizardKycSchema, input);
+    return ctx.db.transaction(async (tx) => {
+      const row = await load(ctx, id, { forUpdate: true, db: tx });
+      if (row.preauth.raisedByOrgId !== payer.orgId) throw new NotFoundError("Pre-authorization not found.");
+      requireSide(ctx, row, "hospital");
+      if (row.preauth.status !== "draft") throw new ConflictError("KYC can only be changed on a draft.");
+      const m = await PreauthRepository.member(tx, payer, row.preauth.beneficiaryId);
+      if (!m) throw new NotFoundError("Member not found among your policies.");
+      assertSamePayer(kyc, m);
+      await PreauthRepository.update(tx, row.preauth.id, { clinical: { ...(row.preauth.clinical as Record<string, unknown>), kyc }, latestEvaluationId: null });
+      await AuditService.record(tx, { ...actorOf(ctx), action: "preauth.kyc_updated", resourceType: "preauth", resourceId: row.preauth.id, newState: { kycMode: kyc.mode } });
+    });
+  },
+
+  /** New Claim, Clinical Details & Package: the step's required fields, then the normal update. */
+  async saveClinical(ctx: ServiceContext, id: string, input: unknown) {
+    parseOrThrow(wizardClinicalSchema, input);
+    return PreauthService.update(ctx, id, input);
+  },
+
+  /** New Claim: drafts this insurer / TPA raised and can resume. */
+  async raisedDrafts(ctx: ServiceContext) {
+    return PreauthRepository.raisedDrafts(ctx.db, raisingPayer(ctx.principal).orgId);
+  },
+
+  /**
+   * Everything the New Claim wizard shows for a draft its caller's organization raised: the stored details and
+   * KYC, the member, papers with their MUST / EXPECTED / OPTIONAL tiers, the checklist and the deterministic pre-scrutiny.
+   */
+  async wizard(ctx: ServiceContext, id: string) {
+    const payer = raisingPayer(ctx.principal);
+    const row = await load(ctx, id);
+    if (row.preauth.raisedByOrgId !== payer.orgId) throw new NotFoundError("Pre-authorization not found.");
+    const today = todayIso();
+    const details = storedDetails(row.preauth);
+    const kyc = storedKyc(row.preauth);
+    const diagnosisIds = (details.diagnosisIds as string[] | undefined) ?? [];
+    const [docs, usable, cl, ruleDocs, member, diagnoses] = await Promise.all([
+      DocumentRepository.forSubject(ctx.db, "preauth", row.preauth.id),
+      DocumentRepository.usableTypes(ctx.db, "preauth", row.preauth.id),
+      checklistFor(ctx.db, row),
+      requiredDocumentsFor(ctx.db, row.preauth.policyId, "preauth", today),
+      PreauthRepository.member(ctx.db, payer, row.preauth.beneficiaryId),
+      ClinicalRepository.diagnosesByIds(ctx.db, diagnosisIds),
+    ]);
+    const clinical = wizardClinicalSchema.safeParse(details);
+    const newborn = isNewborn(row.patient.dob, row.preauth.expectedAdmission ?? today);
+    const requirements = wizardDocuments(ruleDocs, usable, { newborn });
+    const num = (v: string | null | undefined) => (v === null || v === undefined ? null : Number(v));
+    const scrutiny = scrutinize({
+      evaluated: !!cl.loaded,
+      clinicalIssues: clinical.success ? [] : clinical.error.issues.map((i) => ({ field: String(i.path[0] ?? "details"), message: i.message })),
+      documents: requirements,
+      checklist: cl.checklist,
+      estimatedCost: num(row.preauth.estimatedCost),
+      availableBalance: num(row.beneficiary.sumInsuredAvailable),
+      admissionType: details.admissionType as string | undefined,
+      admissionDate: row.preauth.expectedAdmission,
+      today,
+      kyc,
+      record: {
+        fullName: row.patient.fullName,
+        gender: row.patient.gender,
+        dob: row.patient.dob,
+        memberId: row.beneficiary.memberId,
+        coverStart: row.beneficiary.coverStart,
+        coverEnd: row.beneficiary.coverEnd,
+        sumInsured: num(row.beneficiary.sumInsured),
+        policyHasTpa: !!row.preauth.tpaId,
+      },
+      diagnosisCodes: diagnoses.map((x) => x.code),
+    });
+    await AuditService.record(ctx.db, { ...actorOf(ctx), action: "preauth.viewed", resourceType: "preauth", resourceId: row.preauth.id, newState: { via: "new_claim" } });
+    return {
+      ...row,
+      member: member ?? null,
+      details,
+      kyc,
+      diagnoses,
+      clinicalComplete: clinical.success,
+      documents: docs,
+      requirements,
+      policyHasDocumentRules: ruleDocs !== null,
+      checklist: cl.checklist,
+      evaluation: cl.loaded,
+      scrutiny,
+      editable: row.preauth.status === "draft",
+    };
+  },
+
+  /**
+   * New Claim, Submit. The checks are re-run on the server first. The case details must be complete; any
+   * other gap (a missing paper, a failed or unverified check, a KYC mismatch) can be sent only with the reviewer's
+   * acknowledgment, which is written to the audit trail with the submission. The payer still decides.
+   */
+  async wizardSubmit(ctx: ServiceContext, id: string, input: unknown) {
+    const d = parseOrThrow(wizardSubmitSchema, input);
+    await PreauthService.runChecks(ctx, id);
+    const w = await PreauthService.wizard(ctx, id);
+    if (!w.editable) throw new InvalidTransitionError("Only drafts can be submitted.");
+    if (w.scrutiny.blocking) {
+      throw new ValidationError(`Complete Clinical Details & Package first: ${w.scrutiny.findings.filter((f) => f.key.startsWith("clinical:")).map((f) => f.explanation).join(" ")}`);
+    }
+    const gaps = w.scrutiny.findings;
+    if (gaps.length && !d.acknowledged) {
+      throw new ValidationError(`Tick the acknowledgment to send with ${gaps.length} unresolved ${gaps.length === 1 ? "gap" : "gaps"}.`, { acknowledged: ["Required."] });
+    }
+    const acknowledgment = gaps.length ? gapsAcknowledgment(gaps.length) : null;
+    const updated = await PreauthService.submit(ctx, id, { overrideReason: acknowledgment ?? undefined }, { acknowledgedGaps: gaps.map((f) => f.key) });
+    await AuditService.record(ctx.db, {
+      ...actorOf(ctx),
+      action: "preauth.wizard_submitted",
+      resourceType: "preauth",
+      resourceId: w.preauth.id,
+      newState: {
+        acknowledgment,
+        acknowledgedGaps: gaps.map((f) => ({ key: f.key, severity: f.severity, title: f.title })),
+        channel: "claimix",
+        onBehalfOfHospital: w.preauth.hospitalId,
+      },
+    });
+    return updated;
+  },
+
   async update(ctx: ServiceContext, id: string, input: unknown) {
     const d = parseOrThrow(preauthDetailsSchema, input);
     return ctx.db.transaction(async (tx) => {
@@ -222,6 +524,9 @@ export const PreauthService = {
       requireSide(ctx, row, "hospital");
       if (!HOSPITAL_EDITABLE.has(row.preauth.status as PreauthStatus)) throw new ConflictError("This request can't be edited in its current status.");
       const cols = detailsToColumns(d);
+      // KYC & Policy is captured separately and kept across detail saves.
+      const kyc = storedKyc(row.preauth);
+      if (kyc) cols.clinical.kyc = kyc;
       // On a draft, any change invalidates the last rules check (re-run before submitting).
       const updated = await PreauthRepository.update(tx, row.preauth.id, { ...cols, ...(row.preauth.status === "draft" ? { latestEvaluationId: null } : {}) });
       await AuditService.record(tx, { ...actorOf(ctx), action: "preauth.updated", resourceType: "preauth", resourceId: row.preauth.id, previousState: auditView(row.preauth), newState: auditView(updated) });
@@ -268,7 +573,7 @@ export const PreauthService = {
    * Submits a draft. The server re-runs the rules on current data and recomputes
    * the checklist — the button state in the browser is never trusted.
    */
-  async submit(ctx: ServiceContext, id: string, input: unknown) {
+  async submit(ctx: ServiceContext, id: string, input: unknown, opts: { acknowledgedGaps?: string[] } = {}) {
     const d = parseOrThrow(submitSchema, input);
     return ctx.db.transaction(async (tx) => {
       let row = await load(ctx, id, { forUpdate: true, db: tx });
@@ -281,7 +586,9 @@ export const PreauthService = {
       row = { ...row, preauth: { ...row.preauth, latestEvaluationId: res.evaluationId } };
       const { checklist } = await checklistFor(tx, row);
 
-      if (!checklist.canSubmit) {
+      // New Claim only (never from the browser): the reviewer acknowledged the open items as gaps.
+      const acknowledged = !!opts.acknowledgedGaps?.length;
+      if (!checklist.canSubmit && !acknowledged) {
         throw new ValidationError(`Complete the checklist first: ${checklist.incomplete.map((i) => i.label).join("; ")}.`);
       }
       if (checklist.hardFailures.length && (!d.overrideReason || d.overrideReason.length < 20)) {
@@ -295,6 +602,22 @@ export const PreauthService = {
         requiredAction: "Review the request",
         responsibleTeam: row.preauth.insurerId ? "Insurer / TPA review team" : "Government scheme (via hospital scheme desk)",
       }, { submittedAt: new Date(), submitOverrideReason: checklist.hardFailures.length ? d.overrideReason! : null });
+      // Raised by an insurer / TPA: the hospital is told a request was submitted for its patient.
+      if (row.preauth.raisedByOrgId) {
+        await NotificationService.toOrganizations(tx, [row.preauth.hospitalId], {
+          kind: "preauth.raised_submitted",
+          title: `Pre-authorization ${row.preauth.reference} was submitted on your hospital's behalf`,
+          body: "Raised by the patient's insurer / TPA through the New Claim wizard. Respond to any queries from the request page.",
+          resourceType: "preauth",
+          resourceId: row.preauth.id,
+        }, ctx.principal.userId);
+      }
+      if (!checklist.canSubmit) {
+        await AuditService.record(tx, {
+          ...actorOf(ctx), action: "preauth.submitted_with_acknowledged_gaps", resourceType: "preauth", resourceId: row.preauth.id,
+          newState: { incomplete: checklist.incomplete.map((i) => i.key), acknowledgedGaps: opts.acknowledgedGaps },
+        });
+      }
       if (checklist.hardFailures.length) {
         await AuditService.record(tx, { ...actorOf(ctx), action: "preauth.submitted_with_failed_checks", resourceType: "preauth", resourceId: row.preauth.id, newState: { failed: checklist.hardFailures.map((i) => i.key), reason: d.overrideReason } });
       }
@@ -309,6 +632,10 @@ export const PreauthService = {
     return ctx.db.transaction(async (tx) => {
       const row = await load(ctx, id, { forUpdate: true, db: tx });
       const side = requireSide(ctx, row, "payer");
+      // Maker-checker: a request an insurer raised itself is decided by a different reviewer.
+      if (row.preauth.raisedByOrgId && row.preauth.createdBy === ctx.principal.userId) {
+        throw new ForbiddenError("You raised this request, so another reviewer in your organization must decide it.");
+      }
       if (side === "scheme_desk" && !d.payerReference) {
         throw new ValidationError("Enter the scheme's reference number for this decision.", { payerReference: ["Required when recording a scheme decision."] });
       }

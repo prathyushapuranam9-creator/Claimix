@@ -130,6 +130,7 @@ export function FilterBar({
   more,
   moreActive = 0,
   searchIcon = false,
+  submitLabel = "Apply",
 }: {
   basePath: string;
   q?: string;
@@ -141,6 +142,8 @@ export function FilterBar({
   moreActive?: number;
   /** Show a magnifier inside the search field. */
   searchIcon?: boolean;
+  /** The submit button's label (e.g. "Find" for a lookup). */
+  submitLabel?: string;
 }) {
   const form = (
     <form className={styles.filters} method="get" action={basePath} role="search">
@@ -161,7 +164,7 @@ export function FilterBar({
         </details>
       )}
       <div className={styles.filterActions}>
-        <Button type="submit">Apply</Button>
+        <Button type="submit">{submitLabel}</Button>
         <ButtonLink href={basePath} variant="ghost">Clear</ButtonLink>
       </div>
     </form>

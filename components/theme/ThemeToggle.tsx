@@ -1,34 +1,67 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { THEME_COOKIE } from "./theme";
 import styles from "./ThemeToggle.module.css";
 
-export const THEME_KEY = "claimix-theme";
-
-/** Runs before first paint (inlined in <head>) so there is no flash of the wrong theme. */
-export const THEME_INIT_SCRIPT = `try{var t=localStorage.getItem("${THEME_KEY}");if(t!=="light"&&t!=="dark")t=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.dataset.theme=t}catch(e){}`;
+/**
+ * The saved choice lives in a cookie so the server renders <html data-theme> with it: no script runs before paint and
+ * there is no flash of the wrong theme. Without a saved choice the CSS follows the OS preference.
+ */
+export const THEME_KEY = THEME_COOKIE;
 
 type Theme = "light" | "dark";
+
+const isTheme = (v: unknown): v is Theme => v === "light" || v === "dark";
+
+function save(t: Theme) {
+  document.cookie = `${THEME_COOKIE}=${t}; Path=/; Max-Age=31536000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+  try {
+    localStorage.setItem(THEME_KEY, t);
+  } catch {
+    /* storage unavailable: the cookie still keeps the choice */
+  }
+}
+
+/** The theme on <html>, or the OS preference when nothing was chosen. */
+function current(): Theme {
+  const t = document.documentElement.dataset.theme;
+  if (isTheme(t)) return t;
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
 
 function subscribe(cb: () => void) {
   const mo = new MutationObserver(cb);
   mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  return () => mo.disconnect();
+  const mq = matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", cb);
+  return () => {
+    mo.disconnect();
+    mq.removeEventListener("change", cb);
+  };
 }
 
-const read = (): Theme => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
-
 export function ThemeToggle() {
-  const theme = useSyncExternalStore(subscribe, read, () => "light" as Theme);
+  const theme = useSyncExternalStore(subscribe, current, () => "light" as Theme);
   const next: Theme = theme === "dark" ? "light" : "dark";
+
+  // No choice rendered by the server: carry over one saved before the cookie existed (localStorage only), otherwise
+  // mark the OS preference on <html> (the CSS already showed it before paint, so nothing changes on screen).
+  useEffect(() => {
+    if (isTheme(document.documentElement.dataset.theme)) return;
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(THEME_KEY);
+    } catch {
+      /* storage unavailable */
+    }
+    if (isTheme(saved)) save(saved);
+    document.documentElement.dataset.theme = isTheme(saved) ? saved : current();
+  }, []);
 
   const toggle = () => {
     document.documentElement.dataset.theme = next;
-    try {
-      localStorage.setItem(THEME_KEY, next);
-    } catch {
-      /* storage unavailable: the choice just lasts for this page view */
-    }
+    save(next);
   };
 
   return (

@@ -1,5 +1,5 @@
 import "server-only";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
 import { diagnoses, procedures } from "@/db/schema";
 
@@ -7,6 +7,12 @@ import { diagnoses, procedures } from "@/db/schema";
 export const ClinicalRepository = {
   diagnosisOptions(db: DbOrTx) {
     return db.select({ id: diagnoses.id, code: diagnoses.code, name: diagnoses.name }).from(diagnoses).orderBy(asc(diagnoses.code));
+  },
+  /** These diagnoses, in the order given (ids not found are skipped). */
+  async diagnosesByIds(db: DbOrTx, ids: string[]) {
+    if (!ids.length) return [];
+    const rows = await db.select({ id: diagnoses.id, code: diagnoses.code, name: diagnoses.name }).from(diagnoses).where(inArray(diagnoses.id, ids));
+    return ids.map((id) => rows.find((r) => r.id === id)).filter((r): r is (typeof rows)[number] => !!r);
   },
   procedureOptions(db: DbOrTx) {
     return db.select({ id: procedures.id, code: procedures.code, name: procedures.name }).from(procedures).orderBy(asc(procedures.name));

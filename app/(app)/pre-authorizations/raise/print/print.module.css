@@ -1,0 +1,75 @@
+.sheet {
+  display: grid;
+  gap: var(--sp-4);
+  max-width: 900px;
+  padding: var(--sp-5);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+}
+
+.sheet h2 {
+  margin: 0;
+  padding-bottom: var(--sp-1);
+  border-bottom: 1px solid var(--c-border-strong);
+  font-size: var(--fs-md);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.table th,
+.table td {
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--c-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  width: 34%;
+  background: var(--c-surface-2);
+  font-weight: 600;
+}
+
+.num {
+  text-align: right;
+}
+
+.signatures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: var(--sp-5);
+  margin-top: var(--sp-5);
+}
+
+.signature {
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--c-text);
+  font-size: var(--fs-sm);
+}
+
+.note {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+.actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+@media print {
+  .actions {
+    display: none;
+  }
+
+  .sheet {
+    max-width: none;
+    padding: 0;
+    border: 0;
+  }
+}

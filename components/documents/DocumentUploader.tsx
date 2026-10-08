@@ -9,7 +9,7 @@ import { SelectField } from "@/components/ui/Field";
 import { Alert } from "@/components/ui/Surface";
 import styles from "./DocumentUploader.module.css";
 
-const ACCEPT = ".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg";
+const ACCEPT = ".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp";
 const MAX = 10 * 1024 * 1024;
 
 interface Props {
@@ -72,7 +72,7 @@ export function DocumentUploader({ upload, suggested, only, button = "Upload" }:
           ))}
         </SelectField>
         <div className={styles.file}>
-          <label htmlFor="doc-file" className={styles.label}>File (PDF, PNG or JPG, up to 10 MB)</label>
+          <label htmlFor="doc-file" className={styles.label}>File (PDF, PNG, JPG or WEBP, up to 10 MB)</label>
           <input id="doc-file" ref={fileRef} type="file" accept={ACCEPT} className={styles.input} />
         </div>
         <Button type="button" onClick={onSubmit} loading={pending}>{button}</Button>

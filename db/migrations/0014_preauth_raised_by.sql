@@ -1,0 +1,2 @@
+ALTER TABLE "pre_authorizations" ADD COLUMN "raised_by_org_id" uuid;--> statement-breakpoint
+ALTER TABLE "pre_authorizations" ADD CONSTRAINT "pre_authorizations_raised_by_org_id_organizations_id_fk" FOREIGN KEY ("raised_by_org_id") REFERENCES "public"."organizations"("id") ON DELETE no action ON UPDATE no action;

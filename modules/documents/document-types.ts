@@ -15,6 +15,8 @@ export const DOCUMENT_TYPES: Record<string, { label: string; category: DocumentC
   employee_id: { label: "Employee / corporate ID", category: "patient" },
   beneficiary_id: { label: "Scheme beneficiary ID / enrolment", category: "patient" },
   insurance_other: { label: "Other insurance document", category: "patient" },
+  birth_certificate: { label: "Birth certificate / hospital birth record", category: "patient" },
+  endorsement_letter: { label: "Policy endorsement letter", category: "patient" },
   doctor_consultation: { label: "Doctor consultation note", category: "medical" },
   clinical_notes: { label: "Clinical notes & diagnosis", category: "medical" },
   medical_history: { label: "Past medical history", category: "medical" },

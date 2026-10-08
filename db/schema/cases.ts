@@ -2,7 +2,7 @@ import { check, date, index, integer, jsonb, numeric, pgTable, text, timestamp, 
 import { sql } from "drizzle-orm";
 import { id, timestamps } from "./_common";
 import { claimStatus, claimType, payerDecision, preauthStatus, queryStatus, settlementStatus } from "./enums";
-import { users } from "./identity";
+import { organizations, users } from "./identity";
 import { beneficiaries, policies } from "./policies";
 import { governmentSchemes, hospitals, insurers, patients, tpas } from "./parties";
 
@@ -73,6 +73,8 @@ export const preAuthorizations = pgTable("pre_authorizations", {
   // Manual confirmations / human-verification notes per checklist item.
   checklist: jsonb("checklist").$type<Record<string, { confirmed: boolean; note?: string; by: string; at: string }>>().notNull().default({}),
   createdBy: uuid("created_by").notNull().references(() => users.id),
+  // Set when an insurer / TPA reviewer raised this request on the hospital's behalf (New Claim wizard); null = the hospital raised it.
+  raisedByOrgId: uuid("raised_by_org_id").references(() => organizations.id),
   isDemo: boolean("is_demo").notNull().default(false),
   submittedAt: timestamp("submitted_at", { withTimezone: true }),
   ...timestamps,

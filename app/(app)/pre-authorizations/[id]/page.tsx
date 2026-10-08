@@ -83,6 +83,18 @@ export default async function PreauthPage({ params }: { params: Promise<{ id: st
         }
       />
       <Stack>
+        {p.raisedByOrgId &&
+          (p.raisedByOrgId === ctx.principal.organizationId && status === "draft" ? (
+            <Alert tone="info" title="Raised by your organization on the hospital's behalf">
+              <p>Continue preparing it in the New Claim wizard, where its documents, audit checks and acknowledgment are completed.</p>
+              <p><ButtonLink href={`/pre-authorizations/raise?id=${p.id}`}>Continue in New Claim wizard</ButtonLink></p>
+            </Alert>
+          ) : (
+            <Alert tone="info" title="Raised on the hospital's behalf">
+              Started by {(p.raisedByOrgId === p.insurerId ? w.insurerName : p.raisedByOrgId === p.tpaId ? w.tpaName : null) ?? "the patient's insurer / TPA"} through the New
+              Claim wizard. It is recorded against {w.hospitalName ?? "the treating hospital"}; queries are answered here as usual.
+            </Alert>
+          ))}
         {w.side === "hospital" && (status === "submitted" || status === "pending") && (
           <Alert tone="success" title="Submitted — awaiting payer">
             <p>

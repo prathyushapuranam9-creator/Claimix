@@ -1,0 +1,848 @@
+/* New Claim wizard: horizontal stepper, step panels and a sticky action footer. Theme tokens only (light + dark). */
+
+.wizard {
+  display: grid;
+  /* minmax(0, 1fr): the scrollable stepper must not widen the column past the viewport on phones. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  /* Room for the sticky footer so the last field is never hidden behind it. */
+  padding-bottom: var(--sp-6);
+}
+
+.wizard > * {
+  min-width: 0;
+}
+
+.stepper {
+  display: flex;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: var(--sp-3);
+  list-style: none;
+  overflow-x: auto;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+}
+
+.stepItem {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 150px;
+}
+
+.stepItem:not(:last-child)::after {
+  content: "";
+  flex: 1;
+  min-width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--c-border-strong);
+}
+
+.stepItem[data-state="done"]:not(:last-child)::after {
+  background: var(--c-success);
+}
+
+.stepButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--c-text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stepButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.stepButton:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.stepNum {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--c-border-strong);
+  border-radius: 50%;
+  background: var(--c-surface);
+  font-size: var(--fs-xs);
+}
+
+.stepItem[data-state="active"] .stepButton {
+  color: var(--c-text);
+}
+
+.stepItem[data-state="active"] .stepNum {
+  border-color: var(--c-primary);
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+
+.stepItem[data-state="done"] .stepNum {
+  border-color: var(--c-success);
+  background: var(--c-success-bg);
+  color: var(--c-success);
+}
+
+.stepItem[data-state="error"] .stepNum {
+  border-color: var(--c-danger);
+  background: var(--c-danger-bg);
+  color: var(--c-danger);
+}
+
+.stepState {
+  display: block;
+  color: var(--c-text-subtle);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+
+.footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.footerInfo {
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.footerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-left: auto;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--sp-4);
+}
+
+.dropzone {
+  display: grid;
+  gap: var(--sp-2);
+  place-items: center;
+  min-height: 132px;
+  padding: var(--sp-4);
+  border: 2px dashed var(--c-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface-2);
+  color: var(--c-text-muted);
+  text-align: center;
+  cursor: pointer;
+}
+
+.dropzone:focus-within,
+.dropzone[data-over="true"] {
+  border-color: var(--c-primary);
+  background: var(--c-info-bg);
+  color: var(--c-text);
+}
+
+.dropzone input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.dropTitle {
+  color: var(--c-text);
+  font-weight: 600;
+}
+
+.files {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  width: 100%;
+}
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  justify-content: space-between;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  font-size: var(--fs-sm);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.fileActions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.reqList {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.req {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--sp-3);
+  align-items: start;
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+
+.req[data-missing="true"] {
+  border-color: var(--c-danger);
+}
+
+.tier {
+  display: inline-block;
+  min-width: 84px;
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.tier[data-tier="must"] {
+  background: var(--c-danger-bg);
+  color: var(--c-danger);
+}
+
+.tier[data-tier="expected"] {
+  background: var(--c-warning-bg);
+  color: var(--c-warning);
+}
+
+.tier[data-tier="optional"] {
+  background: var(--c-neutral-bg);
+  color: var(--c-neutral);
+}
+
+.reqName {
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.costTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.costTable th,
+.costTable td {
+  padding: var(--sp-2);
+  border-bottom: 1px solid var(--c-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.costTable th {
+  color: var(--c-text-muted);
+  font-weight: 600;
+}
+
+.costTable .num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.costTable input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-input);
+  color: var(--c-text);
+  font: inherit;
+}
+
+.costTable input[aria-invalid="true"] {
+  border-color: var(--c-danger);
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.cellError {
+  display: block;
+  margin-top: 2px;
+  color: var(--c-danger);
+  font-size: var(--fs-xs);
+}
+
+.radioRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.radioRow legend {
+  margin-bottom: var(--sp-1);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.radio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 40px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  cursor: pointer;
+}
+
+.radio:has(input:checked) {
+  border-color: var(--c-primary);
+  background: var(--c-info-bg);
+}
+
+.fieldError {
+  color: var(--c-danger);
+  font-size: var(--fs-xs);
+}
+
+.dxSearch {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.dxList {
+  width: 100%;
+  min-height: 140px;
+  padding: var(--sp-1);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-input);
+  color: var(--c-text);
+  font: inherit;
+}
+
+.collapsible {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+
+.collapsible > summary {
+  padding: var(--sp-3) var(--sp-4);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.collapsibleBody {
+  padding: 0 var(--sp-4) var(--sp-4);
+}
+
+.findings {
+  display: grid;
+  gap: var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.finding {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+
+.finding[data-severity="critical"] {
+  border-left-color: var(--c-danger);
+}
+
+.finding[data-severity="high"] {
+  border-left-color: var(--c-warning);
+}
+
+.finding[data-severity="medium"] {
+  border-left-color: var(--c-info);
+}
+
+.finding[data-severity="low"] {
+  border-left-color: var(--c-neutral);
+}
+
+.findingHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  font-weight: 600;
+}
+
+.findingBody {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.findingBody dt {
+  color: var(--c-text-muted);
+  font-weight: 600;
+}
+
+.findingBody dd {
+  margin: 0 0 var(--sp-1);
+}
+
+.inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--sp-2);
+}
+
+.inline > :first-child {
+  flex: 1 1 260px;
+}
+
+.ack {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ack input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  flex: none;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+@media (max-width: 640px) {
+  .stepItem {
+    min-width: 0;
+  }
+
+  .stepLabel {
+    display: none;
+  }
+
+  .stepItem[data-state="active"] .stepLabel {
+    display: inline;
+  }
+
+  .req {
+    grid-template-columns: 1fr;
+  }
+
+  .footer {
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .footerActions {
+    width: 100%;
+  }
+
+  .footerActions > * {
+    flex: 1 1 auto;
+  }
+}
+
+@media print {
+  .stepper,
+  .footer {
+    display: none;
+  }
+}
+
+/* ---- New Insurance Case additions ---- */
+
+.caseBanner {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+  color: var(--c-text);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.fullForm {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+}
+
+.plainFieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.modeRow,
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pill[aria-pressed="true"] {
+  border-color: var(--c-primary);
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+
+.pill:focus-visible,
+.segment:focus-within {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.pill:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  padding: 3px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--c-surface-2);
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--radius-pill);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segment input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.segment:has(input:checked) {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+
+.findRow {
+  display: flex;
+  align-items: end;
+  gap: var(--sp-2);
+  max-width: 520px;
+}
+
+.findRow > :first-child {
+  flex: 1;
+}
+
+.matched {
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-md);
+  background: var(--c-success-bg);
+  color: var(--c-text);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.results {
+  display: grid;
+  gap: var(--sp-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stayRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--sp-4);
+}
+
+.dateTime {
+  display: grid;
+  gap: var(--sp-2);
+}
+
+.timeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.timeRow select,
+.costTable select {
+  min-height: 38px;
+  padding: 0 var(--sp-2);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-input);
+  color: var(--c-text);
+  font: inherit;
+}
+
+.costTable select {
+  width: 100%;
+}
+
+.stayTotal {
+  margin: var(--sp-2) 0 0;
+  font-weight: 600;
+}
+
+.costTotal {
+  display: grid;
+  align-content: end;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+}
+
+.costTotal strong {
+  font-size: var(--fs-xl);
+}
+
+.checksBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-left-width: 4px;
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+
+.checksBanner > div {
+  display: grid;
+  gap: 2px;
+}
+
+.checksBanner[data-tone="danger"] {
+  border-left-color: var(--c-danger);
+}
+
+.checksBanner[data-tone="warning"] {
+  border-left-color: var(--c-warning);
+}
+
+.checksBanner[data-tone="success"] {
+  border-left-color: var(--c-success);
+}
+
+.gapList {
+  display: grid;
+  gap: var(--sp-1);
+  margin: var(--sp-2) 0 0;
+  padding-left: var(--sp-4);
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+}
+
+.uploadButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-primary);
+  border-radius: var(--radius-md);
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.uploadButton:focus-within {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.uploadButton[aria-disabled="true"] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.uploadButton input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.centralRow {
+  max-width: 320px;
+  margin-bottom: var(--sp-3);
+}
+
+@media (max-width: 640px) {
+  .findRow {
+    max-width: none;
+  }
+
+  .rowActions {
+    justify-content: flex-start;
+  }
+}
+
+/* ---- New Claim: centered page and collapsible form ---- */
+
+.page {
+  display: grid;
+  gap: var(--sp-4);
+  width: 100%;
+  max-width: 1080px;
+  margin-inline: auto;
+}
+
+.page > * {
+  min-width: 0;
+}
+
+.panel {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.panelHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.panelTitle {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.panelTitle .caseBanner {
+  margin: 0;
+}
+
+.panelBody {
+  min-width: 0;
+}
+
+.caret {
+  margin-left: var(--sp-1);
+}
+
+/* Fieldsets size to their content by default; inside the wizard they shrink so wide tables scroll in their own box. */
+.wizard fieldset {
+  min-width: 0;
+}
+
+/* position: relative keeps absolutely positioned bits (visually-hidden headers) inside the scroll box. */
+.tableWrap {
+  position: relative;
+  max-width: 100%;
+}

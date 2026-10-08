@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, count, eq, isNotNull, sql } from "drizzle-orm";
+import { and, count, eq, isNotNull, or, sql } from "drizzle-orm";
 import { accessRequests, auditLogs, claims, hospitalNetworks, preAuthorizations } from "@/db/schema";
 import { DEMO } from "@/tests/fixtures/seed/ids";
 import { ConflictError, ForbiddenError, RateLimitedError, ValidationError } from "@/lib/errors";
@@ -135,14 +135,19 @@ describe("reports and dashboards are tenant-scoped", () => {
     expect(r.preauthStatus?.draft ?? 0).toBeGreaterThan(0);
   });
 
-  it("payers see only submitted cases sent to them, never drafts", async () => {
+  it("payers see only submitted cases sent to them, never a hospital's drafts (only drafts they raised themselves)", async () => {
     const r = await ReportService.overview(as("insurerA"), {});
     const [pa] = await ctx.db
       .select({ n: count() })
       .from(preAuthorizations)
-      .where(and(eq(preAuthorizations.insurerId, DEMO.org.insurerA), isNotNull(preAuthorizations.submittedAt)));
+      .where(or(and(eq(preAuthorizations.insurerId, DEMO.org.insurerA), isNotNull(preAuthorizations.submittedAt)), eq(preAuthorizations.raisedByOrgId, DEMO.org.insurerA)));
     expect(total(r.preauthStatus)).toBe(pa!.n);
-    expect(r.preauthStatus?.draft).toBeUndefined();
+    // New Claim wizard drafts are the insurer's own work in progress; no hospital draft is ever counted.
+    const [ownDrafts] = await ctx.db
+      .select({ n: count() })
+      .from(preAuthorizations)
+      .where(and(eq(preAuthorizations.status, "draft"), eq(preAuthorizations.raisedByOrgId, DEMO.org.insurerA)));
+    expect(r.preauthStatus?.draft ?? 0).toBe(ownDrafts!.n);
     expect(r.preauthTat?.decided ?? 0).toBeGreaterThan(0);
 
     const b = await ReportService.overview(as("insurerB"), {});

@@ -77,3 +77,16 @@ describe("storage keys (path traversal)", () => {
     await expect(s.get("../../package.json")).rejects.toThrow();
   });
 });
+
+describe("WEBP uploads (photo ID / policy card)", () => {
+  const WEBP = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 0x56, 0x50, 0x38, 0x20]);
+  const WAV = new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x24, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]);
+
+  it("accepts a real WEBP by content and refuses RIFF files that aren't WEBP or a mismatched extension", () => {
+    expect(detectKind(WEBP)).toBe("webp");
+    expect(detectKind(WAV)).toBeNull();
+    expect(validateUpload({ name: "card.webp", size: WEBP.length, bytes: WEBP })).toMatchObject({ ok: true, kind: "webp", mime: "image/webp" });
+    expect(validateUpload({ name: "card.png", size: WEBP.length, bytes: WEBP }).ok).toBe(false);
+    expect(validateUpload({ name: "sound.webp", size: WAV.length, bytes: WAV }).ok).toBe(false);
+  });
+});

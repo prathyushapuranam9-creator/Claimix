@@ -9,6 +9,7 @@ export const ALLOWED_TYPES = {
   pdf: { mime: "application/pdf", exts: ["pdf"] },
   png: { mime: "image/png", exts: ["png"] },
   jpg: { mime: "image/jpeg", exts: ["jpg", "jpeg"] },
+  webp: { mime: "image/webp", exts: ["webp"] },
 } as const;
 
 export type AllowedKind = keyof typeof ALLOWED_TYPES;
@@ -21,6 +22,8 @@ export function detectKind(buf: Uint8Array): AllowedKind | null {
   if (startsWith(buf, [0x25, 0x50, 0x44, 0x46, 0x2d])) return "pdf"; // %PDF-
   if (startsWith(buf, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return "png";
   if (startsWith(buf, [0xff, 0xd8, 0xff])) return "jpg";
+  // RIFF....WEBP
+  if (startsWith(buf, [0x52, 0x49, 0x46, 0x46]) && startsWith(buf, [0x57, 0x45, 0x42, 0x50], 8)) return "webp";
   return null;
 }
 
@@ -41,9 +44,9 @@ export function validateUpload(file: { name: string; size: number; bytes: Uint8A
   const displayName = safeDisplayName(file.name);
   const ext = displayName.includes(".") ? displayName.split(".").pop()!.toLowerCase() : "";
   const allowedExt = Object.values(ALLOWED_TYPES).some((t) => (t.exts as readonly string[]).includes(ext));
-  if (!allowedExt) return { ok: false, error: "Upload a PDF, PNG or JPG file." };
+  if (!allowedExt) return { ok: false, error: "Upload a PDF, PNG, JPG or WEBP file." };
   const kind = detectKind(file.bytes);
-  if (!kind) return { ok: false, error: "This file's content isn't a valid PDF, PNG or JPG." };
+  if (!kind) return { ok: false, error: "This file's content isn't a valid PDF, PNG or JPG (or WEBP) file." };
   if (!(ALLOWED_TYPES[kind].exts as readonly string[]).includes(ext)) {
     return { ok: false, error: `The file extension .${ext} doesn't match its content (${kind.toUpperCase()}).` };
   }
