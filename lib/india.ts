@@ -38,3 +38,30 @@ export function ageOn(dob: string, on: string = new Date().toISOString().slice(0
   const [y, m, d] = on.split("-").map(Number) as [number, number, number];
   return y - by - (m < bm || (m === bm && d < bd) ? 1 : 0);
 }
+
+// ---------------------------------------------------------------- Aadhaar
+
+// Verhoeff tables (UIDAI uses the Verhoeff checksum for the 12th digit).
+const V_D = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 2, 3, 4, 0, 6, 7, 8, 9, 5], [2, 3, 4, 0, 1, 7, 8, 9, 5, 6], [3, 4, 0, 1, 2, 8, 9, 5, 6, 7], [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
+  [5, 9, 8, 7, 6, 0, 4, 3, 2, 1], [6, 5, 9, 8, 7, 1, 0, 4, 3, 2], [7, 6, 5, 9, 8, 2, 1, 0, 4, 3], [8, 7, 6, 5, 9, 3, 2, 1, 0, 4], [9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+];
+const V_P = [
+  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [1, 5, 7, 6, 2, 8, 3, 0, 9, 4], [5, 8, 0, 3, 7, 9, 6, 1, 4, 2], [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
+  [9, 4, 5, 3, 1, 2, 6, 8, 7, 0], [4, 2, 8, 6, 5, 7, 3, 9, 0, 1], [2, 7, 9, 3, 8, 0, 6, 4, 1, 5], [7, 0, 4, 6, 9, 1, 3, 2, 5, 8],
+];
+
+/** Digits only ("1234 5678 9012" → "123456789012"). */
+export const aadhaarDigits = (v: string) => v.replace(/[\s-]/g, "");
+
+/** A well-formed Aadhaar number: 12 digits, not starting with 0 or 1, with a valid Verhoeff check digit. */
+export function isValidAadhaar(v: string): boolean {
+  const d = aadhaarDigits(v);
+  if (!/^[2-9]\d{11}$/.test(d)) return false;
+  let c = 0;
+  d.split("").reverse().forEach((ch, i) => (c = V_D[c]![V_P[i % 8]![Number(ch)]!]!));
+  return c === 0;
+}
+
+/** The only form Aadhaar is ever shown in: the last 4 digits. */
+export const maskAadhaar = (last4: string | null | undefined) => (last4 ? `XXXX XXXX ${last4}` : null);

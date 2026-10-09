@@ -43,7 +43,7 @@ const RULE = rgb(0.84, 0.87, 0.9);
 const BAND = rgb(0.95, 0.97, 0.98);
 
 /** The standard fonts cannot draw characters outside Latin-1. */
-const clean = (s: string | null | undefined) =>
+export const clean = (s: string | null | undefined) =>
   (s ?? "")
     .replace(/₹/g, "Rs. ")
     .replace(/[‘’]/g, "'")
@@ -53,7 +53,7 @@ const clean = (s: string | null | undefined) =>
     .replace(/[^\x20-\x7e\xa0-\xff]/g, "?")
     .trim();
 
-function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
+export function wrap(text: string, font: PDFFont, size: number, width: number): string[] {
   const out: string[] = [];
   let line = "";
   for (const word of clean(text).split(" ")) {

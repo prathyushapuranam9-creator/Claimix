@@ -19,9 +19,11 @@ interface Props {
   hospitals?: { id: string; name: string }[];
   cancelHref: string;
   submitLabel: string;
+  /** The Aadhaar on file, masked (edit only). */
+  aadhaarOnFile?: string | null;
 }
 
-export function PatientForm({ action, defaults, hospitals, cancelHref, submitLabel }: Props) {
+export function PatientForm({ action, defaults, hospitals, cancelHref, submitLabel, aadhaarOnFile }: Props) {
   const { register, handleSubmit, setError, formState } = useForm<PatientInput>({
     resolver: zodResolver(patientInputSchema),
     defaultValues: { gender: "undisclosed", ...defaults },

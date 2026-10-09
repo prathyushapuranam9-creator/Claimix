@@ -648,10 +648,20 @@
   list-style: none;
 }
 
+/* Stay starts (left) and Stay ends (right) on one row; they stack only on narrow screens. */
 .stayRow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  flex: 1 1 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-4);
+  width: 100%;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .stayRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .dateTime {
@@ -791,7 +801,7 @@
   }
 }
 
-/* ---- New Claim: centered page and collapsible form ---- */
+/* ---- New Claim: centered page and the form panel ---- */
 
 .page {
   display: grid;
@@ -811,16 +821,8 @@
   min-width: 0;
 }
 
-.panelHead {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-2);
-}
 
 .panelTitle {
-  flex: 1 1 260px;
   min-width: 0;
 }
 
@@ -828,13 +830,7 @@
   margin: 0;
 }
 
-.panelBody {
-  min-width: 0;
-}
 
-.caret {
-  margin-left: var(--sp-1);
-}
 
 /* Fieldsets size to their content by default; inside the wizard they shrink so wide tables scroll in their own box. */
 .wizard fieldset {
@@ -845,4 +841,474 @@
 .tableWrap {
   position: relative;
   max-width: 100%;
+}
+
+/* ---- Find the Patient: search with suggestions ---- */
+
+.finder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+}
+
+.finderField {
+  position: relative;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.finderActions {
+  display: flex;
+  gap: var(--sp-2);
+  padding-top: 26px;
+}
+
+.suggestions {
+  position: absolute;
+  top: calc(100% - 18px);
+  left: 0;
+  right: 0;
+  z-index: 25;
+  max-height: 320px;
+  margin: 0;
+  padding: var(--sp-1);
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.suggestion {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.suggestion[aria-selected="true"] {
+  background: var(--c-info-bg);
+}
+
+.suggestion[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.suggestName {
+  font-weight: 600;
+}
+
+.suggestMeta {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.suggestEmpty {
+  padding: var(--sp-2);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 640px) {
+  .finderActions {
+    padding-top: 0;
+  }
+}
+
+/* ---- Clinical Details & Package: stay pickers, chronic illness, cost dropdown ---- */
+
+.stayHeading {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--c-text-muted);
+}
+
+.illnessRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: var(--sp-3);
+  align-items: end;
+}
+
+.illnessOther {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+
+.illnessOther > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.illnessChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.illnessChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px var(--sp-1) 2px var(--sp-3);
+  border-radius: var(--radius-pill);
+  background: var(--c-info-bg);
+  color: var(--c-text);
+  font-size: var(--fs-sm);
+}
+
+.illnessChip button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--c-text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.illnessChip button:hover {
+  background: var(--c-surface-2);
+  color: var(--c-text);
+}
+
+.illnessChip button:focus-visible {
+  outline: 2px solid var(--c-focus);
+}
+
+.summaryTotal {
+  margin-left: var(--sp-2);
+  color: var(--c-text-muted);
+  font-weight: 500;
+}
+
+/* ---- Supporting Documents: progress + categorized accordion ---- */
+
+.progress {
+  display: grid;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+
+.progressHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.progressBar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--c-surface-2);
+}
+
+.progressBar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--c-success);
+  transition: width 0.25s ease;
+}
+
+.docGroups {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.docGroup {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+
+.docGroup > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  cursor: pointer;
+}
+
+.docGroup > summary:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+
+.docGroup > .reqList {
+  padding: 0 var(--sp-3) var(--sp-3);
+}
+
+.docGroupTitle {
+  font-weight: 700;
+}
+
+.docGroupCount {
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.docGroupCount[data-missing="true"] {
+  color: var(--c-danger);
+  font-weight: 600;
+}
+
+/* A row: a 3px accent on the left only — red: required and missing; green: uploaded. */
+.docRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--sp-3);
+  align-items: start;
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-left: 3px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+
+.docRow[data-state="missing"] {
+  border-left-color: var(--c-danger);
+}
+
+.docRow[data-state="uploaded"] {
+  border-left-color: var(--c-success);
+}
+
+@media (max-width: 640px) {
+  .docRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- AI Pre-Scrutiny & Rules Engine: executive dashboard ---- */
+
+.dashboard {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+
+.riskBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-left-width: 6px;
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+}
+
+.riskBanner[data-risk="High"] {
+  border-left-color: var(--c-danger);
+}
+
+.riskBanner[data-risk="Medium"] {
+  border-left-color: var(--c-warning);
+}
+
+.riskBanner[data-risk="Low"] {
+  border-left-color: var(--c-success);
+}
+
+.riskMain {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.riskLabel {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.riskValue {
+  font-size: var(--fs-2xl);
+  line-height: 1.1;
+}
+
+.riskBanner[data-risk="High"] .riskValue {
+  color: var(--c-danger);
+}
+
+.riskBanner[data-risk="Medium"] .riskValue {
+  color: var(--c-warning);
+}
+
+.riskBanner[data-risk="Low"] .riskValue {
+  color: var(--c-success);
+}
+
+.riskStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  margin: 0;
+}
+
+.riskStats > div {
+  display: grid;
+  gap: 2px;
+  min-width: 96px;
+}
+
+.riskStats dt {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+.riskStats dd {
+  margin: 0;
+  font-size: var(--fs-xl);
+  font-weight: 700;
+}
+
+.riskRun {
+  flex: none;
+}
+
+.tabs {
+  display: flex;
+  gap: var(--sp-1);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--c-border);
+}
+
+.tab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 40px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: none;
+  color: var(--c-text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tab[aria-selected="true"] {
+  border-bottom-color: var(--c-primary-edge);
+  color: var(--c-text);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+
+.tabCount {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--c-surface-2);
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+
+.tabPanel {
+  display: grid;
+  gap: var(--sp-3);
+}
+
+.findingGroup {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+
+.findingGroup > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  cursor: pointer;
+}
+
+.findingGroup > summary:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -2px;
+}
+
+.findingGroup > .findings {
+  padding: 0 var(--sp-3) var(--sp-3);
+}
+
+.findingItem {
+  list-style: none;
+}
+
+.finding[data-severity="cleared"] {
+  border-left-color: var(--c-success);
+}
+
+.findingNote {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.quickFix {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-2);
+}
+
+.quickFix > :global(div):first-child {
+  flex: 1 1 240px;
+}
+
+.quickForm {
+  display: grid;
+  gap: var(--sp-2);
+  flex: 1 1 100%;
+  padding: var(--sp-3);
+  border: 1px dashed var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+}
+
+.quickActions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+/* Document group headings: underline only while hovered (or keyboard-focused); pointer shows they open. */
+.docGroup > summary .docGroupTitle {
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.docGroup > summary:hover .docGroupTitle,
+.docGroup > summary:focus-visible .docGroupTitle {
+  text-decoration: underline;
 }

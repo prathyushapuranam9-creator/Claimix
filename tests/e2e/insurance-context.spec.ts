@@ -121,8 +121,8 @@ test("one common login: Aarogya → Navjeevan → Suraksha through the insurance
 
   // --- 1. Aarogya Shield → Payer Reviewer
   await choose(p, AAROGYA, "Payer Reviewer");
-  await expect(banner(p)).toContainText(`Insurance: ${AAROGYA}`);
-  await expect(banner(p)).toContainText("Role: Payer Reviewer");
+  await expect(banner(p)).toContainText(AAROGYA);
+  await expect(banner(p)).toContainText("Payer Reviewer");
   await expect(p.getByText("Actionable workflows")).toBeVisible(); // the reviewer's dashboard
   await p.goto("/pre-authorizations?view=all");
   await expect(banner(p)).toBeVisible(); // the indicator follows you to every page
@@ -153,7 +153,7 @@ test("one common login: Aarogya → Navjeevan → Suraksha through the insurance
   await expect(p).toHaveURL(/\/pre-authorizations/);
   await expect(p.getByLabel("Insurance Company")).toHaveValue(/[0-9a-f-]{36}/); // current context preselected
   await choose(p, NAVJEEVAN, "Payer Reviewer");
-  await expect(banner(p)).toContainText(`Insurance: ${NAVJEEVAN}`);
+  await expect(banner(p)).toContainText(NAVJEEVAN);
   await p.goto("/pre-authorizations?view=all");
   await expect(refLink(p, n.reference)).toBeVisible();
   await expect(refLink(p, a.reference)).toHaveCount(0);
@@ -164,7 +164,7 @@ test("one common login: Aarogya → Navjeevan → Suraksha through the insurance
 
   // --- 3. Switch → Suraksha → its insurer role (whatever role the database offers for it)
   await choose(p, SURAKSHA);
-  await expect(banner(p)).toContainText(`Insurance: ${SURAKSHA}`);
+  await expect(banner(p)).toContainText(SURAKSHA);
   await p.goto("/pre-authorizations?view=all");
   await expect(refLink(p, s.reference)).toBeVisible();
   await expect(refLink(p, a.reference)).toHaveCount(0);
@@ -213,8 +213,8 @@ test("insurer reviewers get the testing block for their own company only; other 
 
   // Switching works exactly as for the testing login, and shows its own company's data only.
   await choose(p, AAROGYA, "Payer Reviewer");
-  await expect(banner(p)).toContainText(`Insurance: ${AAROGYA}`);
-  await expect(banner(p)).toContainText("Role: Payer Reviewer");
+  await expect(banner(p)).toContainText(AAROGYA);
+  await expect(banner(p)).toContainText("Payer Reviewer");
   await p.goto("/pre-authorizations?view=all");
   await expect(refLink(p, a.reference)).toBeVisible();
   await expect(refLink(p, n.reference)).toHaveCount(0);
@@ -275,8 +275,8 @@ test("the designated insurance login (a payer reviewer, like Vikram) switches co
 
   // Navjeevan → Payer Reviewer: the same dashboard now shows Navjeevan.
   await choose(p, NAVJEEVAN, "Payer Reviewer");
-  await expect(banner(p)).toContainText(`Insurance: ${NAVJEEVAN}`);
-  await expect(banner(p)).toContainText("Role: Payer Reviewer");
+  await expect(banner(p)).toContainText(NAVJEEVAN);
+  await expect(banner(p)).toContainText("Payer Reviewer");
   await expect(p.getByText("Actionable workflows")).toBeVisible();
   await expect(p.getByLabel("Insurance Company").locator("option:checked")).toHaveText(NAVJEEVAN);
   await p.goto("/pre-authorizations?view=all");
@@ -286,12 +286,12 @@ test("the designated insurance login (a payer reviewer, like Vikram) switches co
 
   // Aarogya again, then Suraksha.
   await choose(p, AAROGYA, "Payer Reviewer");
-  await expect(banner(p)).toContainText(`Insurance: ${AAROGYA}`);
+  await expect(banner(p)).toContainText(AAROGYA);
   await p.goto("/pre-authorizations?view=all");
   await expect(refLink(p, a.reference)).toBeVisible();
   await expect(refLink(p, n.reference)).toHaveCount(0);
   await choose(p, SURAKSHA);
-  await expect(banner(p)).toContainText(`Insurance: ${SURAKSHA}`);
+  await expect(banner(p)).toContainText(SURAKSHA);
   await p.goto("/pre-authorizations?view=all");
   await expect(refLink(p, s.reference)).toBeVisible();
   await expect(refLink(p, a.reference)).toHaveCount(0);

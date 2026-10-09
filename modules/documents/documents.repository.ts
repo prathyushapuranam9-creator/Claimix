@@ -47,6 +47,32 @@ export const DocumentRepository = {
    * The patient's coverage-stage (insurance) documents: filed against the patient with no pre-auth or
    * claim subject. These are the documents the coverage form reads; treatment documents never appear here.
    */
+  /** A patient's saved case registration forms (Register Case), newest first, within the viewer's document scope. */
+  async registrationForms(db: DbOrTx, principal: Principal, scope: Scope, patientId: string) {
+    return db
+      .select({
+        id: documents.id,
+        originalName: documents.originalName,
+        scanStatus: documents.scanStatus,
+        createdAt: documents.createdAt,
+        uploadedByName: users.fullName,
+        preauthId: preAuthorizations.id,
+        reference: preAuthorizations.reference,
+      })
+      .from(documents)
+      .innerJoin(preAuthorizations, eq(preAuthorizations.id, documents.subjectId))
+      .leftJoin(users, eq(users.id, documents.uploadedBy))
+      .where(and(
+        eq(documents.patientId, patientId),
+        eq(documents.subjectType, "preauth"),
+        eq(documents.docType, "case_registration_form"),
+        isNull(documents.deletedAt),
+        scopePredicate(principal, scope, DOCUMENT_SCOPE),
+      ))
+      .orderBy(desc(documents.createdAt))
+      .limit(50);
+  },
+
   async insuranceForPatient(db: DbOrTx, patientId: string) {
     return db
       .select({

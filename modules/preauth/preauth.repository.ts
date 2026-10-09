@@ -45,6 +45,7 @@ const memberColumns = {
   gender: patients.gender,
   dob: patients.dob,
   phone: patients.phone,
+  aadhaarLast4: patients.aadhaarLast4,
   department: patients.department,
   hospitalId: patients.hospitalId,
   hospitalName: memberHospital.name,
@@ -71,6 +72,8 @@ export interface MemberRow {
   gender: string;
   dob: string;
   phone: string | null;
+  /** Last 4 digits only (shown masked); the full Aadhaar is never stored. */
+  aadhaarLast4: string | null;
   department: string | null;
   hospitalId: string;
   hospitalName: string;
@@ -103,11 +106,32 @@ function members(db: DbOrTx, payer: { orgType: "insurer" | "tpa"; orgId: string 
 
 export const PreauthRepository = {
   /** Look up the payer's own members by UHID (hospital patient number), member ID or name. */
-  async findMembers(db: DbOrTx, payer: { orgType: "insurer" | "tpa"; orgId: string }, q: string): Promise<MemberRow[]> {
+  /**
+   * The payer's own members matching part of a name, UHID, member / policy number or mobile number (case-insensitive),
+   * a policy number typed on one of the payer's earlier claims for the member, or an Aadhaar number: the full 12 digits
+   * (compared by keyed hash) or its last 4 digits — the rest of an Aadhaar is never stored, so it can't be searched.
+   */
+  async findMembers(
+    db: DbOrTx,
+    payer: { orgType: "insurer" | "tpa"; orgId: string },
+    q: string,
+    opts: { limit?: number; aadhaarHash?: string } = {},
+  ): Promise<MemberRow[]> {
     const term = likeContains(q);
-    return members(db, payer, or(ilike(patients.patientNo, term), ilike(beneficiaries.memberId, term), ilike(patients.fullName, term))!)
+    const digits = q.replace(/[\s-]/g, "");
+    const conds: (SQL | undefined)[] = [
+      ilike(patients.patientNo, term),
+      ilike(beneficiaries.memberId, term),
+      ilike(patients.fullName, term),
+      // Policy number recorded at KYC on this payer's own claims for the member.
+      sql`exists (select 1 from ${preAuthorizations} pa where pa.beneficiary_id = ${beneficiaries.id} and pa.raised_by_org_id = ${payer.orgId} and pa.clinical -> 'kyc' ->> 'policyNumber' ilike ${term})`,
+    ];
+    if (/^\d{3,}$/.test(digits)) conds.push(sql`regexp_replace(coalesce(${patients.phone}, ''), '[^0-9]', '', 'g') like ${`%${digits}%`}`);
+    if (/^\d{4}$/.test(digits)) conds.push(eq(patients.aadhaarLast4, digits));
+    if (opts.aadhaarHash) conds.push(eq(patients.aadhaarHash, opts.aadhaarHash));
+    return members(db, payer, or(...conds)!)
       .orderBy(asc(patients.fullName))
-      .limit(20) as Promise<MemberRow[]>;
+      .limit(opts.limit ?? 20) as Promise<MemberRow[]>;
   },
 
   /** The payer's members with exactly this member ID (case-insensitive). */

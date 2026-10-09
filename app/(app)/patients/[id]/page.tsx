@@ -29,6 +29,7 @@ import { CellText, DataTable } from "@/components/ui/DataTable";
 import { Details, formStyles } from "@/components/ui/Form";
 import { Alert, Badge, Card, EmptyState, PageHeader, Stack } from "@/components/ui/Surface";
 import { WorkflowStepper } from "@/components/workflow/WorkflowStepper";
+import { DocumentViewButton } from "@/components/documents/DocumentViewer";
 import { deleteDocumentAction } from "@/app/(app)/documents/actions";
 import { addCoverageAction, uploadInsuranceDocumentAction } from "../actions";
 import { dischargeAction } from "../registration-actions";
@@ -132,6 +133,35 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
             ]}
           />
         </Card>
+
+        {registrationForms.length > 0 && (
+          <Card title="Case registration forms" padded={false}>
+            <DataTable
+              caption="Case registration forms"
+              rows={registrationForms}
+              rowKey={(r) => r.id}
+              columns={[
+                { key: "c", header: "Case", cell: (r) => <Link href={`/pre-authorizations/${r.preauthId}`} className="mono">{r.reference}</Link> },
+                { key: "f", header: "Form", cell: (r) => <CellText sub={r.uploadedByName ? `Signed and saved by ${r.uploadedByName}` : undefined}>{r.originalName}</CellText> },
+                { key: "d", header: "Saved", nowrap: true, cell: (r) => formatDateTime(r.createdAt) },
+                {
+                  key: "a",
+                  header: "",
+                  nowrap: true,
+                  cell: (r) =>
+                    r.scanStatus === "clean" ? (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                        <DocumentViewButton id={r.id} name={r.originalName} />
+                        <a href={`/api/documents/${r.id}`}>Download</a>
+                      </span>
+                    ) : (
+                      "Security scan pending"
+                    ),
+                },
+              ]}
+            />
+          </Card>
+        )}
         {canProfileCheck && <EligibilityResultCard />}
         <PatientVisits
           visits={visits}

@@ -1,0 +1,235 @@
+/* Register Case page. Theme tokens only (light + dark); prints as the plain form. */
+
+.page {
+  display: grid;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.toolbar {
+  position: sticky;
+  top: calc(var(--topbar-h) + 4px);
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  color: var(--c-text);
+  cursor: pointer;
+}
+
+.iconBtn:hover {
+  background: var(--c-surface-2);
+}
+
+.iconBtn[aria-pressed="true"] {
+  border-color: var(--c-primary-edge);
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+
+.iconBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.iconBtn:focus-visible,
+.menu > :focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.toolbarInfo {
+  margin-left: auto;
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.menuWrap {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 240px;
+  padding: var(--sp-1);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.menu > button,
+.menu > a {
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.menu > button:hover,
+.menu > a:hover {
+  background: var(--c-surface-2);
+}
+
+.menu > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.sheet {
+  display: grid;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+}
+
+.sheetHead h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+}
+
+.sheet h3 {
+  margin: 0 0 var(--sp-2);
+  padding-bottom: var(--sp-1);
+  border-bottom: 1px solid var(--c-border-strong);
+  font-size: var(--fs-md);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+}
+
+.table th,
+.table td {
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--c-border);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.table tbody th {
+  width: 34%;
+  background: var(--c-surface-2);
+  font-weight: 600;
+}
+
+.num {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.signRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-4);
+  align-items: flex-start;
+}
+
+.signRow > :first-child {
+  flex: 1 1 320px;
+}
+
+.signer {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-1) var(--sp-3);
+  margin: 0;
+  font-size: var(--fs-sm);
+}
+
+.signer dt {
+  color: var(--c-text-muted);
+  font-weight: 600;
+}
+
+.signer dd {
+  margin: 0;
+}
+
+.signed {
+  display: grid;
+  gap: var(--sp-1);
+  margin: var(--sp-3) 0 0;
+}
+
+.signed img {
+  width: 240px;
+  height: auto;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.signed figcaption,
+.note,
+.muted {
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.note {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-xs);
+}
+
+.editActions,
+.submitBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+.submitBar > .muted {
+  margin-right: auto;
+}
+
+@media (max-width: 640px) {
+  .sheet {
+    padding: var(--sp-3);
+  }
+
+  .toolbarInfo {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
+
+@media print {
+  .sheet {
+    padding: 0;
+    border: 0;
+  }
+}

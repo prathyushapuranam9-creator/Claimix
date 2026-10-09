@@ -343,6 +343,17 @@
 
 .themeSlot { margin-left: auto; }
 
+/* Testing-context pill: takes the free space before the theme toggle and shrinks (never overlaps the controls). */
+.contextSlot {
+  display: flex;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.themeSlot.afterContext { margin-left: 0; }
+
 .bell {
   position: relative;
   display: inline-grid;

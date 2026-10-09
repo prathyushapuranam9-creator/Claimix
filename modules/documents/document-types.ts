@@ -29,6 +29,7 @@ export const DOCUMENT_TYPES: Record<string, { label: string; category: DocumentC
   investigation_reports: { label: "Investigation reports", category: "medical" },
   surgery_recommendation: { label: "Surgery recommendation", category: "medical" },
   preauth_form: { label: "Signed pre-authorization form", category: "hospital" },
+  case_registration_form: { label: "Case registration form (electronically signed)", category: "hospital" },
   admission_details: { label: "Admission details", category: "hospital" },
   treatment_estimate: { label: "Treatment cost estimate", category: "hospital" },
   procedure_details: { label: "Procedure details", category: "hospital" },

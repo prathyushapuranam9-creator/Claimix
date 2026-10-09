@@ -25,6 +25,7 @@ describe("wizardDocuments", () => {
       ["preauth_form", "must"],
       ["doctor_consultation", "expected"],
       ["medical_history", "optional"],
+      ["treatment_estimate", "optional"],
     ]);
     expect(d.find((x) => x.type === "preauth_form")?.printable).toBe(true);
   });
@@ -104,6 +105,9 @@ describe("New Claim helpers", () => {
     expect(stayDays("2026-10-20", "09:00", "2026-10-20", "18:00")).toBe(1);
     expect(stayDays("2026-10-20", undefined, "2026-10-19", undefined)).toBeNull();
     expect(stayDays("2026-10-20")).toBeNull();
+    // The date-and-time picker writes HH:mm:ss.SSS.
+    expect(stayDays("2026-10-20", "09:00:00.000", "2026-10-21", "08:59:59.900")).toBe(1);
+    expect(stayDays("2026-10-20", "09:00:00.000", "2026-10-21", "09:00:00.100")).toBe(2);
   });
 
   it("expected cost is the package amount when given, otherwise per day × days", () => {
@@ -117,7 +121,8 @@ describe("New Claim helpers", () => {
     const r = wizardClinicalSchema.safeParse({ claimType: "cashless", chronicIllness: ["None", "Diabetes"] });
     expect(r.success).toBe(false);
     const fields = r.success ? [] : r.error.issues.map((i) => i.path[0]);
-    expect(fields).toEqual(expect.arrayContaining(["diagnosisIds", "symptoms", "admissionDate", "dischargeDate", "doctorName", "doctorContact", "chronicIllness", "costItems"]));
+    expect(fields).toEqual(expect.arrayContaining(["diagnosisIds", "symptoms", "admissionDate", "dischargeDate", "doctorName", "chronicIllness", "costItems"]));
+    expect(fields).not.toContain("doctorContact");
     expect(gapsAcknowledgment(3)).toBe("I have seen these 3 gaps and am sending anyway. This is written to the case audit trail with the submission.");
   });
 });

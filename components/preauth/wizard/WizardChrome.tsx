@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
-import { Button } from "@/components/ui/Button";
+import type { ReactNode } from "react";
 import { WIZARD_STEPS } from "./steps";
 import styles from "./NewClaimWizard.module.css";
 
@@ -77,25 +76,12 @@ export function FullFormNote({ href }: { href: string | null }) {
   );
 }
 
-/**
- * The claim form, collapsible with the same ▾ / ▴ toggle as the Eligibility Check. Collapsing only hides the form:
- * everything entered stays as it was.
- */
+/** The claim form: the patient / case line above it, then the form (always fully shown). */
 export function FormPanel({ heading, children }: { heading: ReactNode; children: ReactNode }) {
-  const [open, setOpen] = useState(true);
-  const id = useId();
   return (
     <section className={styles.panel} aria-label="New claim form">
-      <div className={styles.panelHead}>
-        <div className={styles.panelTitle}>{heading}</div>
-        <Button type="button" variant="secondary" size="sm" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)}>
-          {open ? "Collapse form" : "Expand form"}
-          <span aria-hidden="true" className={styles.caret}>{open ? "▴" : "▾"}</span>
-        </Button>
-      </div>
-      <div id={id} hidden={!open} className={styles.panelBody}>
-        {children}
-      </div>
+      <div className={styles.panelTitle}>{heading}</div>
+      {children}
     </section>
   );
 }

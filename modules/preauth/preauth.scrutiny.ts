@@ -37,7 +37,21 @@ export const STANDARD_CASHLESS_DOCUMENTS: StandardDocument[] = [
     tier: "expected",
   },
   { type: "medical_history", accepts: ["medical_history"], label: "Previous consultation papers (OP card / prescriptions before this admission)", tier: "optional" },
+  { type: "treatment_estimate", accepts: ["treatment_estimate"], label: "Treatment cost estimate", tier: "optional" },
 ];
+
+/** Groups of the Supporting Documents list. */
+export type DocCategory = "identity" | "medical" | "financial";
+export const DOC_CATEGORIES: { key: DocCategory; label: string }[] = [
+  { key: "identity", label: "Identity & Policy" },
+  { key: "medical", label: "Medical & Pre-Auth" },
+  { key: "financial", label: "Financials & Estimates" },
+];
+const FINANCIAL = new Set(["treatment_estimate", "final_bill", "pharmacy_bills", "implant_invoice", "payment_receipts"]);
+const IDENTITY = new Set(["id_proof", "insurance_card", "policy_copy", "beneficiary_id", "employee_id", "insurance_other", "birth_certificate", "endorsement_letter"]);
+export function docCategory(type: string): DocCategory {
+  return FINANCIAL.has(type) ? "financial" : IDENTITY.has(type) ? "identity" : "medical";
+}
 
 /** Extra papers for a newborn's admission (cover for a newborn usually depends on the baby being endorsed). */
 export const NEWBORN_DOCUMENTS: StandardDocument[] = [
@@ -104,6 +118,8 @@ export interface KycSnapshot {
   sumInsured?: number;
   memberId?: string;
   tpaId?: string;
+  /** Keyed hash of the Aadhaar entered at KYC (never the number itself). */
+  aadhaarHash?: string;
 }
 
 /** The member as recorded (patient + coverage). */
@@ -116,6 +132,8 @@ export interface MemberRecord {
   coverEnd: string;
   sumInsured: number | null;
   policyHasTpa: boolean;
+  /** Keyed hash of the Aadhaar on the patient record, if any. */
+  aadhaarHash?: string | null;
 }
 
 export interface ScrutinyInput {
@@ -146,6 +164,11 @@ export interface Scrutiny {
 
 const MANUAL_STEP: Record<string, 1 | 2> = { patient_identified: 1, details_match: 1, diagnosis_confirmed: 2, procedure_confirmed: 2 };
 const DATA_STEP: Record<string, 1 | 2> = { payer_identified: 1, estimate_entered: 2 };
+
+/** The wizard step a readiness-checklist item belongs to (for grouping cleared checks). */
+export function checklistStep(key: string): 1 | 2 | 3 | 4 {
+  return MANUAL_STEP[key] ?? DATA_STEP[key] ?? (key === "documents_uploaded" ? 3 : 4);
+}
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -193,6 +216,9 @@ export function scrutinize(i: ScrutinyInput): Scrutiny {
     }
     if (r.gender !== "undisclosed" && k.gender !== r.gender) {
       f.push({ key: "kyc:gender", severity: "high", title: "Gender differs from the policy record", explanation: `Typed ${k.gender}; the record has ${r.gender}.`, resolution: "Check the photo ID and the policy record.", step: 1 });
+    }
+    if (k.aadhaarHash && r.aadhaarHash && k.aadhaarHash !== r.aadhaarHash) {
+      f.push({ key: "kyc:aadhaar", severity: "high", title: "Aadhaar differs from the patient record", explanation: "The Aadhaar number entered at KYC doesn't match the one on the patient's record.", resolution: "Check the Aadhaar card; the hospital corrects the patient record if it is wrong.", step: 1 });
     }
     if (k.memberId && norm(k.memberId) !== norm(r.memberId)) {
       f.push({ key: "kyc:member", severity: "high", title: "Member ID differs from the policy record", explanation: `Typed ${k.memberId}; the record has ${r.memberId}.`, resolution: "Check the card; the case is filed against the member on record.", step: 1 });

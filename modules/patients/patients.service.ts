@@ -1,5 +1,5 @@
 import "server-only";
-import type { DbOrTx } from "@/db/client";
+import { aadhaarColumns } from "./aadhaar";
 import type { ServiceContext } from "@/lib/auth/context";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import type { ListQuery } from "@/lib/pagination";
@@ -102,8 +102,61 @@ export const PatientService = {
   async create(ctx: ServiceContext, input: unknown) {
     const scope = requirePermission(ctx.principal, "patient:write");
     const data = parseOrThrow(patientInputSchema, input);
-    const hospitalId = await resolveRegisteringHospital(ctx, scope, data.hospitalId);
-    return ctx.db.transaction(async (tx) => insertPatient(tx, ctx, hospitalId, data));
+
+    let hospitalId: string;
+    if (scope === "all") {
+      if (!data.hospitalId) throw new ValidationError("Select the registering hospital.", { hospitalId: ["Select a hospital."] });
+      if (!(await HospitalRepository.exists(ctx.db, data.hospitalId))) throw new ValidationError("Select a valid hospital.", { hospitalId: ["Select a valid hospital."] });
+      hospitalId = data.hospitalId;
+    } else if (scope === "organization" && ctx.principal.orgType === "hospital") {
+      // Staff can only register into their own hospital; any client-sent hospitalId is ignored.
+      hospitalId = ctx.principal.organizationId;
+    } else {
+      throw new ForbiddenError();
+    }
+
+    const patientNo = data.patientNo ?? generatePatientNo();
+    return ctx.db.transaction(async (tx) => {
+      // Same person registered twice is a likely mistake, but two people can share a name and birth date,
+      // so this is a warning the user can confirm — not a rejection. Only this hospital's own records are checked.
+      if (!data.confirmDuplicate) {
+        const same = await PatientRepository.likelyDuplicates(tx, hospitalId, data.fullName, data.dob);
+        if (same.length) {
+          throw new ValidationError(
+            `A patient named ${data.fullName} with this date of birth is already registered at this hospital (${same.map((s) => s.patientNo).join(", ")}). Check the existing record before creating another.`,
+            { _duplicate: same.map((s) => `${s.id}|${s.patientNo}`) },
+          );
+        }
+      }
+      if (await PatientRepository.patientNoTaken(tx, hospitalId, patientNo)) {
+        throw new ConflictError(`Patient number ${patientNo} is already in use at this hospital.`);
+      }
+      const aadhaar = aadhaarColumns(data.aadhaar);
+      if (aadhaar) {
+        const taken = await PatientRepository.aadhaarTaken(tx, hospitalId, aadhaar.aadhaarHash);
+        if (taken) throw new ConflictError(`This Aadhaar number is already registered at this hospital as ${taken.patientNo}.`);
+      }
+      const row = await PatientRepository.insert(tx, {
+        ...aadhaar,
+        hospitalId,
+        patientNo,
+        fullName: data.fullName,
+        dob: data.dob,
+        gender: data.gender,
+        phone: data.phone ?? null,
+        email: data.email ?? null,
+        department: data.department ?? null,
+        visitReason: data.visitReason ?? null,
+      });
+      await AuditService.record(tx, {
+        action: "patient.created",
+        ...actorOf(ctx),
+        resourceType: "patient",
+        resourceId: row.id,
+        newState: { ...auditView(row), ...(aadhaar ? { aadhaarLast4: aadhaar.aadhaarLast4 } : {}), ...(data.confirmDuplicate ? { confirmedPossibleDuplicate: true } : {}) },
+      });
+      return row;
+    });
   },
 
   async update(ctx: ServiceContext, id: string, input: unknown) {
@@ -117,8 +170,15 @@ export const PatientService = {
       if (patientNo !== before.patientNo && (await PatientRepository.patientNoTaken(tx, before.hospitalId, patientNo, id))) {
         throw new ConflictError(`Patient number ${patientNo} is already in use at this hospital.`);
       }
+      // A new Aadhaar replaces the one on file; leaving it blank keeps it.
+      const aadhaar = aadhaarColumns(data.aadhaar);
+      if (aadhaar) {
+        const taken = await PatientRepository.aadhaarTaken(tx, before.hospitalId, aadhaar.aadhaarHash, id);
+        if (taken) throw new ConflictError(`This Aadhaar number is already registered at this hospital as ${taken.patientNo}.`);
+      }
       // The registering hospital never changes through an edit.
       const row = await PatientRepository.update(tx, id, {
+        ...aadhaar,
         patientNo,
         fullName: data.fullName,
         dob: data.dob,
@@ -136,7 +196,7 @@ export const PatientService = {
         resourceType: "patient",
         resourceId: id,
         previousState: auditView(before),
-        newState: auditView(row),
+        newState: { ...auditView(row), ...(aadhaar ? { aadhaarLast4: aadhaar.aadhaarLast4 } : {}) },
       });
       return row;
     });

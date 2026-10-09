@@ -1323,6 +1323,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "aadhaar_hash": {
+          "name": "aadhaar_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aadhaar_last4": {
+          "name": "aadhaar_last4",
+          "type": "varchar(4)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_demo": {
           "name": "is_demo",
           "type": "boolean",
@@ -1378,6 +1390,36 @@
           "columns": [
             {
               "expression": "full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "patients_aadhaar_hash_idx": {
+          "name": "patients_aadhaar_hash_idx",
+          "columns": [
+            {
+              "expression": "aadhaar_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "patients_aadhaar_last4_idx": {
+          "name": "patients_aadhaar_last4_idx",
+          "columns": [
+            {
+              "expression": "aadhaar_last4",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -1551,18 +1593,6 @@
           "type": "varchar(80)",
           "primaryKey": false,
           "notNull": true
-        },
-        "policy_number": {
-          "name": "policy_number",
-          "type": "varchar(80)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "policyholder_name": {
-          "name": "policyholder_name",
-          "type": "varchar(200)",
-          "primaryKey": false,
-          "notNull": false
         },
         "relationship": {
           "name": "relationship",
@@ -3393,6 +3423,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "raised_by_org_id": {
+          "name": "raised_by_org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_demo": {
           "name": "is_demo",
           "type": "boolean",
@@ -3419,12 +3455,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "raised_by_org_id": {
-          "name": "raised_by_org_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {

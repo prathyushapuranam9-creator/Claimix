@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
 import { claims, organizations, patients, preAuthorizations } from "@/db/schema";
 import type { Scope } from "@/lib/permissions/catalog";
@@ -103,6 +103,16 @@ export const PatientRepository = {
    * Patients already registered at this hospital with the same name (ignoring case and extra spaces) and date of
    * birth. Used to warn about a likely repeat registration; it is never a hard rule.
    */
+  /** Another patient at this hospital with the same Aadhaar (compared by its keyed hash). */
+  async aadhaarTaken(db: DbOrTx, hospitalId: string, hash: string, exceptId?: string) {
+    const [row] = await db
+      .select({ id: patients.id, patientNo: patients.patientNo })
+      .from(patients)
+      .where(and(eq(patients.hospitalId, hospitalId), isNull(patients.deletedAt), eq(patients.aadhaarHash, hash), exceptId ? ne(patients.id, exceptId) : undefined))
+      .limit(1);
+    return row;
+  },
+
   async likelyDuplicates(db: DbOrTx, hospitalId: string, fullName: string, dob: string) {
     const normalized = fullName.trim().replace(/\s+/g, " ").toLowerCase();
     return db

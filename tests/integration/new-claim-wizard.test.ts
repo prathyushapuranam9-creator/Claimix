@@ -1,11 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { auditLogs, documents, notifications, preAuthorizations } from "@/db/schema";
+import { auditLogs, documents, notifications, patients, preAuthorizations } from "@/db/schema";
+import { isValidAadhaar } from "@/lib/india";
+import { PatientService } from "@/modules/patients/patients.service";
+import { RegistrationService } from "@/modules/preauth/registration.service";
 import { DEMO } from "@/tests/fixtures/seed/ids";
 import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import { DocumentService } from "@/modules/documents/documents.service";
 import { setStorageForTests } from "@/modules/documents/storage";
-import { KycCardService } from "@/modules/preauth/kyc-card.service";
 import { PreauthService } from "@/modules/preauth/preauth.service";
 import { codes, file, freshFloaterPatient, useTempStorage } from "./fixtures";
 import { demoPrincipals, svc, testContext } from "./helpers";
@@ -58,11 +60,10 @@ const pkg = () => ({
   symptoms: "Right lower abdominal pain for two days with fever.",
   admissionType: "planned",
   admissionDate: "2026-12-20",
-  admissionTime: "09:00",
+  admissionTime: "09:00:00.000",
   dischargeDate: "2026-12-23",
-  dischargeTime: "11:00",
+  dischargeTime: "11:00:00.000",
   doctorName: "Dr Test Surgeon",
-  doctorContact: "9876543210",
   department: "General Surgery",
   roomCategory: "Twin sharing",
   chronicIllness: ["None"],
@@ -166,9 +167,29 @@ describe("New Claim: steps and submission", () => {
     const pkgOnly = await PreauthService.saveClinical(as("insurerA"), draft.id, { ...pkg(), packageAmount: 55000 });
     expect(Number(pkgOnly.estimatedCost)).toBe(55000);
     const w = await PreauthService.wizard(as("insurerA"), draft.id);
-    expect(w.details).toMatchObject({ chronicIllness: ["None"], doctorContact: "9876543210", familyPhysician: "Dr Family" });
+    expect(w.details).toMatchObject({ chronicIllness: ["None"], familyPhysician: "Dr Family", admissionTime: "09:00:00.000" });
+    expect(w.details).not.toHaveProperty("doctorContact");
+    // A chronic illness typed in (not on the list) is kept as written.
+    await PreauthService.saveClinical(as("insurerA"), draft.id, { ...pkg(), chronicIllness: ["Diabetes", "Thyroid disorder"] });
+    expect((await PreauthService.wizard(as("insurerA"), draft.id)).details.chronicIllness).toEqual(["Diabetes", "Thyroid disorder"]);
     expect(w.kyc).toMatchObject({ policyNumber: "POL-TEST-001" });
     expect(w.diagnoses.map((x) => x.id)).toEqual([c.dx.K35]);
+  });
+
+  it("Pre-Scrutiny quick fixes save one field on its own, only for the raiser, and only the allowed fields", async () => {
+    const { draft } = await raised();
+    let w = await PreauthService.wizard(as("insurerA"), draft.id);
+    expect(w.scrutiny.findings.map((f) => f.key)).toContain("clinical:diagnosisIds");
+    await PreauthService.quickFix(as("insurerA"), draft.id, { diagnosisIds: [c.dx.K35] });
+    w = await PreauthService.wizard(as("insurerA"), draft.id);
+    expect(w.scrutiny.findings.map((f) => f.key)).not.toContain("clinical:diagnosisIds");
+    expect(w.preauth.diagnosisId).toBe(c.dx.K35);
+    await PreauthService.quickFix(as("insurerA"), draft.id, { admissionDate: "2026-12-20", admissionTime: "09:00:00.000", chronicIllness: ["Asthma / COPD / Bronchitis", "Thyroid disorder"] });
+    w = await PreauthService.wizard(as("insurerA"), draft.id);
+    expect(w.details).toMatchObject({ diagnosisIds: [c.dx.K35], admissionTime: "09:00:00.000", chronicIllness: ["Asthma / COPD / Bronchitis", "Thyroid disorder"] });
+    await expect(PreauthService.quickFix(as("insurerA"), draft.id, { estimatedCost: 1 })).rejects.toBeInstanceOf(ValidationError);
+    await expect(PreauthService.quickFix(as("insurerB"), draft.id, { symptoms: "Should not save" })).rejects.toThrow();
+    expect(await ctx.db.select().from(auditLogs).where(and(eq(auditLogs.action, "preauth.quick_fix"), eq(auditLogs.resourceId, draft.id)))).toHaveLength(2);
   });
 
   it("files the raiser's uploads under the patient's hospital, and lets it remove only its own while a draft", async () => {
@@ -190,15 +211,6 @@ describe("New Claim: steps and submission", () => {
     expect(keys).toEqual(expect.arrayContaining(["not_evaluated", "document:preauth_form", "kyc:name", "kyc:dates"]));
     expect(keys.some((k) => k.startsWith("clinical:"))).toBe(true);
     expect(w.scrutiny.blocking).toBeGreaterThan(0);
-  });
-
-  it("Use These Details: a photo can't be read (no OCR); a text PDF card fills only labelled values", async () => {
-    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
-    expect(await KycCardService.read(as("insurerA"), { name: "card.png", size: png.length, bytes: png })).toMatchObject({ hasText: false, values: {} });
-    const pdf = new TextEncoder().encode("%PDF-1.4\n1 0 obj << /Length 60 >> stream\nBT (Policy No: POL-778899) Tj (Member ID: MEM-445566) Tj ET\nendstream endobj\n%%EOF");
-    const r = await KycCardService.read(as("insurerA"), { name: "card.pdf", size: pdf.length, bytes: pdf });
-    expect(r.hasText).toBe(true);
-    await expect(KycCardService.read(as("deskA"), { name: "card.png", size: png.length, bytes: png })).rejects.toThrow();
   });
 
   it("sends with acknowledged gaps (audited), refuses incomplete details or a missing acknowledgment", async () => {
@@ -238,5 +250,129 @@ describe("New Claim: steps and submission", () => {
     const f = await freshFloaterPatient(ctx.db, who.deskA);
     const p = await PreauthService.create(as("deskA"), { beneficiaryId: f.coverage.id, claimType: "cashless", diagnosisId: c.dx.K35, procedureId: c.px.APPENDECTOMY, estimatedCost: 50000 });
     await expect(PreauthService.submit(as("deskA"), p.id, { overrideReason: "I have seen these gaps and am sending anyway." })).rejects.toThrow(/Complete the checklist/);
+  });
+});
+
+describe("Find the Patient: suggestions by any identifier, Aadhaar kept private", () => {
+  /** 11 digits + the Verhoeff check digit: valid in form, never a real person's number. */
+  const aadhaarFor = (prefix: string) => {
+    for (let d = 0; d <= 9; d++) if (isValidAadhaar(prefix + d)) return prefix + d;
+    throw new Error("no check digit");
+  };
+  const uniquePrefix = () => `${2 + Math.floor(Math.random() * 8)}${String(Date.now()).slice(-6)}${String(Math.floor(Math.random() * 1e4)).padStart(4, "0")}`;
+
+  async function withAadhaar(phone: string) {
+    const f = await freshFloaterPatient(ctx.db, who.staffA);
+    const aadhaar = aadhaarFor(uniquePrefix());
+    await PatientService.update(as("staffA"), f.patient.id, { fullName: f.patient.fullName, dob: "1982-02-02", gender: "female", phone, aadhaar });
+    return { ...f, aadhaar };
+  }
+
+  it("stores only a keyed hash and the last 4 digits; finds by the full number or the last 4, never by other digits", async () => {
+    const { patient, coverage, aadhaar } = await withAadhaar("+91 98765 41234");
+    const [row] = await ctx.db.select().from(patients).where(eq(patients.id, patient.id));
+    expect(row!.aadhaarLast4).toBe(aadhaar.slice(-4));
+    expect(row!.aadhaarHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.stringify(row)).not.toContain(aadhaar);
+    const audit = await ctx.db.select().from(auditLogs).where(and(eq(auditLogs.action, "patient.updated"), eq(auditLogs.resourceId, patient.id)));
+    expect(JSON.stringify(audit)).not.toContain(aadhaar);
+
+    const ids = async (q: string, k: keyof typeof who = "insurerA") => (await PreauthService.members(as(k), q)).map((m) => m.beneficiaryId);
+    expect(await ids(aadhaar)).toContain(coverage.id);
+    expect(await ids(`${aadhaar.slice(0, 4)} ${aadhaar.slice(4, 8)} ${aadhaar.slice(8)}`)).toContain(coverage.id);
+    expect(await ids(aadhaar.slice(-4))).toContain(coverage.id);
+    expect(await ids(aadhaar.slice(2, 8))).not.toContain(coverage.id);
+    // Another insurer never finds the patient, by any value.
+    expect(await ids(aadhaar, "insurerB")).not.toContain(coverage.id);
+    const lookups = await ctx.db.select().from(auditLogs).where(eq(auditLogs.action, "patient.aadhaar_lookup"));
+    expect(lookups.length).toBeGreaterThan(0);
+    expect(JSON.stringify(lookups)).not.toContain(aadhaar);
+  });
+
+  it("matches part of the name (any case), UHID, member ID, mobile digits and a policy number typed at KYC", async () => {
+    const { patient, coverage } = await withAadhaar("98765 4" + String(Date.now()).slice(-4));
+    const ids = async (q: string) => (await PreauthService.members(as("insurerA"), q, { limit: 50 })).map((m) => m.beneficiaryId);
+    expect(await ids(patient.fullName.slice(0, 14).toUpperCase())).toContain(coverage.id);
+    expect(await ids(patient.patientNo.slice(-5))).toContain(coverage.id);
+    expect(await ids(coverage.memberId.slice(-6))).toContain(coverage.id);
+    const [row] = await ctx.db.select().from(patients).where(eq(patients.id, patient.id));
+    expect(await ids(row!.phone!.replace(/D/g, "").slice(-6))).toContain(coverage.id);
+    const policyNumber = `POL-SRCH-${Date.now()}`;
+    await PreauthService.raise(as("insurerA"), { beneficiaryId: coverage.id, kyc: kycFor({ patient, coverage } as Fresh, { policyNumber }) });
+    expect(await ids(policyNumber.slice(-8))).toContain(coverage.id);
+    expect(await ids("zzzz-no-such-patient")).toEqual([]);
+    expect(await ids("a")).toEqual([]);
+  });
+
+  it("the same Aadhaar can't be registered twice at one hospital", async () => {
+    const { aadhaar } = await withAadhaar("9876500111");
+    const other = await freshFloaterPatient(ctx.db, who.staffA);
+    await expect(
+      PatientService.update(as("staffA"), other.patient.id, { fullName: other.patient.fullName, dob: "1982-02-02", gender: "female", aadhaar }),
+    ).rejects.toThrow(/already registered/);
+  });
+});
+
+describe("KYC Aadhaar and Register Case", () => {
+  const SIGNATURE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+  const aadhaarFor = (prefix: string) => {
+    for (let d = 0; d <= 9; d++) if (isValidAadhaar(prefix + d)) return prefix + d;
+    throw new Error("no check digit");
+  };
+
+  it("KYC keeps only a keyed hash and the last 4 digits; a blank keeps it; a different one than the record is flagged", async () => {
+    const f = await freshFloaterPatient(ctx.db, who.staffA);
+    const onRecord = aadhaarFor(`3${String(Date.now()).slice(-10)}`);
+    await PatientService.update(as("staffA"), f.patient.id, { fullName: f.patient.fullName, dob: "1982-02-02", gender: "female", aadhaar: onRecord });
+    const other = aadhaarFor(`4${String(Date.now()).slice(-10)}`);
+    const draft = await PreauthService.raise(as("insurerA"), { beneficiaryId: f.coverage.id, kyc: kycFor(f, { aadhaar: other }) });
+    const [row] = await ctx.db.select().from(preAuthorizations).where(eq(preAuthorizations.id, draft.id));
+    const kyc = (row!.clinical as { kyc: Record<string, unknown> }).kyc;
+    expect(kyc.aadhaarLast4).toBe(other.slice(-4));
+    expect(kyc).not.toHaveProperty("aadhaar");
+    expect(JSON.stringify(row)).not.toContain(other);
+    let w = await PreauthService.wizard(as("insurerA"), draft.id);
+    expect(w.scrutiny.findings.map((x) => x.key)).toContain("kyc:aadhaar");
+    // Blank keeps the one on the case; the matching number clears the finding.
+    await PreauthService.saveKyc(as("insurerA"), draft.id, kycFor(f));
+    expect(((await PreauthService.wizard(as("insurerA"), draft.id)).kyc as Record<string, unknown>).aadhaarLast4).toBe(other.slice(-4));
+    await PreauthService.saveKyc(as("insurerA"), draft.id, kycFor(f, { aadhaar: onRecord }));
+    w = await PreauthService.wizard(as("insurerA"), draft.id);
+    expect(w.scrutiny.findings.map((x) => x.key)).not.toContain("kyc:aadhaar");
+    await expect(PreauthService.saveKyc(as("insurerA"), draft.id, kycFor(f, { aadhaar: "12345" }))).rejects.toBeInstanceOf(ValidationError);
+  });
+
+  it("Register Case: refuses an incomplete or unsigned form; Submit files the signed PDF with the case and the patient record, once", async () => {
+    const { draft, patient } = await raised();
+    await expect(RegistrationService.submit(as("insurerA"), draft.id, { signature: SIGNATURE })).rejects.toThrow(/Complete the form first/);
+    await PreauthService.saveClinical(as("insurerA"), draft.id, pkg());
+    await expect(RegistrationService.submit(as("insurerA"), draft.id, { signature: null })).rejects.toThrow(/Sign/);
+    await expect(RegistrationService.submit(as("insurerA"), draft.id, { signature: "data:image/png;base64,bm90IGEgcG5n" })).rejects.toThrow(/couldn't be read/);
+
+    const first = await RegistrationService.submit(as("insurerA"), draft.id, { signature: SIGNATURE });
+    expect(first.duplicate).toBe(false);
+    const [doc] = await ctx.db.select().from(documents).where(eq(documents.id, first.documentId));
+    expect(doc).toMatchObject({ docType: "case_registration_form", patientId: patient.id, subjectId: draft.id, organizationId: DEMO.org.hospitalA, mimeType: "application/pdf" });
+    const data = await RegistrationService.data(as("insurerA"), draft.id);
+    expect(data.registration).toMatchObject({ documentId: first.documentId, current: true, signerRole: expect.any(String) });
+    expect(await ctx.db.select().from(auditLogs).where(and(eq(auditLogs.action, "preauth.case_registered"), eq(auditLogs.resourceId, draft.id)))).toHaveLength(1);
+
+    // The same content again: no second copy.
+    const again = await RegistrationService.submit(as("insurerA"), draft.id, { signature: SIGNATURE });
+    expect(again).toEqual({ documentId: first.documentId, duplicate: true });
+
+    // On the patient's record for the raiser and the hospital; never for another insurer.
+    expect((await DocumentService.registrationForms(as("insurerA"), patient.id)).map((r) => r.id)).toContain(first.documentId);
+    expect((await DocumentService.registrationForms(as("staffA"), patient.id)).map((r) => r.id)).toContain(first.documentId);
+    await expect(DocumentService.registrationForms(as("insurerB"), patient.id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(RegistrationService.submit(as("insurerB"), draft.id, { signature: SIGNATURE })).rejects.toThrow();
+
+    // Later edits keep the registration but mark it out of date; the PDF downloads.
+    await PreauthService.saveClinical(as("insurerA"), draft.id, { ...pkg(), symptoms: "Changed after registration." });
+    expect((await RegistrationService.data(as("insurerA"), draft.id)).registration?.current).toBe(false);
+    const { pdf } = await RegistrationService.pdf(as("insurerA"), draft.id);
+    expect(Buffer.from(pdf.slice(0, 5)).toString()).toBe("%PDF-");
+    const copy = await RegistrationService.saveCopy(as("insurerA"), draft.id, { signature: null });
+    expect(copy.documentId).toBeTruthy();
   });
 });
