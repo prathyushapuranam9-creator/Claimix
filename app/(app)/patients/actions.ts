@@ -17,13 +17,6 @@ export async function checkPatientEligibilityAction(patientId: string, beneficia
   return runAction("patient.eligibility_check", async () => PatientEligibilityService.check(await actionContext(), patientId, beneficiaryId));
 }
 
-export async function createPatientAction(input: PatientInput): Promise<ActionResult> {
-  const r = await runAction("patient.create", async () => (await PatientService.create(await actionContext(), input)).id);
-  // Straight to the new patient, where the next step (insurance coverage) is offered.
-  if (r.ok) redirect(`/patients/${r.data}?registered=1`);
-  return r;
-}
-
 export async function updatePatientAction(id: string, input: PatientInput): Promise<ActionResult> {
   const r = await runAction("patient.update", async () => (await PatientService.update(await actionContext(), id, input)).id);
   if (r.ok) redirect(`/patients/${r.data}`);

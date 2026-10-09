@@ -13,6 +13,7 @@ import { coverageWorkflowSteps } from "@/modules/eligibility/workflow";
 import { CoverageService } from "@/modules/patients/coverage.service";
 import { COVER_PERIOD_LABEL, coverPeriodStatus, RELATIONSHIP_LABEL, VERIFICATION_LABEL } from "@/modules/patients/coverage.validation";
 import { PatientService } from "@/modules/patients/patients.service";
+import { RegistrationService } from "@/modules/scheduling/scheduling.service";
 import { PatientEligibilityService } from "@/modules/eligibility/patient-eligibility.service";
 import { PolicyCheckService } from "@/modules/patients/policy-check.service";
 import { departmentLabel, GENDER_LABEL, NO_VISIT_REASON } from "@/modules/patients/patients.validation";
@@ -20,6 +21,7 @@ import { PolicyService } from "@/modules/policies/policies.service";
 import { CoverageForm } from "@/components/patients/CoverageForm";
 import { ExtractedDetailsNotice, InsuranceDocumentsCard } from "@/components/patients/InsuranceDocuments";
 import { EligibilityCheckButton, EligibilityCheckProvider, EligibilityResultCard } from "@/components/patients/PatientEligibility";
+import { PatientVisits } from "@/components/patients/PatientVisits";
 import { PolicyCheck } from "@/components/patients/PolicyCheck";
 import { OUTCOME_TONE } from "@/components/eligibility/EligibilityResult";
 import { ButtonLink } from "@/components/ui/Button";
@@ -29,6 +31,7 @@ import { Alert, Badge, Card, EmptyState, PageHeader, Stack } from "@/components/
 import { WorkflowStepper } from "@/components/workflow/WorkflowStepper";
 import { deleteDocumentAction } from "@/app/(app)/documents/actions";
 import { addCoverageAction, uploadInsuranceDocumentAction } from "../actions";
+import { dischargeAction } from "../registration-actions";
 
 export const metadata: Metadata = { title: "Patient · Claimix" };
 
@@ -43,15 +46,21 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
   const { patient: p, hospitalName } = await orNotFound(PatientService.get(ctx, id));
   const canWrite = can(ctx.principal, "patient:write");
   const canCheck = can(ctx.principal, "eligibility:check");
-  const canUploadDocs = canWrite && can(ctx.principal, "document:upload");
-  const canReadDocs = can(ctx.principal, "document:read");
+  // The insurance side of the profile: coverage needs a policy to record against, so `policy:read` is
+  // what decides whether any of it is shown. Front-desk staff hold none of these.
+  const canSeeInsurance = can(ctx.principal, "policy:read");
+  const canManageCoverage = canWrite && canSeeInsurance;
+  const canUploadDocs = canManageCoverage && can(ctx.principal, "document:upload");
+  const canReadDocs = canSeeInsurance && can(ctx.principal, "document:read");
+  const canSeePolicyCheck = can(ctx.principal, "preauth:read") || can(ctx.principal, "claim:read") || can(ctx.principal, "document:read");
   // The profile check is also offered to payer reviewers, for their own policies only (enforced server-side).
   const canProfileCheck = PatientEligibilityService.canCheck(ctx.principal);
-  const [coverage, policyOptions, policyCheck, insuranceDocs] = await Promise.all([
-    CoverageService.forPatient(ctx, p.id),
-    canWrite ? PolicyService.options(ctx) : Promise.resolve([]),
-    PolicyCheckService.forPatient(ctx, p.id),
+  const [coverage, policyOptions, policyCheck, insuranceDocs, visits] = await Promise.all([
+    canSeeInsurance ? CoverageService.forPatient(ctx, p.id) : Promise.resolve([]),
+    canManageCoverage ? PolicyService.options(ctx) : Promise.resolve([]),
+    canSeePolicyCheck ? PolicyCheckService.forPatient(ctx, p.id) : Promise.resolve({ preauths: null, claims: null, documents: null }),
     canReadDocs ? DocumentService.insuranceDocuments(ctx, p.id) : Promise.resolve([]),
+    RegistrationService.forPatient(ctx, p.id),
   ]);
   // Contact details are shown to the registering hospital and the patient only.
   const showContact = ctx.principal.orgType === "hospital" || ctx.principal.orgType === "platform";
@@ -63,7 +72,6 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
   // Nothing is saved here: the values only pre-fill the coverage form below.
   const fromDocument = canUploadDocs ? param(sp, "fromDocument") : undefined;
   const extraction = fromDocument ? await orNotFound(InsuranceExtractionService.fromDocument(ctx, p.id, fromDocument)) : null;
-  const justRegistered = canWrite && param(sp, "registered") === "1";
   const coverageAdded = canWrite && param(sp, "coverage") === "added";
 
   const lastCheck = [...lastChecks.values()].sort((a, b) => b.evaluatedAt.getTime() - a.evaluatedAt.getTime())[0]?.overall ?? null;
@@ -84,20 +92,12 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
         }
       />
       <Stack>
-        {justRegistered && (
-          <Alert tone="success" title="Patient registered successfully.">
-            <p>Next step: add insurance coverage. Upload the insurance document to fill the details from it, or add the coverage manually.</p>
-            <p>
-              <a href="#insurance-documents">Upload insurance document</a> · <a href="#add-coverage">Add coverage manually</a>
-            </p>
-          </Alert>
-        )}
         {coverageAdded && (
           <Alert tone="success" title="Coverage added successfully.">
             <p>Next step: check eligibility against the policy&apos;s own rules, below.</p>
           </Alert>
         )}
-        {canWrite && (
+        {canManageCoverage && (
           <Card title="Insurance workflow">
             <WorkflowStepper
               steps={coverageWorkflowSteps({
@@ -119,6 +119,9 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
               ["Reason for Visit", p.visitReason ?? NO_VISIT_REASON],
               ["Date of birth", `${formatDate(p.dob)} (${ageOn(p.dob)} years)`],
               ["Gender", GENDER_LABEL[p.gender]],
+              ...(p.abhaNumber || p.abhaAddress
+                ? ([["ABHA", [p.abhaAddress, p.abhaNumber && p.abhaNumber.replace(/^(\d{2})(\d{4})(\d{4})(\d{4})$/, "$1-$2-$3-$4")].filter(Boolean).join(" · ")]] as [string, string][])
+                : []),
               ["Registered", formatDateTime(p.createdAt)],
               ...(showContact
                 ? ([
@@ -130,6 +133,13 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
           />
         </Card>
         {canProfileCheck && <EligibilityResultCard />}
+        <PatientVisits
+          visits={visits}
+          canRegister={canWrite}
+          discharge={canWrite ? (admissionId) => dischargeAction.bind(null, admissionId) : undefined}
+        />
+        {canSeeInsurance && (
+          <>
         {canReadDocs && (
           <div id="insurance-documents">
             <InsuranceDocumentsCard
@@ -166,8 +176,26 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
               </EmptyState>
             }
             columns={[
-              { key: "p", header: "Policy / scheme", cell: (c) => <CellText sub={c.category === "government" ? c.schemeName : c.insurerName}>{c.policyName}</CellText> },
-              { key: "m", header: "Member ID", cell: (c) => <CellText sub={RELATIONSHIP_LABEL[c.relationship as keyof typeof RELATIONSHIP_LABEL] ?? c.relationship}><span className="mono">{c.memberId}</span></CellText> },
+              {
+                key: "p",
+                header: "Policy / scheme",
+                cell: (c) => (
+                  <CellText sub={[c.category === "government" ? c.schemeName : c.insurerName, c.policyNumber ? `Policy ${c.policyNumber}` : null].filter(Boolean).join(" · ")}>
+                    {c.policyName}
+                  </CellText>
+                ),
+              },
+              {
+                key: "m",
+                header: "Member ID",
+                cell: (c) => (
+                  <CellText
+                    sub={[RELATIONSHIP_LABEL[c.relationship as keyof typeof RELATIONSHIP_LABEL] ?? c.relationship, c.policyholderName].filter(Boolean).join(" · ")}
+                  >
+                    <span className="mono">{c.memberId}</span>
+                  </CellText>
+                ),
+              },
               {
                 key: "d",
                 header: "Cover period",
@@ -246,6 +274,9 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
             />
           </Card>
         )}
+          </>
+        )}
+        {canSeePolicyCheck && (
         <PolicyCheck
           key={p.id}
           patient={{ id: p.id, fullName: p.fullName, patientNo: p.patientNo, dob: p.dob, gender: p.gender, hospitalName, department: p.department, visitReason: p.visitReason }}
@@ -253,7 +284,8 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
           data={policyCheck}
           today={today}
         />
-        {canWrite && (
+        )}
+        {canManageCoverage && (
           <div id="add-coverage">
             <Card title={extraction ? "Add coverage from the insurance document" : "Add coverage"}>
               <Stack>

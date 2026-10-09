@@ -86,6 +86,8 @@ export default async function EditCoveragePage({ params, searchParams }: { param
             defaults={{
               policyId: cov.policyId ?? "",
               memberId: cov.memberId,
+              policyNumber: cov.policyNumber ?? "",
+              policyholderName: cov.policyholderName ?? "",
               relationship: cov.relationship as CoverageInput["relationship"],
               coverStart: cov.coverStart,
               coverEnd: cov.coverEnd,

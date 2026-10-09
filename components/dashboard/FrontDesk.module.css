@@ -1,0 +1,70 @@
+/* Today's appointments on the front-desk dashboard: one aligned row per appointment.
+   Columns line up on wide screens and stack on phones; long names truncate instead of pushing. */
+.rows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-1) var(--sp-4);
+  align-items: center;
+  padding: var(--sp-3) var(--sp-5);
+  border-top: 1px solid var(--c-border);
+}
+
+.row:first-child { border-top: 0; }
+
+@media (min-width: 720px) {
+  .row {
+    /* time · patient · doctor · status · action */
+    grid-template-columns: 4.5rem minmax(0, 1.4fr) minmax(0, 1.4fr) auto auto;
+  }
+}
+
+.time {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cell {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+}
+
+.sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+.status {
+  justify-self: start;
+}
+
+@media (min-width: 720px) {
+  .status { justify-self: end; }
+}
+
+.action {
+  justify-self: start;
+  white-space: nowrap;
+}
+
+@media (min-width: 720px) {
+  .action { justify-self: end; }
+}

@@ -19,6 +19,7 @@ import { deleteDocumentAction, reviewDocumentAction } from "@/app/(app)/document
 import { DocumentUploader } from "@/components/documents/DocumentUploader";
 import { EligibilityResult } from "@/components/eligibility/EligibilityResult";
 import { ChecklistPanel } from "@/components/preauth/ChecklistPanel";
+import { SubmissionReview } from "@/components/preauth/SubmissionReview";
 import { DecisionPanel } from "@/components/preauth/DecisionPanel";
 import { SimpleMessageForm } from "@/components/preauth/SimpleMessageForm";
 import { CellText, DataTable } from "@/components/ui/DataTable";
@@ -176,6 +177,33 @@ export default async function ClaimPage({ params }: { params: Promise<{ id: stri
                   </details>
                 )}
               </Card>
+
+              {w.side === "hospital" && status === "draft" && (
+                <SubmissionReview
+                  stage="claim"
+                  reference={c.reference}
+                  patient={{ fullName: w.patient.fullName, patientNo: w.patient.patientNo, dob: w.patient.dob }}
+                  hospitalName={w.hospitalName}
+                  payerLabel={w.policy.category === "government" ? "Scheme" : "Insurance company"}
+                  payerName={w.policy.category === "government" ? w.schemeName : w.insurerName}
+                  tpaName={w.tpaName}
+                  policyName={w.policy.name}
+                  beneficiary={w.beneficiary}
+                  caseRows={[
+                    ["Claim type", c.claimType === "cashless" ? "Cashless" : "Reimbursement"],
+                    ["Pre-authorization", w.preauth ? <span key="pa" className="mono">{w.preauth.reference}</span> : "None (reimbursement)"],
+                    ["Final diagnosis", w.diagnosisCode ? `${w.diagnosisCode} — ${w.diagnosisName}` : null],
+                    ["Procedure", w.procedureName],
+                    ["Admission", formatDate(c.admissionDate)],
+                    ["Discharge", formatDate(c.dischargeDate)],
+                    ["Final bill no.", c.billNumber],
+                    ["Room rent / day", formatINR(c.roomRentPerDay)],
+                    ["Claimed amount", formatINR(c.claimedAmount)],
+                  ]}
+                  evaluation={w.evaluation ? { evaluation: w.evaluation.evaluation, ruleVersion: w.evaluation.ruleVersion } : null}
+                  documents={w.documents.map((d) => ({ docType: d.docType, status: d.status }))}
+                />
+              )}
 
               {w.side === "hospital" && status === "draft" && (
                 <Card title="Claim readiness checklist">

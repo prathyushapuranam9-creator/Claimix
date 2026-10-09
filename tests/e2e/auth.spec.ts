@@ -36,18 +36,20 @@ test("hospital staff can sign in, see their scope, and sign out", async ({ page 
   await signIn(page, "staff.a@demo.claimix.invalid");
   await expect(page).toHaveURL(/\/dashboard/);
   await expect(page.locator("#main").getByText("Hospital Staff · Sunrise Multispeciality Hospital")).toBeVisible();
-  // Hospital dashboard, and navigation limited to the role's permissions.
-  await expect(page.getByText("Queries to answer")).toBeVisible();
+  // The front-desk dashboard, and navigation limited to the role's permissions.
+  await expect(page.getByText("Today at the front desk")).toBeVisible();
   await openMenuIfCollapsed(page);
   const nav = page.getByRole("complementary", { name: "Main navigation" });
   await expect(nav.getByRole("link", { name: "Patients" })).toBeVisible();
-  // The eligibility checker is deliberately not in the sidebar: staff reach it from the dashboard's primary action.
-  await expect(nav.getByRole("link", { name: "Eligibility checker" })).toHaveCount(0);
-  await expect(nav.getByRole("link", { name: "Users" })).toHaveCount(0);
-  await expect(nav.getByRole("link", { name: "Audit log" })).toHaveCount(0);
-  await page.getByRole("link", { name: "Check eligibility" }).first().click();
-  await expect(page).toHaveURL(/\/eligibility$/);
-  await expect(page.getByRole("heading", { name: "Eligibility checker", level: 1 })).toBeVisible();
+  // Registration only: the insurance side of Claimix is not part of this role.
+  for (const gone of ["Eligibility checker", "Pre-authorizations", "Claims", "Documents", "Policies", "Insurance Assistant", "Reports", "Users", "Audit log"]) {
+    await expect(nav.getByRole("link", { name: gone, exact: true })).toHaveCount(0);
+  }
+  // Reload so the phone drawer is closed and does not intercept the click.
+  await page.goto("/dashboard");
+  await page.getByRole("link", { name: "Register patient" }).first().click();
+  await expect(page).toHaveURL(/\/patients\/new$/);
+  await expect(page.getByRole("heading", { name: "Register patient", level: 1 })).toBeVisible();
 
   // Sign out lives in the header's profile menu (reload first so the mobile drawer is closed).
   await page.goto("/dashboard");

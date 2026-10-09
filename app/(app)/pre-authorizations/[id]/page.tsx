@@ -202,6 +202,7 @@ export default async function PreauthPage({ params }: { params: Promise<{ id: st
 
               {w.side === "hospital" && status === "draft" && (
                 <SubmissionReview
+                  stage="preauth"
                   reference={p.reference}
                   patient={{ fullName: w.patient.fullName, patientNo: w.patient.patientNo, dob: w.patient.dob }}
                   hospitalName={w.hospitalName}
@@ -209,22 +210,19 @@ export default async function PreauthPage({ params }: { params: Promise<{ id: st
                   payerName={w.policy.category === "government" ? w.schemeName : w.insurerName}
                   tpaName={w.tpaName}
                   policyName={w.policy.name}
-                  beneficiary={{
-                    memberId: w.beneficiary.memberId,
-                    relationship: w.beneficiary.relationship,
-                    coverStart: w.beneficiary.coverStart,
-                    coverEnd: w.beneficiary.coverEnd,
-                    verificationStatus: w.beneficiary.verificationStatus,
-                  }}
-                  treatment={{
-                    diagnosis: w.diagnosisCode ? `${w.diagnosisCode} — ${w.diagnosisName}` : null,
-                    procedure: w.procedureName,
-                    claimType: p.claimType,
-                    admission: p.expectedAdmission,
-                    stayDays: p.expectedStayDays,
-                    room: [p.roomCategory, p.roomRentPerDay ? `${formatINR(p.roomRentPerDay)}/day` : null].filter(Boolean).join(" · ") || null,
-                  }}
-                  money={{ estimatedCost: p.estimatedCost, requested: p.expectedInsuranceAmount, patientContribution: p.patientContribution }}
+                  beneficiary={w.beneficiary}
+                  caseRows={[
+                    ["Claim type", p.claimType === "cashless" ? "Cashless" : "Reimbursement"],
+                    ["Diagnosis", w.diagnosisCode ? `${w.diagnosisCode} — ${w.diagnosisName}` : null],
+                    ["Procedure", w.procedureName],
+                    ["Expected admission", formatDate(p.expectedAdmission)],
+                    ["Length of stay", p.expectedStayDays ? `${p.expectedStayDays} days` : null],
+                    ["Room", [p.roomCategory, p.roomRentPerDay ? `${formatINR(p.roomRentPerDay)}/day` : null].filter(Boolean).join(" · ") || null],
+                    ["Treating doctor", clinical.doctorName ?? null],
+                    ["Estimated cost", formatINR(p.estimatedCost)],
+                    ["Requested from payer", formatINR(p.expectedInsuranceAmount)],
+                    ["Patient's share", formatINR(p.patientContribution)],
+                  ]}
                   evaluation={w.evaluation ? { evaluation: w.evaluation.evaluation, ruleVersion: w.evaluation.ruleVersion } : null}
                   documents={w.documents.map((d) => ({ docType: d.docType, status: d.status }))}
                 />

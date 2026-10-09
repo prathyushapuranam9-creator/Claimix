@@ -39,6 +39,10 @@ export const beneficiaries = pgTable("beneficiaries", {
   policyId: uuid("policy_id").references(() => policies.id),
   schemeId: uuid("scheme_id").references(() => governmentSchemes.id),
   memberId: varchar("member_id", { length: 80 }).notNull(),
+  /** The policy / scheme number as printed, when it differs from the member ID; null = not recorded. */
+  policyNumber: varchar("policy_number", { length: 80 }),
+  /** The policyholder as named on the document, when the patient is not the policyholder themselves. */
+  policyholderName: varchar("policyholder_name", { length: 200 }),
   relationship: varchar("relationship", { length: 40 }).notNull().default("self"),
   coverStart: date("cover_start").notNull(),
   coverEnd: date("cover_end").notNull(),

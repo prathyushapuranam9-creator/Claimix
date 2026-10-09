@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
 import { permissions, rolePermissions, roles, users } from "@/db/schema";
-import { MERGED_PAYER_ROLE_KEYS, PERMISSIONS, ROLES, type PermissionKey } from "@/lib/permissions/catalog";
+import { MERGED_PAYER_ROLE_KEYS, PERMISSIONS, ROLES, WITHDRAWN_HOSPITAL_STAFF_PERMISSIONS, type PermissionKey } from "@/lib/permissions/catalog";
 
 /** Syncs the permission catalog and default role grants into the database (idempotent). */
 export async function seedRbac(db: DbOrTx) {
@@ -60,6 +60,17 @@ export async function seedRbac(db: DbOrTx) {
       .update(rolePermissions)
       .set({ scope: "organization" })
       .where(and(eq(rolePermissions.roleId, payerRole.id), eq(rolePermissions.permissionId, policyRead), eq(rolePermissions.scope, "all")));
+  }
+
+  // Hospital Staff became front-desk registration only. Grants are otherwise never removed here, so the
+  // insurance permissions the role used to hold are revoked explicitly; without this, databases seeded
+  // under the old matrix would keep granting them at runtime.
+  const [staffRole] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, "hospital_staff"));
+  if (staffRole) {
+    const withdrawn = WITHDRAWN_HOSPITAL_STAFF_PERMISSIONS.map((k) => permId.get(k)).filter((id): id is string => !!id);
+    if (withdrawn.length) {
+      await db.delete(rolePermissions).where(and(eq(rolePermissions.roleId, staffRole.id), inArray(rolePermissions.permissionId, withdrawn)));
+    }
   }
 
   const roleRows = await db.select({ id: roles.id, key: roles.key }).from(roles).where(inArray(roles.key, ROLES.map((r) => r.key)));

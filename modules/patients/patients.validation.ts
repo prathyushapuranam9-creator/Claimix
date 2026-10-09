@@ -43,6 +43,21 @@ export function departmentLabel(key: string | null | undefined): string {
   return key && key in PATIENT_DEPARTMENTS ? PATIENT_DEPARTMENTS[key as PatientDepartment] : NO_DEPARTMENT;
 }
 
+/**
+ * ABHA (Ayushman Bharat Health Account) as presented by the patient: a 14-digit number, usually written
+ * in 2-4-4-4 groups, and an ABHA address such as "name@abdm". Claimix has no ABDM integration, so these
+ * are recorded, never verified or created there — and they are never required to register.
+ */
+export const zOptionalAbhaNumber = z.preprocess(
+  (v) => (typeof v === "string" ? v.replace(/[\s-]/g, "") || undefined : v),
+  z.string().regex(/^\d{14}$/, "An ABHA number is 14 digits.").optional(),
+);
+
+export const zOptionalAbhaAddress = z.preprocess(
+  (v) => (typeof v === "string" ? v.trim().toLowerCase() || undefined : v),
+  z.string().regex(/^[a-z0-9._-]{3,64}@[a-z][a-z0-9]{1,30}$/, "An ABHA address looks like name@abdm.").max(120).optional(),
+);
+
 export const patientInputSchema = z.object({
   fullName: zName,
   dob: zPastDate("Date of birth"),
@@ -52,6 +67,8 @@ export const patientInputSchema = z.object({
   patientNo: zOptionalText(40).refine((v) => v === undefined || /^[A-Za-z0-9-]+$/.test(v), "Use letters, numbers and hyphens only."),
   department: z.preprocess((v) => (v === "" ? undefined : v), z.enum(Object.keys(PATIENT_DEPARTMENTS) as [PatientDepartment, ...PatientDepartment[]], { message: "Select a department from the list." }).optional()),
   visitReason: zOptionalText(300),
+  abhaNumber: zOptionalAbhaNumber,
+  abhaAddress: zOptionalAbhaAddress,
   // Only platform admins choose a hospital; staff always register into their own.
   hospitalId: zOptionalUuid,
   /** Set after the user has seen the "possible duplicate" warning and chose to register anyway. */

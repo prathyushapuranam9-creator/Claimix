@@ -48,7 +48,9 @@ export default async function EligibilityPage({ searchParams }: { searchParams: 
               items={[
                 [cov.category === "government" ? "Scheme cover" : "Policy", cov.policyName],
                 ["Member ID", <span key="m" className="mono">{cov.memberId}</span>],
+                ["Policy number", cov.policyNumber ? <span key="pn" className="mono">{cov.policyNumber}</span> : null],
                 ["Relationship", RELATIONSHIP_LABEL[cov.relationship as keyof typeof RELATIONSHIP_LABEL] ?? cov.relationship],
+                ["Policyholder", cov.policyholderName],
                 ["Cover period", `${formatDate(cov.coverStart)} – ${formatDate(cov.coverEnd)}`],
                 ["Sum insured", formatINR(cov.sumInsured)],
                 ["Available balance", formatINR(cov.sumInsuredAvailable)],

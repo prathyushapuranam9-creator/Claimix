@@ -33,6 +33,8 @@ function auditView(d: ReturnType<typeof coverageInputSchema.parse>, policyId: st
   return {
     policyId,
     memberId: d.memberId,
+    policyNumber: d.policyNumber ?? null,
+    policyholderName: d.policyholderName ?? null,
     relationship: d.relationship,
     coverStart: d.coverStart,
     coverEnd: d.coverEnd,
@@ -44,6 +46,7 @@ function auditView(d: ReturnType<typeof coverageInputSchema.parse>, policyId: st
 
 export const CoverageService = {
   async forPatient(ctx: ServiceContext, patientId: string) {
+    requirePermission(ctx.principal, "policy:read");
     const scope = requirePermission(ctx.principal, "patient:read");
     const p = await PatientRepository.findScoped(ctx.db, ctx.principal, scope, requireId(patientId, "Patient"));
     if (!p) throw new NotFoundError("Patient not found.");
@@ -53,6 +56,7 @@ export const CoverageService = {
   },
 
   async get(ctx: ServiceContext, beneficiaryId: string) {
+    requirePermission(ctx.principal, "policy:read");
     const scope = requirePermission(ctx.principal, "patient:read");
     const row = await CoverageRepository.findScoped(ctx.db, ctx.principal, scope, requireId(beneficiaryId, "Coverage"));
     if (!row) throw new NotFoundError("Coverage not found.");
@@ -72,6 +76,7 @@ export const CoverageService = {
    * throughout: without it the coverage is simply recorded as still requiring verification.
    */
   async add(ctx: ServiceContext, patientId: string, input: unknown) {
+    requirePermission(ctx.principal, "policy:read");
     const scope = requirePermission(ctx.principal, "patient:write");
     const d = parseOrThrow(coverageInputSchema, input);
     return ctx.db.transaction(async (tx) => {
@@ -89,6 +94,8 @@ export const CoverageService = {
         policyId: policy.id,
         schemeId: policy.schemeId,
         memberId: d.memberId,
+        policyNumber: d.policyNumber ?? null,
+        policyholderName: d.policyholderName ?? null,
         relationship: d.relationship,
         coverStart: d.coverStart,
         coverEnd: d.coverEnd,
@@ -116,6 +123,7 @@ export const CoverageService = {
    * which payer received that request.
    */
   async update(ctx: ServiceContext, beneficiaryId: string, input: unknown) {
+    requirePermission(ctx.principal, "policy:read");
     const scope = requirePermission(ctx.principal, "patient:write");
     const d = parseOrThrow(coverageInputSchema, input);
     return ctx.db.transaction(async (tx) => {
@@ -138,6 +146,8 @@ export const CoverageService = {
         policyId: policy.id,
         schemeId: policy.schemeId,
         memberId: d.memberId,
+        policyNumber: d.policyNumber ?? null,
+        policyholderName: d.policyholderName ?? null,
         relationship: d.relationship,
         coverStart: d.coverStart,
         coverEnd: d.coverEnd,

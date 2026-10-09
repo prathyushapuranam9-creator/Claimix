@@ -3,6 +3,7 @@ import { setupSystem } from "@/db/setup";
 import { seedCore } from "./core";
 import { seedNetwork } from "./network";
 import { seedPolicies } from "./policies";
+import { seedScheduling } from "./scheduling";
 
 /**
  * TEST FIXTURES ONLY. Fictional organizations, users, patients and policies used by the
@@ -22,5 +23,6 @@ export async function seed(db: Db, demoPassword: string, opts: SeedOptions = {})
     await seedCore(tx, roleIds, demoPassword, opts);
     await seedNetwork(tx);
     await seedPolicies(tx, opts);
+    await seedScheduling(tx, opts);
   });
 }

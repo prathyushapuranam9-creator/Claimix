@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { alphaId, signIn } from "./helpers";
+import { alphaId, registerPatient, signIn } from "./helpers";
 
 const details = (page: Page) => page.locator("main section").filter({ has: page.getByRole("heading", { name: "Details", exact: true }) });
 const policyBlock = (page: Page) => page.locator("details[data-patient-id]");
@@ -8,18 +8,12 @@ const policyBlock = (page: Page) => page.locator("details[data-patient-id]");
 const valueOf = (scope: ReturnType<Page["locator"]>, label: string) => scope.locator("dt", { hasText: new RegExp(`^${label}$`) }).locator("xpath=following-sibling::dd[1]");
 
 async function register(page: Page, name: string, dept?: string, reason?: string) {
-  await page.goto("/patients/new");
-  await page.getByLabel("Full name").fill(name);
-  await page.getByLabel("Date of birth").fill("1985-06-15");
-  if (dept) await page.getByLabel("Department").selectOption({ label: dept });
-  if (reason) await page.getByLabel("Reason for visit").fill(reason);
-  await page.getByRole("button", { name: "Register patient" }).click();
-  await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
-  return new URL(page.url()).pathname.split("/").pop()!;
+  const path = await registerPatient(page, { name, dob: "1985-06-15", department: dept, reason });
+  return path.split("/").pop()!;
 }
 
 test.describe("Patients: Department and Reason for Visit", () => {
-  test("recorded values show identically in the list, Details and Policy Check; edits carry through", async ({ page }) => {
+  test("recorded values show identically in the list and Details; edits carry through", async ({ page }) => {
     await signIn(page, "staff.a@demo.claimix.invalid");
     const name = `Dept Check ${alphaId()}`;
     const id = await register(page, name, "Neurology", "Headache and dizziness");
@@ -28,11 +22,8 @@ test.describe("Patients: Department and Reason for Visit", () => {
     await expect(valueOf(details(page), "Name")).toHaveText(name);
     await expect(valueOf(details(page), "Department")).toHaveText("Neurology");
     await expect(valueOf(details(page), "Reason for Visit")).toHaveText("Headache and dizziness");
-    // Profile → Policy Check (same values).
-    await policyBlock(page).locator("summary").click();
-    await expect(valueOf(policyBlock(page), "Name")).toHaveText(name);
-    await expect(valueOf(policyBlock(page), "Department")).toHaveText("Neurology");
-    await expect(valueOf(policyBlock(page), "Reason for Visit")).toHaveText("Headache and dizziness");
+    // Policy Check belongs to the insurance side, which the front desk does not have.
+    await expect(policyBlock(page)).toHaveCount(0);
 
     // Patients list: Department column (existing columns kept, search still works).
     await page.goto(`/patients?q=${encodeURIComponent(name)}`);
@@ -62,9 +53,7 @@ test.describe("Patients: Department and Reason for Visit", () => {
     await register(page, name);
     await expect(valueOf(details(page), "Department")).toHaveText("Not Assigned");
     await expect(valueOf(details(page), "Reason for Visit")).toHaveText("Not Available");
-    await policyBlock(page).locator("summary").click();
-    await expect(valueOf(policyBlock(page), "Department")).toHaveText("Not Assigned");
-    await expect(valueOf(policyBlock(page), "Reason for Visit")).toHaveText("Not Available");
+    await expect(policyBlock(page)).toHaveCount(0);
     await page.goto(`/patients?q=${encodeURIComponent(name)}`);
     await expect(page.getByRole("row").filter({ hasText: name })).toContainText("Not Assigned");
   });

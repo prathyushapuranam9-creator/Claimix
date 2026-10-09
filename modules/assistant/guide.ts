@@ -145,7 +145,25 @@ function createClaim(w: Who): GuideReply {
 /** "I registered a patient, what now?" - the one next step, with both ways of recording the cover. */
 function afterRegistration(w: Who): GuideReply {
   if (!w.can("patient:write")) {
-    return guide(`Registering patients and recording their coverage is done by hospital staff. Your role (${w.roleName}) cannot do it.`);
+    return guide(`Registering patients is done by hospital staff. Your role (${w.roleName}) cannot do it.`);
+  }
+  if (!w.can("policy:read")) {
+    // Hospital Staff is front-desk registration only; the insurance side is not theirs.
+    return guide(
+      [
+        "A patient is registered in one process, and it finishes at the last step:",
+        "",
+        "Path:",
+        pathBlock("Sidebar", "Patients", "Register patient"),
+        "",
+        "1. **Find or register a patient** — search by name, patient number or mobile first, and select an existing patient rather than creating a duplicate.",
+        "2. **Doctor & slot** — choose the department, the doctor, the booking date and an available slot.",
+        "3. **Payment & register** — check the summary, take the payment (Cash, UPI or Card, or leave it to collect), confirm **Patient Rights & Responsibilities** and select **Register patient**.",
+        "",
+        "The patient is registered only once that last step succeeds. Insurance, coverage, eligibility, pre-authorizations and claims are not part of this role.",
+      ].join("\n"),
+      [{ label: "Register patient", href: "/patients/new" }],
+    );
   }
   return guide(
     [
@@ -170,7 +188,7 @@ function afterRegistration(w: Who): GuideReply {
 
 /** Where coverage is recorded, for either scenario. */
 function coverageReply(w: Who): GuideReply {
-  if (!w.can("patient:write")) {
+  if (!w.can("policy:read")) {
     return guide(
       `Coverage is recorded by hospital staff on the patient's page. Your role (${w.roleName}) can ${w.can("patient:read") ? "see a patient's recorded coverage but not change it" : "not open patient records"}.`,
       w.can("patient:read") ? [{ label: "Open Patients", href: "/patients" }] : [],
@@ -183,7 +201,7 @@ function coverageReply(w: Who): GuideReply {
       "Path:",
       pathBlock(...reach(w, "coverage").steps),
       "",
-      "The button says **Add coverage manually** when the patient has no coverage yet, and **Add another coverage** afterwards. Fill **Policy / scheme**, **Member / beneficiary ID**, **Relationship to policyholder**, **Cover start**, **Cover end**, **Sum insured**, **Available balance** and **Verification**, then **Save coverage**.",
+      "The button says **Add coverage manually** when the patient has no coverage yet, and **Add another coverage** afterwards. Fill **Policy / scheme**, **Member / beneficiary ID**, **Relationship to policyholder**, **Cover start**, **Cover end**, **Sum insured**, **Available balance** and **Verification**, then **Save coverage**. **Policy number** and **Policyholder** are optional - fill them when the document names them separately.",
       "",
       "If you have the insurance card or policy document, upload it in **Insurance documents** first and use **Review extracted details** - the form then opens pre-filled with what could be read from it, for you to check.",
       "",
@@ -196,8 +214,8 @@ function coverageReply(w: Who): GuideReply {
 /** "Do I have to upload the insurance card?" - no, and here is what it changes. */
 function insuranceDocumentReply(w: Who, q: string): GuideReply {
   const mandatory = /\b(have to|need to|must|mandatory|required|necessary|obliged|without)\b/i.test(q);
-  if (!w.can("patient:write")) {
-    return guide(`The patient's insurance documents are uploaded by hospital staff on the patient's page. Your role (${w.roleName}) cannot upload them.`);
+  if (!w.can("policy:read")) {
+    return guide(`The patient's insurance documents belong to the insurance side of Claimix, which your role (${w.roleName}) does not have.`);
   }
   const lines = mandatory
     ? [

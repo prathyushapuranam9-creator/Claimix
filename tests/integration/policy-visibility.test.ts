@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DEMO } from "@/tests/fixtures/seed/ids";
-import { NotFoundError } from "@/lib/errors";
+import { ForbiddenError, NotFoundError } from "@/lib/errors";
 import type { Scope } from "@/lib/permissions/catalog";
 import type { Principal } from "@/lib/permissions/principal";
 import { PolicyService } from "@/modules/policies/policies.service";
@@ -66,11 +66,16 @@ describe("payer policy isolation", () => {
 });
 
 describe("policy browsing that must keep working", () => {
-  it("hospital staff, read-only users and administrators still see all products", async () => {
-    for (const k of ["staffA", "readOnly", "admin"] as const) {
+  it("read-only users and administrators still see all products", async () => {
+    for (const k of ["readOnly", "admin"] as const) {
       const r = await PolicyService.list(as(k), { ...Q, q: "DEMO DATA" }, {});
       expect(idsOf(r.rows)).toEqual(expect.arrayContaining([DEMO.policy.aarogyaFloater, DEMO.policy.surakshaIndividual, DEMO.policy.pmjayScheme]));
       await expect(PolicyService.get(as(k), DEMO.policy.surakshaIndividual)).resolves.toBeTruthy();
     }
+  });
+
+  it("hospital staff no longer browse products: the role is front-desk registration only", async () => {
+    await expect(PolicyService.list(as("staffA"), { ...Q, q: "DEMO DATA" }, {})).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(PolicyService.get(as("staffA"), DEMO.policy.aarogyaFloater)).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

@@ -53,6 +53,30 @@ a missing fact, an unknown/misconfigured rule, or a policy with no rules for a r
 Versions move `draft → active → retired`; rules of published versions can't be changed (DB trigger).
 Every evaluation is recorded with policy, rule set, version, per-rule results, missing information and an input snapshot.
 
+## Hospital Staff: patient registration
+
+Hospital Staff is **front-desk registration only**. Registration is a three-step process at
+`/patients/new` and the patient is created by the **last** step, not by the details form:
+
+1. **Identify & details** — search by name, patient number or mobile and select the existing patient
+   (no duplicate), or enter a new one; choose the visit type (OPD consultation / IP admission).
+2. **Doctor & slot** — department (only those with a doctor), doctor, booking date, free slot. Booked
+   slots are shown and disabled; the slot row is locked in the transaction and a unique index makes one
+   live appointment per slot.
+3. **Payment & register** — the summary of what was already entered, payment (Cash / UPI / Card, or
+   collect later), the Patient Rights & Responsibilities acknowledgement, then **Register patient**.
+   The patient (when new) and the visit are written in one transaction.
+
+Doctors and their slots are administrator reference data (`/admin/doctors`, `hospital:manage`).
+
+> **The insurance side was withdrawn from this role.** Coverage, eligibility, pre-authorizations,
+> claims, their documents, the case reports and the Insurance Assistant are no longer granted to
+> Hospital Staff (`WITHDRAWN_HOSPITAL_STAFF_PERMISSIONS`; `db:setup` revokes them). Creating a
+> pre-authorization or claim requires a hospital organization and no hospital-side role now holds the
+> permission, so **pre-authorizations and claims cannot currently be raised at all** and the payer
+> workflow has no inbound requests. The insurance code and the payer side remain in place; granting
+> those permissions to a hospital-side role restores the flow.
+
 ## Patient coverage
 
 The hospital workflow starts on a patient's page: register the patient, record the cover, check eligibility, then

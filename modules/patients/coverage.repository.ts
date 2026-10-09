@@ -17,6 +17,8 @@ const coverageColumns = {
   policyId: beneficiaries.policyId,
   schemeId: beneficiaries.schemeId,
   memberId: beneficiaries.memberId,
+  policyNumber: beneficiaries.policyNumber,
+  policyholderName: beneficiaries.policyholderName,
   relationship: beneficiaries.relationship,
   coverStart: beneficiaries.coverStart,
   coverEnd: beneficiaries.coverEnd,

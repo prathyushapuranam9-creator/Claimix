@@ -39,8 +39,8 @@ describe("TPA management", () => {
     // Another insurer doesn't see Aarogya's products counted.
     const other = (await TpaService.list(as("insurerB"), Q)).rows.find((r) => r.id === DEMO.org.tpaA)!;
     expect(other.policyCount).toBe(await dbCount([eq(policies.tpaId, DEMO.org.tpaA), eq(policies.insurerId, DEMO.org.insurerB)]));
-    // Administrators and hospital staff see the full count.
-    for (const k of ["admin", "staffA"] as const) {
+    // Administrators and read-only users see the full count.
+    for (const k of ["admin", "readOnly"] as const) {
       expect((await TpaService.list(as(k), Q)).rows.find((r) => r.id === DEMO.org.tpaA)!.policyCount, k).toBe(await dbCount([eq(policies.tpaId, DEMO.org.tpaA)]));
     }
   });

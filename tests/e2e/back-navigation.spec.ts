@@ -28,8 +28,8 @@ test.describe("Back navigation", () => {
   });
 
   test("Policies → policy → any number of tabs → Back returns to the list (and so does the browser's Back)", async ({ page }) => {
-    await signIn(page, "staff.a@demo.claimix.invalid");
-    await sidebar(page, "Policies");
+    await signIn(page, "admin@demo.claimix.invalid");
+    await sidebar(page, "Insurers / Providers");
     await page.waitForURL(/\/policies$/);
     for (const useBrowser of [false, true]) {
       await page.getByRole("link", { name: /Aarogya Family Floater Plus/ }).first().click();
@@ -46,8 +46,8 @@ test.describe("Back navigation", () => {
   });
 
   test("each policy tab: Back leaves the policy, never reopens it", async ({ page }) => {
-    await signIn(page, "staff.a@demo.claimix.invalid");
-    await sidebar(page, "Policies");
+    await signIn(page, "admin@demo.claimix.invalid");
+    await sidebar(page, "Insurers / Providers");
     await page.waitForURL(/\/policies$/);
     for (const t of POLICY_TABS) {
       await page.getByRole("link", { name: /Aarogya Family Floater Plus/ }).first().click();
@@ -59,7 +59,7 @@ test.describe("Back navigation", () => {
   });
 
   test("opened directly: Back goes to the parent page, with no loop back", async ({ page }) => {
-    await signIn(page, "staff.a@demo.claimix.invalid");
+    await signIn(page, "admin@demo.claimix.invalid");
     // Policy page by URL, on a tab → the Policies list.
     await page.goto(`/policies/${DEMO.policy.aarogyaFloater}?tab=claims`);
     await back(page).click();
@@ -117,7 +117,7 @@ test("profile icon: no hover effect; click still opens the menu", async ({ page 
 });
 
 test("Eligibility Result shows the patient's name, department and reason for join, and closes with ×", async ({ page }) => {
-  await signIn(page, "staff.a@demo.claimix.invalid");
+  await signIn(page, "insurer.a@demo.claimix.invalid");
   await page.goto(`/patients/${IDS.patientA1}`);
   const details = page.locator("main section").filter({ has: page.getByRole("heading", { name: "Details", exact: true }) });
   const value = (scope: ReturnType<Page["locator"]>, label: string) => scope.locator("dt", { hasText: new RegExp(`^${label}$`) }).locator("xpath=following-sibling::dd[1]");
