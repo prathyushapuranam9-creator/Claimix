@@ -1,11 +1,19 @@
 import { z } from "zod";
 import { caseDetailsShape } from "@/modules/eligibility/eligibility.validation";
+import { zOptionalAadhaar } from "@/modules/patients/patients.validation";
 import { zDate, zMoney, zOptionalDate, zOptionalMoney, zOptionalText, zOptionalUuid, zUuid } from "@/lib/validation";
 
 /** Unselected radios / empty inputs arrive as null or "": treated as not given, so the wizard's own message shows. */
 const blankChoice = (v: unknown) => (v === null || v === "" ? undefined : v);
 const tenDigits = z.preprocess(blankChoice, z.string().trim().regex(/^\d{10}$/, "Enter a 10-digit number.").optional());
-const hhmm = z.preprocess(blankChoice, z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM.").optional());
+/** A time of day: HH:mm, optionally with seconds and milliseconds (HH:mm:ss.SSS, as the date-time picker writes it). */
+const hhmm = z.preprocess(blankChoice, z.string().regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d{3})?)?$/, "Use HH:mm:ss.SSS.").optional());
+
+/** Any accepted time as HH:mm:ss.SSS (so times compare and parse the same way). */
+export function fullTime(t?: string): string {
+  const m = /^(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{3}))?)?$/.exec(t ?? "");
+  return m ? `${m[1]}:${m[2]}:${m[3] ?? "00"}.${m[4] ?? "000"}` : "00:00:00.000";
+}
 
 const clinicalShape = {
   symptoms: zOptionalText(2000),
@@ -20,7 +28,6 @@ const clinicalShape = {
   department: zOptionalText(60),
   familyPhysician: zOptionalText(120),
   criticalFindings: zOptionalText(2000),
-  doctorContact: tenDigits,
   familyPhysicianContact: tenDigits,
   currentAddress: zOptionalText(300),
   occupation: zOptionalText(120),
@@ -54,7 +61,7 @@ const nonNegInt = (max: number) => z.preprocess(blankChoice, z.coerce.number().i
 
 export const CLINICAL_FIELDS = Object.keys(clinicalShape) as (keyof typeof clinicalShape)[];
 
-export const preauthDetailsSchema = z
+const detailsObject = z
   .object({
     ...caseDetailsShape,
     ...clinicalShape,
@@ -72,14 +79,27 @@ export const preauthDetailsSchema = z
     /** All diagnoses, primary first (the first is also stored as diagnosisId). */
     diagnosisIds: z.array(zUuid).max(10).optional(),
     dischargeDate: zOptionalDate,
-    chronicIllness: z.array(z.enum(CHRONIC_ILLNESSES)).max(CHRONIC_ILLNESSES.length).optional(),
+    // Common conditions from the list, or ones typed in (kept as written).
+    chronicIllness: z.array(z.string().trim().min(2, "Enter at least 2 characters.").max(80, "Keep this under 80 characters.")).max(15, "Up to 15 conditions.").optional(),
     ailmentDurationDays: nonNegInt(36500),
-  })
+  });
+
+/**
+ * Pre-Scrutiny quick fix: one or a few Clinical Details & Package fields, merged into the stored case and saved with
+ * the general rules (the full step's required fields are still checked by the engine and at submission).
+ */
+export const quickFixSchema = detailsObject
+  .pick({ diagnosisIds: true, symptoms: true, doctorName: true, admissionDate: true, admissionTime: true, dischargeDate: true, dischargeTime: true, chronicIllness: true, packageAmount: true })
+  .partial()
+  .strict();
+export type QuickFixInput = z.input<typeof quickFixSchema>;
+
+export const preauthDetailsSchema = detailsObject
   .superRefine((v, ctx) => {
     if (v.expectedInsuranceAmount !== undefined && v.estimatedCost !== undefined && v.expectedInsuranceAmount > v.estimatedCost) {
       ctx.addIssue({ code: "custom", path: ["expectedInsuranceAmount"], message: "Can't exceed the estimated cost." });
     }
-    if (v.admissionDate && v.dischargeDate && `${v.dischargeDate}T${v.dischargeTime ?? "23:59"}` <= `${v.admissionDate}T${v.admissionTime ?? "00:00"}`) {
+    if (v.admissionDate && v.dischargeDate && `${v.dischargeDate}T${v.dischargeTime ? fullTime(v.dischargeTime) : "23:59:59.999"}` <= `${v.admissionDate}T${fullTime(v.admissionTime)}`) {
       ctx.addIssue({ code: "custom", path: ["dischargeDate"], message: "The stay must end after it starts." });
     }
     if (v.chronicIllness?.includes("None") && v.chronicIllness.length > 1) {
@@ -103,16 +123,15 @@ export const wizardClinicalSchema = preauthDetailsSchema.superRefine((v, ctx) =>
   need(v.admissionDate, "admissionDate", "Enter when the stay starts.");
   need(v.dischargeDate, "dischargeDate", "Enter when the stay is expected to end.");
   need(v.doctorName, "doctorName", "Enter the treating doctor's name.");
-  need(v.doctorContact, "doctorContact", "Enter the doctor's 10-digit contact number.");
-  need(v.chronicIllness?.length, "chronicIllness", "Choose the past chronic illnesses, or None.");
+  need(v.chronicIllness?.length, "chronicIllness", "Choose or type the past chronic illnesses, or choose None.");
   need(v.costItems?.length || v.packageAmount !== undefined, "costItems", "Add at least one cost head, or an all-inclusive package amount.");
 });
 
 /** Whole days between the stay's start and end (part days count as a day; at least 1); null when not both given. */
 export function stayDays(start?: string, startTime?: string, end?: string, endTime?: string): number | null {
   if (!start || !end) return null;
-  const a = Date.parse(`${start}T${startTime || "00:00"}:00Z`);
-  const b = Date.parse(`${end}T${endTime || "00:00"}:00Z`);
+  const a = Date.parse(`${start}T${fullTime(startTime)}Z`);
+  const b = Date.parse(`${end}T${fullTime(endTime)}Z`);
   if (Number.isNaN(a) || Number.isNaN(b) || b <= a) return null;
   return Math.max(1, Math.ceil((b - a) / 86_400_000));
 }
@@ -130,6 +149,8 @@ export function expectedCost(items: { perDay?: unknown; days?: unknown }[] | und
 export const wizardKycSchema = z
   .object({
     uhid: zOptionalText(60),
+    /** Optional; never stored in full (a keyed hash and the last 4 digits are kept with the case). */
+    aadhaar: zOptionalAadhaar,
     patientName: z.string().trim().min(2, "Enter the patient's name.").max(120),
     gender: z.enum(["male", "female", "other"], { message: "Select the gender." }),
     dob: zDate,

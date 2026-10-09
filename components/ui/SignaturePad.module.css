@@ -1,0 +1,105 @@
+.wrap {
+  display: grid;
+  gap: var(--sp-2);
+  max-width: 520px;
+}
+
+.head,
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.modes {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-pill);
+}
+
+.modes button {
+  min-height: 30px;
+  padding: 0 var(--sp-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--c-text-muted);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.modes button[aria-pressed="true"] {
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+
+/* The pad stays white in both themes so the signature reads as ink on paper (and prints the same). */
+.canvas {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 480 / 150;
+  border: 1px dashed var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: #fff;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.canvas[data-empty="true"] {
+  border-color: var(--c-text-subtle);
+}
+
+.typeRow {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.typeInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-input);
+  color: var(--c-text);
+  font: inherit;
+}
+
+.action {
+  min-height: 34px;
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.modes button:focus-visible,
+.action:focus-visible,
+.typeInput:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.hint {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}

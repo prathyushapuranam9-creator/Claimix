@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { maskAadhaar } from "@/lib/india";
 import { orNotFound, pageContext } from "@/lib/auth/context";
 import { PatientService } from "@/modules/patients/patients.service";
 import { PatientForm } from "@/components/patients/PatientForm";
@@ -19,6 +20,7 @@ export default async function EditPatientPage({ params }: { params: Promise<{ id
         <PatientForm
           action={update}
           defaults={{ fullName: p.fullName, dob: p.dob, gender: p.gender, patientNo: p.patientNo, phone: p.phone ?? "", email: p.email ?? "", department: p.department ?? "", visitReason: p.visitReason ?? "" }}
+          aadhaarOnFile={maskAadhaar(p.aadhaarLast4)}
           cancelHref={`/patients/${p.id}`}
           submitLabel="Save changes"
         />

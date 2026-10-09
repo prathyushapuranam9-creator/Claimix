@@ -67,12 +67,17 @@ export const patients = pgTable("patients", {
   department: varchar("department", { length: 40 }),
   // Plain-language reason for the visit, as recorded by the hospital; null = not recorded.
   visitReason: varchar("visit_reason", { length: 300 }),
+  // Aadhaar is never stored in full: a keyed hash for exact lookups and the last 4 digits for masked display / partial search.
+  aadhaarHash: varchar("aadhaar_hash", { length: 64 }),
+  aadhaarLast4: varchar("aadhaar_last4", { length: 4 }),
   isDemo: boolean("is_demo").notNull().default(false),
   ...timestamps,
   ...softDelete,
 }, (t) => [
   uniqueIndex("patients_hospital_no_uq").on(t.hospitalId, t.patientNo),
   index("patients_name_idx").on(t.fullName),
+  index("patients_aadhaar_hash_idx").on(t.aadhaarHash),
+  index("patients_aadhaar_last4_idx").on(t.aadhaarLast4),
 ]);
 
 export const hospitalNetworks = pgTable("hospital_networks", {

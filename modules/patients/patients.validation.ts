@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidAadhaar } from "@/lib/india";
 import { zName, zOptionalEmail, zOptionalPhone, zOptionalText, zOptionalUuid, zPastDate } from "@/lib/validation";
 
 export const GENDERS = ["female", "male", "other", "undisclosed"] as const;
@@ -43,6 +44,19 @@ export function departmentLabel(key: string | null | undefined): string {
   return key && key in PATIENT_DEPARTMENTS ? PATIENT_DEPARTMENTS[key as PatientDepartment] : NO_DEPARTMENT;
 }
 
+/**
+ * An optional Aadhaar number, kept as text (so no digit is lost): 12 digits, spaces / hyphens ignored, checked with the
+ * Verhoeff check digit UIDAI uses (an Aadhaar never starts with 0 or 1).
+ */
+export const zOptionalAadhaar = z.preprocess(
+  (v) => (typeof v === "string" ? v.replace(/[\s-]/g, "") || undefined : v),
+  z
+    .string()
+    .regex(/^\d{12}$/, "Aadhaar Number has exactly 12 digits.")
+    .refine(isValidAadhaar, "This isn't a valid Aadhaar number — check the digits.")
+    .optional(),
+);
+
 export const patientInputSchema = z.object({
   fullName: zName,
   dob: zPastDate("Date of birth"),
@@ -52,6 +66,8 @@ export const patientInputSchema = z.object({
   patientNo: zOptionalText(40).refine((v) => v === undefined || /^[A-Za-z0-9-]+$/.test(v), "Use letters, numbers and hyphens only."),
   department: z.preprocess((v) => (v === "" ? undefined : v), z.enum(Object.keys(PATIENT_DEPARTMENTS) as [PatientDepartment, ...PatientDepartment[]], { message: "Select a department from the list." }).optional()),
   visitReason: zOptionalText(300),
+  /** Optional; never stored in full (see modules/patients/aadhaar.ts). Blank on an edit keeps the number on file. */
+  aadhaar: zOptionalAadhaar,
   // Only platform admins choose a hospital; staff always register into their own.
   hospitalId: zOptionalUuid,
   /** Set after the user has seen the "possible duplicate" warning and chose to register anyway. */

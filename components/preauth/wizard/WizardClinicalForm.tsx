@@ -1,6 +1,7 @@
 "use client";
 
-import { Controller, useFieldArray, useForm, useWatch } from "react-hook-form";
+import { useId, useState } from "react";
+import { Controller, useController, useFieldArray, useForm, useWatch, type Control } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ActionResult } from "@/lib/action-result";
 import { useServerResult } from "@/lib/use-action-form";
@@ -8,6 +9,7 @@ import { formatINR } from "@/lib/india";
 import { CHRONIC_ILLNESSES, COST_HEADS, expectedCost, stayDays, wizardClinicalSchema, type PreauthDetailsInput } from "@/modules/preauth/preauth.validation";
 import { Button } from "@/components/ui/Button";
 import { ComboBox } from "@/components/ui/ComboBox";
+import { DateTimePicker } from "@/components/ui/DateTimePicker";
 import { SelectField, TextAreaField, TextField } from "@/components/ui/Field";
 import { FormGrid, FormSection, FullWidth, formStyles } from "@/components/ui/Form";
 import { Alert } from "@/components/ui/Surface";
@@ -18,8 +20,6 @@ type Coded = { id: string; code: string; name: string };
 export const CLINICAL_FORM_ID = "wizard-clinical";
 
 const ROOM_CATEGORIES = ["General ward", "Twin sharing", "Single private", "Deluxe / suite", "ICU", "Day care"];
-const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
-const MINUTES = ["00", "15", "30", "45"];
 const COMPLAINT_SAMPLE = "e.g. Pain in the right lower abdomen for 2 days, fever and vomiting since last night";
 
 /** A segmented pill toggle over a radio group (keyboard and screen-reader friendly). */
@@ -40,25 +40,95 @@ function Pills({ legend, name, options, value, onChange, error }: { legend: stri
   );
 }
 
-/** Date + HH : MM for one end of the stay. */
-function DateTime({ label, date, time, onTime, error, required }: { label: string; date: React.InputHTMLAttributes<HTMLInputElement>; time?: string; onTime: (v: string) => void; error?: string; required?: boolean }) {
-  const [h, m] = (time ?? "").split(":");
-  const set = (hh?: string, mm?: string) => onTime(hh || mm ? `${hh || "00"}:${mm || "00"}` : "");
+/** One end of the stay: its date and time fields, edited together in the date-and-time picker. */
+function StayPicker({ control, dateName, timeName, heading, error, onDirty }: {
+  control: Control<PreauthDetailsInput>;
+  dateName: "admissionDate" | "dischargeDate";
+  timeName: "admissionTime" | "dischargeTime";
+  heading: string;
+  error?: string;
+  onDirty?: (d: boolean) => void;
+}) {
+  const headingId = useId();
+  const date = useController({ control, name: dateName });
+  const time = useController({ control, name: timeName });
   return (
-    <div className={styles.dateTime}>
-      <TextField label={label} type="date" required={required} error={error} {...date} />
-      <div className={styles.timeRow} role="group" aria-label={`${label} time`}>
-        <select aria-label={`${label} hour`} value={h ?? ""} onChange={(e) => set(e.target.value, m)}>
-          <option value="">HH</option>
-          {HOURS.map((x) => <option key={x} value={x}>{x}</option>)}
-        </select>
-        <span aria-hidden="true">:</span>
-        <select aria-label={`${label} minutes`} value={m ?? ""} onChange={(e) => set(h, e.target.value)}>
-          <option value="">MM</option>
-          {MINUTES.map((x) => <option key={x} value={x}>{x}</option>)}
-        </select>
-      </div>
+    <div className={styles.dateTime} data-no-dirty>
+      <span id={headingId} className={styles.stayHeading}>{heading}</span>
+      <DateTimePicker
+        required
+        labelledBy={headingId}
+        value={{ date: (date.field.value as string | undefined) || undefined, time: (time.field.value as string | undefined) || undefined }}
+        onChange={(v) => {
+          date.field.onChange(v.date ?? "");
+          time.field.onChange(v.time ?? "");
+          onDirty?.(true);
+        }}
+        error={error}
+      />
     </div>
+  );
+}
+
+/**
+ * Past history of chronic illness: pick common conditions from the list, or type any other. Each choice shows as a chip
+ * that can be removed; "None" can't be combined with a condition.
+ */
+export function ChronicIllnessInput({ value, onChange, error }: { value: string[]; onChange: (v: string[]) => void; error?: string }) {
+  const id = useId();
+  const [other, setOther] = useState("");
+  const add = (x: string) => {
+    const t = x.trim().replace(/\s+/g, " ");
+    if (t.length < 2 || value.some((v) => v.toLowerCase() === t.toLowerCase())) return;
+    onChange(t === "None" ? ["None"] : [...value.filter((v) => v !== "None"), t]);
+  };
+  const addOther = () => {
+    add(other);
+    setOther("");
+  };
+  return (
+    <fieldset className={styles.radioRow} aria-describedby={error ? `${id}-err` : undefined}>
+      <legend>Past History of Chronic Illness *</legend>
+      <div className={styles.illnessRow}>
+        <SelectField
+          label="Choose a condition"
+          value=""
+          onChange={(e) => {
+            if (e.target.value) add(e.target.value);
+          }}
+        >
+          <option value="">Select from the list…</option>
+          {CHRONIC_ILLNESSES.filter((x) => !value.includes(x)).map((x) => <option key={x} value={x}>{x}</option>)}
+        </SelectField>
+        <div className={styles.illnessOther}>
+          <TextField
+            label="Or type another condition"
+            value={other}
+            maxLength={80}
+            placeholder="e.g. Thyroid disorder"
+            onChange={(e) => setOther(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addOther();
+              }
+            }}
+          />
+          <Button type="button" variant="secondary" onClick={addOther} disabled={other.trim().length < 2}>Add</Button>
+        </div>
+      </div>
+      {value.length > 0 && (
+        <ul className={styles.illnessChips} aria-label="Chosen conditions">
+          {value.map((v) => (
+            <li key={v} className={styles.illnessChip}>
+              {v}
+              <button type="button" aria-label={`Remove ${v}`} onClick={() => onChange(value.filter((x) => x !== v))}>×</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && <span id={`${id}-err`} role="alert" className={styles.fieldError}>{error}</span>}
+    </fieldset>
   );
 }
 
@@ -102,6 +172,8 @@ export function WizardClinicalForm({
   const diagnosisIds = (useWatch({ control, name: "diagnosisIds" }) as string[] | undefined) ?? [];
   const [admissionDate, admissionTime, dischargeDate, dischargeTime] = useWatch({ control, name: ["admissionDate", "admissionTime", "dischargeDate", "dischargeTime"] }) as (string | undefined)[];
   const e = formState.errors;
+  const [costOpen, setCostOpen] = useState(false);
+  const costInvalid = !!(e.costItems || e.packageAmount);
 
   const total = expectedCost(watchedItems as { perDay?: unknown; days?: unknown }[], packageAmount);
   const days = stayDays(admissionDate, admissionTime, dischargeDate, dischargeTime);
@@ -116,15 +188,23 @@ export function WizardClinicalForm({
       noValidate
       onChange={() => onDirty?.(true)}
       onClick={(e) => {
-        // Chips, + Add a Head, Remove and list picks change values without a native change event.
-        if ((e.target as HTMLElement).closest("button:not([type=submit]), [role=option]")) onDirty?.(true);
+        // Chips, + Add a Head, Remove and list picks change values without a native change event (the date-and-time
+        // picker reports its own changes on Confirm).
+        const t = e.target as HTMLElement;
+        if (!t.closest("[data-no-dirty]") && t.closest("button:not([type=submit]), [role=option]")) onDirty?.(true);
       }}
-      onSubmit={handleSubmit(async (v) => {
-        if (apply(await save(v))) {
-          onDirty?.(false);
-          onSaved();
-        }
-      })}
+      onSubmit={handleSubmit(
+        async (v) => {
+          if (apply(await save(v))) {
+            onDirty?.(false);
+            onSaved();
+          }
+        },
+        (errs) => {
+          // A problem inside the cost dropdown opens it so the message is seen.
+          if (errs.costItems || errs.packageAmount) setCostOpen(true);
+        },
+      )}
     >
       {formError && <Alert tone="danger">{formError}</Alert>}
       <fieldset disabled={disabled} className={styles.plainFieldset}>
@@ -182,12 +262,8 @@ export function WizardClinicalForm({
               <fieldset className={styles.radioRow}>
                 <legend>Length of Stay *</legend>
                 <div className={styles.stayRow}>
-                  <Controller control={control} name="admissionTime" render={({ field }) => (
-                    <DateTime label="Stay starts" required date={register("admissionDate")} time={field.value as string | undefined} onTime={field.onChange} error={err("admissionDate")} />
-                  )} />
-                  <Controller control={control} name="dischargeTime" render={({ field }) => (
-                    <DateTime label="Stay ends" required date={register("dischargeDate")} time={field.value as string | undefined} onTime={field.onChange} error={err("dischargeDate")} />
-                  )} />
+                  <StayPicker control={control} dateName="admissionDate" timeName="admissionTime" heading="Stay starts" error={err("admissionDate")} onDirty={onDirty} />
+                  <StayPicker control={control} dateName="dischargeDate" timeName="dischargeTime" heading="Stay ends" error={err("dischargeDate")} onDirty={onDirty} />
                 </div>
                 <p className={styles.stayTotal} data-testid="stay-total">Total stay: {days ?? "—"} {days === 1 ? "day" : "days"}</p>
               </fieldset>
@@ -207,7 +283,6 @@ export function WizardClinicalForm({
               />
             </FullWidth>
             <TextField label="Treating Doctor" required error={err("doctorName")} {...register("doctorName")} />
-            <TextField label="Doctor's Contact Number" type="tel" inputMode="numeric" maxLength={10} required error={err("doctorContact")} {...register("doctorContact")} />
             <TextField label="Department" list="wizard-departments" error={err("department")} {...register("department")} />
             <datalist id="wizard-departments">{departments.map((d) => <option key={d} value={d} />)}</datalist>
             <TextField label="Room Category" list="wizard-rooms" placeholder="e.g. Twin sharing" error={err("roomCategory")} {...register("roomCategory")} />
@@ -216,28 +291,25 @@ export function WizardClinicalForm({
               <Controller
                 control={control}
                 name="chronicIllness"
-                render={({ field }) => {
-                  const v = (field.value as string[] | undefined) ?? [];
-                  const toggle = (x: string) =>
-                    field.onChange(x === "None" ? (v.includes("None") ? [] : ["None"]) : v.includes(x) ? v.filter((y) => y !== x) : [...v.filter((y) => y !== "None"), x]);
-                  return (
-                    <fieldset className={styles.radioRow}>
-                      <legend>Past History of Chronic Illness *</legend>
-                      <div className={styles.chips}>
-                        {CHRONIC_ILLNESSES.map((x) => (
-                          <button key={x} type="button" className={styles.pill} aria-pressed={v.includes(x)} onClick={() => toggle(x)}>{x}</button>
-                        ))}
-                      </div>
-                      {err("chronicIllness") && <span role="alert" className={styles.fieldError}>{err("chronicIllness")}</span>}
-                    </fieldset>
-                  );
-                }}
+                render={({ field }) => (
+                  <ChronicIllnessInput value={(field.value as string[] | undefined) ?? []} onChange={field.onChange} error={err("chronicIllness")} />
+                )}
               />
             </FullWidth>
           </FormGrid>
         </FormSection>
 
-        <FormSection title="Expected cost breakdown" hint="The payer decides the approved amount; this is the hospital's estimate.">
+        <details
+          className={styles.collapsible}
+          open={costOpen || costInvalid}
+          onToggle={(ev) => setCostOpen((ev.currentTarget as HTMLDetailsElement).open)}
+          data-testid="cost-section"
+        >
+          <summary>
+            Expected Cost Breakdown <span className={styles.summaryTotal}>{total === null ? "not entered" : formatINR(total)}</span>
+          </summary>
+          <div className={styles.collapsibleBody}>
+          <p className={styles.muted}>The payer decides the approved amount; this is the hospital&apos;s estimate.</p>
           <div className={styles.tableWrap}>
             <table className={styles.costTable} aria-label="Expected cost breakdown">
               <thead>
@@ -295,7 +367,8 @@ export function WizardClinicalForm({
               <span className={styles.muted}>{packageAmount !== undefined && packageAmount !== "" ? "all-inclusive package" : "sum of the heads"}</span>
             </div>
           </FormGrid>
-        </FormSection>
+          </div>
+        </details>
 
         <details className={styles.collapsible}>
           <summary>Pre-Auth Form Details (IRDAI)</summary>

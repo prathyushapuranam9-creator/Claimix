@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { orNotFound, pageContext } from "@/lib/auth/context";
-import { formatDate, formatDateTime, formatINR } from "@/lib/india";
+import { formatDate, formatDateTime, formatINR, maskAadhaar } from "@/lib/india";
 import { param } from "@/lib/pagination";
 import { todayIso } from "@/lib/validation";
 import { nhcxStatus } from "@/modules/nhcx/nhcx";
@@ -9,18 +9,20 @@ import { ClinicalRepository } from "@/modules/clinical/clinical.repository";
 import { COVER_PERIOD_LABEL, coverPeriodStatus } from "@/modules/patients/coverage.validation";
 import { PATIENT_DEPARTMENTS } from "@/modules/patients/patients.validation";
 import type { MemberRow } from "@/modules/preauth/preauth.repository";
+import { checklistStep } from "@/modules/preauth/preauth.scrutiny";
 import { PreauthService } from "@/modules/preauth/preauth.service";
 import type { WizardKycInput } from "@/modules/preauth/preauth.validation";
 import { NewCaseStart } from "@/components/preauth/wizard/NewCaseStart";
+import { PatientFinder } from "@/components/preauth/wizard/PatientFinder";
 import { NewClaimWizard, type WizardView } from "@/components/preauth/wizard/NewClaimWizard";
 import { FullFormNote } from "@/components/preauth/wizard/WizardChrome";
 import { WIZARD_STEPS } from "@/components/preauth/wizard/steps";
 import styles from "@/components/preauth/wizard/NewClaimWizard.module.css";
 import { ButtonLink } from "@/components/ui/Button";
-import { CellText, DataTable, FilterBar } from "@/components/ui/DataTable";
+import { CellText, DataTable } from "@/components/ui/DataTable";
 import { Badge, Card, EmptyState, PageHeader, Stack } from "@/components/ui/Surface";
 import {
-  confirmWizardItemAction, raiseCaseAction, readCardAction, removeWizardDocumentAction, runAuditChecksAction, saveClinicalAction, saveKycAction, submitWizardAction,
+  confirmWizardItemAction, raiseCaseAction, removeWizardDocumentAction, runAuditChecksAction, saveClinicalAction, saveKycAction, submitWizardAction, suggestPatientsAction, quickFixAction,
   uploadWizardDocumentAction,
 } from "./actions";
 
@@ -63,7 +65,7 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
   // The full pre-authorization form (cases under way, reimbursements) belongs to the hospital desk, so reviewers get
   // the explanation rather than a link they can't open.
   const fullFormHref: string | null = null;
-  const kycActions = { readCard: readCardAction, raise: raiseCaseAction, saveKyc: saveKycAction, upload: uploadWizardDocumentAction, remove: removeWizardDocumentAction };
+  const kycActions = { raise: raiseCaseAction, saveKyc: saveKycAction, upload: uploadWizardDocumentAction, remove: removeWizardDocumentAction };
   const header = <PageHeader title={TITLE} description={SUBTITLE} />;
   const today = todayIso();
 
@@ -75,7 +77,7 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
       return (
         <div className={styles.page}>
           {header}
-          <NewCaseStart defaults={kycFromMember(m)} beneficiaryId={m.beneficiaryId} matched={matchedText(m)} patientName={m.fullName} options={options} actions={kycActions} />
+          <NewCaseStart defaults={kycFromMember(m)} aadhaarOnFile={maskAadhaar(m.aadhaarLast4)} beneficiaryId={m.beneficiaryId} matched={matchedText(m)} patientName={m.fullName} options={options} actions={kycActions} />
         </div>
       );
     }
@@ -88,9 +90,9 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
         {header}
         <Stack>
           <Card title="Find the patient" padded={false}>
-            <FilterBar basePath={PATH} q={q} searchLabel="UHID / IP Number / Patient Name" submitLabel="Find" searchIcon />
+            <PatientFinder basePath={PATH} q={q} suggest={suggestPatientsAction} />
             {q.trim().length < 2 ? (
-              <EmptyState title="Search for the patient">Enter at least 2 characters of the UHID, IP / member number or the patient&apos;s name, then select Find.</EmptyState>
+              <EmptyState title="Search for the patient">Type at least 2 characters of the name, UHID, member or policy number, mobile or Aadhaar — suggestions appear as you type — or select Find.</EmptyState>
             ) : (
               <DataTable
                 caption="Matching patients"
@@ -149,8 +151,10 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
   const d = w.details;
   const m = w.member;
   const docCount = w.requirements.reduce((a, r) => a + r.uploaded, 0);
-  // KYC as saved; a case raised before KYC was captured starts from the record.
-  const kyc: Partial<WizardKycInput> = w.kyc ?? (m ? kycFromMember(m) : { uhid: w.patient.patientNo, patientName: w.patient.fullName, dob: w.patient.dob, memberId: w.beneficiary.memberId });
+  // KYC as saved (its Aadhaar hash never leaves the server); a case raised before KYC was captured starts from the record.
+  const { aadhaarHash: _hash, aadhaarLast4: kycLast4, ...savedKyc } = w.kyc ?? {};
+  void _hash;
+  const kyc: Partial<WizardKycInput> = w.kyc ? (savedKyc as Partial<WizardKycInput>) : (m ? kycFromMember(m) : { uhid: w.patient.patientNo, patientName: w.patient.fullName, dob: w.patient.dob, memberId: w.beneficiary.memberId });
   const nhcx = nhcxStatus();
 
   const view: WizardView = {
@@ -161,6 +165,7 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
     patientName: w.kyc?.patientName ?? w.patient.fullName,
     mobile: w.kyc?.mobile ?? w.patient.phone ?? null,
     kyc,
+    aadhaarOnFile: maskAadhaar(kycLast4 ?? w.patient.aadhaarLast4),
     beneficiaryId: w.preauth.beneficiaryId,
     matched: m ? matchedText(m) : `${w.patient.fullName} · member ${w.beneficiary.memberId}`,
     kycOptions: options,
@@ -172,6 +177,10 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
     requirements: w.requirements,
     policyHasDocumentRules: w.policyHasDocumentRules,
     scrutiny: w.scrutiny,
+    // Checks the engine cleared: readiness items that are done (the documents item is shown per document instead).
+    cleared: w.checklist.items
+      .filter((i) => i.state === "done" && i.key !== "documents_uploaded")
+      .map((i) => ({ key: i.key, label: i.label, detail: i.detail, step: checklistStep(i.key) })),
     evaluatedAt: w.evaluation ? w.evaluation.evaluatedAt.toISOString() : null,
     ruleVersion: w.evaluation?.ruleVersion ?? null,
     summary: [
@@ -186,7 +195,7 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
       ["Line of treatment", d.treatmentType ? cap(String(d.treatmentType)) : "Not entered"],
       ["Admission", d.admissionType ? `${cap(String(d.admissionType))} · ${formatDate(w.preauth.expectedAdmission)}` : "Not entered"],
       ["Stay", w.preauth.expectedStayDays ? `${w.preauth.expectedStayDays} ${w.preauth.expectedStayDays === 1 ? "day" : "days"}` : "Not entered"],
-      ["Treating doctor", d.doctorName ? `${d.doctorName}${d.doctorContact ? ` · ${d.doctorContact}` : ""}` : "Not entered"],
+      ["Treating doctor", d.doctorName ? String(d.doctorName) : "Not entered"],
       ["Expected cost", formatINR(w.preauth.estimatedCost)],
       ["Available balance", formatINR(w.beneficiary.sumInsuredAvailable)],
       ["Supporting documents", String(docCount)],
@@ -205,6 +214,7 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
         actions={{
           ...kycActions,
           saveClinical: saveClinicalAction,
+          quickFix: quickFixAction,
           runChecks: runAuditChecksAction,
           confirmItem: confirmWizardItemAction,
           submit: submitWizardAction,

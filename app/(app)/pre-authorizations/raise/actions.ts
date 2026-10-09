@@ -4,10 +4,14 @@ import { revalidatePath } from "next/cache";
 import { actionContext } from "@/lib/auth/context";
 import { runAction, type ActionResult } from "@/lib/actions";
 import { ValidationError } from "@/lib/errors";
+import { maskAadhaar } from "@/lib/india";
+import { todayIso } from "@/lib/validation";
+import { coverPeriodStatus } from "@/modules/patients/coverage.validation";
 import { DocumentService } from "@/modules/documents/documents.service";
-import { KycCardService, type KycCardReading } from "@/modules/preauth/kyc-card.service";
 import { PreauthService } from "@/modules/preauth/preauth.service";
-import type { PreauthDetailsInput, WizardKycInput } from "@/modules/preauth/preauth.validation";
+import { RegistrationService } from "@/modules/preauth/registration.service";
+import type { PatientSuggestion } from "@/components/preauth/wizard/PatientFinder";
+import type { PreauthDetailsInput, QuickFixInput, WizardKycInput } from "@/modules/preauth/preauth.validation";
 
 /*
  * New Claim (insurer / TPA reviewer raising a cashless case on the hospital's behalf). Every action re-checks
@@ -32,9 +36,23 @@ async function fileOf(form: FormData) {
   return { name: file.name, size: file.size, bytes: new Uint8Array(await file.arrayBuffer()) };
 }
 
-/** KYC & Policy → "Use These Details": reads the dropped policy card (not stored by this call). */
-export async function readCardAction(form: FormData): Promise<ActionResult<KycCardReading>> {
-  return runAction("kyc.card_read", async () => KycCardService.read(await actionContext(), await fileOf(form)));
+/** Find the Patient suggestions while typing: the reviewer's own members only, at most 8. */
+export async function suggestPatientsAction(q: string): Promise<ActionResult<PatientSuggestion[]>> {
+  return runAction("preauth.suggest_patients", async () => {
+    const today = todayIso();
+    const rows = await PreauthService.members(await actionContext(), q, { limit: 8 });
+    return rows.map((m) => ({
+      beneficiaryId: m.beneficiaryId,
+      fullName: m.fullName,
+      patientNo: m.patientNo,
+      dob: m.dob,
+      phone: m.phone,
+      memberId: m.memberId,
+      policyName: m.policyName,
+      aadhaar: maskAadhaar(m.aadhaarLast4),
+      inForce: coverPeriodStatus(m, today) === "in_force",
+    }));
+  });
 }
 
 /** KYC & Policy → Next: creates the draft case and returns its id. */
@@ -50,6 +68,11 @@ export async function saveKycAction(id: string, input: WizardKycInput) {
 /** Clinical Details & Package → Register the Case. */
 export async function saveClinicalAction(id: string, input: PreauthDetailsInput) {
   return step("preauth.wizard_clinical", async () => PreauthService.saveClinical(await actionContext(), id, input));
+}
+
+/** AI Pre-Scrutiny quick fix: a few Clinical Details & Package fields, merged into the saved case. */
+export async function quickFixAction(id: string, input: QuickFixInput) {
+  return step("preauth.quick_fix", async () => PreauthService.quickFix(await actionContext(), id, input));
 }
 
 /** One file per call (the browser sends several in turn for a multi-file drop). */
@@ -79,5 +102,22 @@ export async function confirmWizardItemAction(id: string, input: { key: string; 
 export async function submitWizardAction(id: string, input: { acknowledged: boolean }) {
   const r = await step("preauth.wizard_submit", async () => PreauthService.wizardSubmit(await actionContext(), id, input));
   if (r.ok) revalidatePath(`/pre-authorizations/${id}`);
+  return r;
+}
+
+/** Register Case → Print / Download / Save → Save: a copy of the form filed with the case. */
+export async function saveRegistrationCopyAction(id: string, input: { signature?: string | null }): Promise<ActionResult<string>> {
+  const r = await runAction("preauth.registration_copy", async () => (await RegistrationService.saveCopy(await actionContext(), id, input)).documentId);
+  if (r.ok) revalidatePath(PATH);
+  return r;
+}
+
+/** Register Case → Submit: the signed form saved with the case and the patient's record. */
+export async function submitRegistrationAction(id: string, input: { signature: string | null }): Promise<ActionResult<{ documentId: string; duplicate: boolean }>> {
+  const r = await runAction("preauth.case_registered", async () => RegistrationService.submit(await actionContext(), id, input));
+  if (r.ok) {
+    revalidatePath(PATH);
+    revalidatePath("/patients", "layout");
+  }
   return r;
 }

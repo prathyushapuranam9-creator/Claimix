@@ -156,17 +156,23 @@ export function ContextSwitcher({
   );
 }
 
-/** Small "Exit" control for the banner shown on every page while a testing context is active. */
-export function ExitContextButton({ exitAction }: { exitAction: () => Promise<ActionResult> }) {
+/**
+ * "Exit" control of the testing context (dashboard switcher and the navbar context pill). With `className` it renders
+ * as a plain text button styled by the caller (the pill); the action is the same either way.
+ */
+export function ExitContextButton({ exitAction, className }: { exitAction: () => Promise<ActionResult>; className?: string }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const exit = () => start(async () => { await exitAction(); router.push("/dashboard"); router.refresh(); });
+  if (className) {
+    return (
+      <button type="button" className={className} onClick={exit} disabled={pending} aria-busy={pending || undefined}>
+        Exit
+      </button>
+    );
+  }
   return (
-    <Button
-      size="sm"
-      variant="secondary"
-      loading={pending}
-      onClick={() => start(async () => { await exitAction(); router.push("/dashboard"); router.refresh(); })}
-    >
+    <Button size="sm" variant="secondary" loading={pending} onClick={exit}>
       Exit
     </Button>
   );

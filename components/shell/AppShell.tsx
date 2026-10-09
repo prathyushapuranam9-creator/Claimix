@@ -23,10 +23,12 @@ interface Props {
   logout: () => Promise<void>;
   /** Unread notifications for the signed-in user (null when the role has no inbox). */
   unread: number | null;
+  /** Compact testing-context pill shown in the taskbar (insurance portal testing); none otherwise. */
+  context?: ReactNode;
   children: ReactNode;
 }
 
-export function AppShell({ nav, portal, portalKey, user, logout, unread, children }: Props) {
+export function AppShell({ nav, portal, portalKey, user, logout, unread, context, children }: Props) {
   const pathname = usePathname();
   // The drawer remembers the path it was opened on, so navigating closes it.
   const [openedAt, setOpenedAt] = useState<string | null>(null);
@@ -87,7 +89,7 @@ export function AppShell({ nav, portal, portalKey, user, logout, unread, childre
     <div className={styles.shell} data-collapsed={collapsed} data-portal={portalKey}>
       <a href="#main" className="skip-link">Skip to content</a>
       {open && <button className={styles.scrim} aria-label="Close menu" onClick={() => setOpen(false)} />}
-      <aside id="app-sidebar" className={styles.sidebar} data-open={open} aria-label="Main navigation">
+      <aside id="app-sidebar" className={styles.sidebar} data-open={open} aria-label="Main navigation" data-print="hide">
         <Link href="/dashboard" className={styles.brand} onClick={() => pathname !== "/dashboard" && markSidebarNav()}>
           <LogoMark /> <span className={styles.label}>Claimix</span>
         </Link>
@@ -130,7 +132,7 @@ export function AppShell({ nav, portal, portalKey, user, logout, unread, childre
         </div>
       </aside>
       <div className={styles.column}>
-        <header className={styles.topbar}>
+        <header className={styles.topbar} data-print="hide">
           <button
             type="button"
             className={styles.menuBtn}
@@ -143,7 +145,8 @@ export function AppShell({ nav, portal, portalKey, user, logout, unread, childre
           </button>
           {/* The taskbar shows only the portal; Back and the section name sit just below it. */}
           <span className={styles.topTitle}>{portal}</span>
-          <div className={styles.themeSlot}><ThemeToggle /></div>
+          {context && <div className={styles.contextSlot}>{context}</div>}
+          <div className={context ? `${styles.themeSlot} ${styles.afterContext}` : styles.themeSlot}><ThemeToggle /></div>
           {unread !== null && (
             <span className={styles.bellWrap}>
               <Link href="/notifications" className={styles.bell} aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>
@@ -199,7 +202,7 @@ export function AppShell({ nav, portal, portalKey, user, logout, unread, childre
           </div>
         </header>
         {/* Below the taskbar: Back (to the page the user actually came from) + the current section. */}
-        <div className={styles.pagebar}>
+        <div className={styles.pagebar} data-print="hide">
           {showBack && <BackButton hasHistory={hasHistory} fallback={backFallback} />}
           <nav aria-label="Current section" className={styles.sectionName}>
             {crumb && (

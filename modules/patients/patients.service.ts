@@ -1,4 +1,5 @@
 import "server-only";
+import { aadhaarColumns } from "./aadhaar";
 import type { ServiceContext } from "@/lib/auth/context";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import type { ListQuery } from "@/lib/pagination";
@@ -71,7 +72,13 @@ export const PatientService = {
       if (await PatientRepository.patientNoTaken(tx, hospitalId, patientNo)) {
         throw new ConflictError(`Patient number ${patientNo} is already in use at this hospital.`);
       }
+      const aadhaar = aadhaarColumns(data.aadhaar);
+      if (aadhaar) {
+        const taken = await PatientRepository.aadhaarTaken(tx, hospitalId, aadhaar.aadhaarHash);
+        if (taken) throw new ConflictError(`This Aadhaar number is already registered at this hospital as ${taken.patientNo}.`);
+      }
       const row = await PatientRepository.insert(tx, {
+        ...aadhaar,
         hospitalId,
         patientNo,
         fullName: data.fullName,
@@ -87,7 +94,7 @@ export const PatientService = {
         ...actorOf(ctx),
         resourceType: "patient",
         resourceId: row.id,
-        newState: { ...auditView(row), ...(data.confirmDuplicate ? { confirmedPossibleDuplicate: true } : {}) },
+        newState: { ...auditView(row), ...(aadhaar ? { aadhaarLast4: aadhaar.aadhaarLast4 } : {}), ...(data.confirmDuplicate ? { confirmedPossibleDuplicate: true } : {}) },
       });
       return row;
     });
@@ -104,8 +111,15 @@ export const PatientService = {
       if (patientNo !== before.patientNo && (await PatientRepository.patientNoTaken(tx, before.hospitalId, patientNo, id))) {
         throw new ConflictError(`Patient number ${patientNo} is already in use at this hospital.`);
       }
+      // A new Aadhaar replaces the one on file; leaving it blank keeps it.
+      const aadhaar = aadhaarColumns(data.aadhaar);
+      if (aadhaar) {
+        const taken = await PatientRepository.aadhaarTaken(tx, before.hospitalId, aadhaar.aadhaarHash, id);
+        if (taken) throw new ConflictError(`This Aadhaar number is already registered at this hospital as ${taken.patientNo}.`);
+      }
       // The registering hospital never changes through an edit.
       const row = await PatientRepository.update(tx, id, {
+        ...aadhaar,
         patientNo,
         fullName: data.fullName,
         dob: data.dob,
@@ -121,7 +135,7 @@ export const PatientService = {
         resourceType: "patient",
         resourceId: id,
         previousState: auditView(before),
-        newState: auditView(row),
+        newState: { ...auditView(row), ...(aadhaar ? { aadhaarLast4: aadhaar.aadhaarLast4 } : {}) },
       });
       return row;
     });

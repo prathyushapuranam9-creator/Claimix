@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
   const hasInbox = user.principal.permissions.has("notification:read");
   const unread = hasInbox ? await InboxService.unreadCount({ db: getDb(), principal: user.principal, meta: await requestMeta() }) : null;
-  // While acting as an insurer / TPA role, the same selectors are available from the banner on every page.
+  // While acting as an insurer / TPA role, the same selectors are available from the navbar context pill on every page.
   const acting = user.principal.acting;
   const switcher =
     acting && user.canSwitchContext ? (
@@ -38,8 +38,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       user={{ fullName: user.fullName, email: user.email, roleName: user.roleName, orgName: user.orgName }}
       logout={logoutAction}
       unread={unread}
+      context={acting ? <ContextBanner key={`${user.principal.organizationId}:${user.principal.roleKey}:${user.principal.policyId ?? ""}`} organizationName={acting.organizationName} roleName={acting.roleName} policyName={acting.policyName} switcher={switcher} /> : undefined}
     >
-      {acting && <ContextBanner organizationName={acting.organizationName} roleName={acting.roleName} policyName={acting.policyName} switcher={switcher} />}
       {children}
     </AppShell>
   );

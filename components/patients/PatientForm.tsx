@@ -19,9 +19,11 @@ interface Props {
   hospitals?: { id: string; name: string }[];
   cancelHref: string;
   submitLabel: string;
+  /** The Aadhaar on file, masked (edit only). */
+  aadhaarOnFile?: string | null;
 }
 
-export function PatientForm({ action, defaults, hospitals, cancelHref, submitLabel }: Props) {
+export function PatientForm({ action, defaults, hospitals, cancelHref, submitLabel, aadhaarOnFile }: Props) {
   const { register, handleSubmit, setError, formState } = useForm<PatientInput>({
     resolver: zodResolver(patientInputSchema),
     defaultValues: { gender: "undisclosed", ...defaults },
@@ -101,6 +103,16 @@ export function PatientForm({ action, defaults, hospitals, cancelHref, submitLab
       <FormSection title="Contact">
         <FormGrid>
           <TextField label="Mobile number" type="tel" autoComplete="off" error={e.phone?.message} {...register("phone")} />
+          <TextField
+            label="Aadhaar number (optional)"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={14}
+            placeholder={aadhaarOnFile ?? "12 digits"}
+            hint={aadhaarOnFile ? `On file: ${aadhaarOnFile}. Leave blank to keep it.` : "Stored securely; only the last 4 digits are ever shown."}
+            error={e.aadhaar?.message}
+            {...register("aadhaar")}
+          />
           <TextField label="Email" type="email" autoComplete="off" error={e.email?.message} {...register("email")} />
         </FormGrid>
       </FormSection>

@@ -53,14 +53,10 @@ export function ComboBox({
   }, [options, query, value, multiple]);
 
   const pick = (o: ComboOption) => {
-    if (multiple) {
-      if (value.length < max) onChange([...value, o.value]);
-      setQuery("");
-    } else {
-      onChange([o.value]);
-      setQuery("");
-      setOpen(false);
-    }
+    // The list closes after each pick (so it never covers what follows); typing or ↓ opens it again.
+    onChange(multiple ? (value.length < max ? [...value, o.value] : value) : [o.value]);
+    setQuery("");
+    setOpen(false);
     setActive(0);
   };
 

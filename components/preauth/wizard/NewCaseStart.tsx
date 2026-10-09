@@ -10,13 +10,14 @@ import styles from "./NewClaimWizard.module.css";
 
 /**
  * KYC & Policy for the patient chosen with Find, before the case exists. Next (or clicking any later step) validates
- * and saves the KYC, which creates the draft and its case ID, files the held papers, then opens the chosen step.
+ * and saves the KYC, which creates the draft and its case ID, then opens the chosen step.
  */
 export function NewCaseStart({
   defaults,
   beneficiaryId,
   matched,
   patientName,
+  aadhaarOnFile,
   options,
   actions,
 }: {
@@ -24,6 +25,7 @@ export function NewCaseStart({
   beneficiaryId: string;
   matched: string;
   patientName: string;
+  aadhaarOnFile?: string | null;
   options: KycOptions;
   actions: KycActions;
 }) {
@@ -47,6 +49,7 @@ export function NewCaseStart({
           beneficiaryId={beneficiaryId}
           matched={matched}
           options={options}
+          aadhaarOnFile={aadhaarOnFile}
           actions={actions}
           onDone={(id) => start(() => router.replace(`/pre-authorizations/raise?id=${id}&step=${target.current}`))}
         />

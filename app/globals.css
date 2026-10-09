@@ -296,3 +296,14 @@ textarea { font: inherit; color: inherit; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Printing: only the page content (the app's navigation, taskbar and Back row are left out). */
+@media print {
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+}

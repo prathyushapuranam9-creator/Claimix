@@ -5,6 +5,8 @@ import { ConflictError, ForbiddenError, InvalidTransitionError, NotFoundError, V
 import type { ListQuery } from "@/lib/pagination";
 import { requirePermission, scopeFor, type Principal } from "@/lib/permissions/principal";
 import { randomToken } from "@/lib/security/crypto";
+import { aadhaarDigits } from "@/lib/india";
+import { aadhaarColumns, aadhaarHash } from "@/modules/patients/aadhaar";
 import { parseOrThrow, requireId, todayIso } from "@/lib/validation";
 import { actorOf, AuditService } from "@/modules/audit/audit.service";
 import { DocumentRepository } from "@/modules/documents/documents.repository";
@@ -22,7 +24,7 @@ import { isNewborn, scrutinize, wizardDocuments } from "./preauth.scrutiny";
 import { PreauthRepository, type MemberRow } from "./preauth.repository";
 import { ClinicalRepository } from "@/modules/clinical/clinical.repository";
 import {
-  cancelSchema, CLINICAL_FIELDS, confirmItemSchema, decisionSchema, preauthCreateSchema, preauthDetailsSchema, queryResponseSchema, expectedCost, gapsAcknowledgment, stayDays, submitSchema, wizardClinicalSchema, wizardKycSchema, wizardRaiseSchema, wizardSubmitSchema, type PreauthDetailsInput, type WizardKyc,
+  cancelSchema, CLINICAL_FIELDS, confirmItemSchema, decisionSchema, preauthCreateSchema, preauthDetailsSchema, queryResponseSchema, quickFixSchema, expectedCost, gapsAcknowledgment, stayDays, submitSchema, wizardClinicalSchema, wizardKycSchema, wizardRaiseSchema, wizardSubmitSchema, type PreauthDetailsInput, type WizardKyc,
 } from "./preauth.validation";
 import { allowedTransitions, canTransition, HOSPITAL_EDITABLE, PAYER_DECISIONS, STATUS_LABEL, TERMINAL, type PreauthStatus, type Side } from "./preauth.workflow";
 
@@ -157,9 +159,20 @@ export function storedDetails(p: Row["preauth"]): PreauthDetailsInput {
 }
 
 /** KYC & Policy as recorded on the case (null before it was captured). */
-export function storedKyc(p: Row["preauth"]): WizardKyc | null {
+export function storedKyc(p: Row["preauth"]): StoredKyc | null {
   const k = (p.clinical as Record<string, unknown>).kyc;
-  return k && typeof k === "object" ? (k as WizardKyc) : null;
+  return k && typeof k === "object" ? (k as StoredKyc) : null;
+}
+
+/** KYC as kept with the case: the Aadhaar (if given) only as a keyed hash and its last 4 digits, never in full. */
+export type StoredKyc = Omit<WizardKyc, "aadhaar"> & { aadhaarHash?: string; aadhaarLast4?: string };
+
+/** A blank Aadhaar keeps the one already on the case. */
+function kycForStorage(k: WizardKyc, prev?: StoredKyc | null): StoredKyc {
+  const { aadhaar, ...rest } = k;
+  const a = aadhaarColumns(aadhaar);
+  if (a) return { ...rest, ...a };
+  return prev?.aadhaarHash ? { ...rest, aadhaarHash: prev.aadhaarHash, aadhaarLast4: prev.aadhaarLast4 } : rest;
 }
 
 /** Non-clinical fields safe for audit state. */
@@ -306,11 +319,18 @@ export const PreauthService = {
   },
 
   /** New Claim wizard, step 1: the payer's own members matching a UHID / member ID / name (at least 2 characters). */
-  async members(ctx: ServiceContext, q: string) {
+  async members(ctx: ServiceContext, q: string, opts: { limit?: number } = {}) {
     const payer = raisingPayer(ctx.principal);
-    const term = q.trim();
+    const term = q.trim().slice(0, 100);
     if (term.length < 2) return [];
-    return PreauthRepository.findMembers(ctx.db, payer, term.slice(0, 100));
+    // A full Aadhaar is compared by its keyed hash only (never stored or logged); the lookup itself is audited.
+    const digits = aadhaarDigits(term);
+    const hash = /^\d{12}$/.test(digits) ? aadhaarHash(digits) : undefined;
+    const rows = await PreauthRepository.findMembers(ctx.db, payer, term, { limit: opts.limit, aadhaarHash: hash });
+    if (hash) {
+      await AuditService.record(ctx.db, { ...actorOf(ctx), action: "patient.aadhaar_lookup", resourceType: "patient", newState: { last4: digits.slice(-4), matches: rows.length } });
+    }
+    return rows;
   },
 
   /** New Claim wizard: one of the payer's members (refused if the coverage isn't under its own policies). */
@@ -366,7 +386,7 @@ export const PreauthService = {
         schemeId: policy.schemeId,
         status: "draft",
         ...cols,
-        clinical: { ...cols.clinical, kyc: d.kyc },
+        clinical: { ...cols.clinical, kyc: kycForStorage(d.kyc) },
         createdBy: ctx.principal.userId,
         raisedByOrgId: payer.orgId,
       });
@@ -402,7 +422,7 @@ export const PreauthService = {
       const m = await PreauthRepository.member(tx, payer, row.preauth.beneficiaryId);
       if (!m) throw new NotFoundError("Member not found among your policies.");
       assertSamePayer(kyc, m);
-      await PreauthRepository.update(tx, row.preauth.id, { clinical: { ...(row.preauth.clinical as Record<string, unknown>), kyc }, latestEvaluationId: null });
+      await PreauthRepository.update(tx, row.preauth.id, { clinical: { ...(row.preauth.clinical as Record<string, unknown>), kyc: kycForStorage(kyc, storedKyc(row.preauth)) }, latestEvaluationId: null });
       await AuditService.record(tx, { ...actorOf(ctx), action: "preauth.kyc_updated", resourceType: "preauth", resourceId: row.preauth.id, newState: { kycMode: kyc.mode } });
     });
   },
@@ -411,6 +431,20 @@ export const PreauthService = {
   async saveClinical(ctx: ServiceContext, id: string, input: unknown) {
     parseOrThrow(wizardClinicalSchema, input);
     return PreauthService.update(ctx, id, input);
+  },
+
+  /**
+   * AI Pre-Scrutiny quick fix: the given Clinical Details & Package fields merged into the stored case (nothing else
+   * changes), saved through the normal update (audited, and the last engine run is cleared so it is re-run).
+   */
+  async quickFix(ctx: ServiceContext, id: string, input: unknown) {
+    const payer = raisingPayer(ctx.principal);
+    const patch = parseOrThrow(quickFixSchema, input);
+    const row = await load(ctx, id);
+    if (row.preauth.raisedByOrgId !== payer.orgId) throw new NotFoundError("Pre-authorization not found.");
+    const updated = await PreauthService.update(ctx, id, { ...storedDetails(row.preauth), ...patch });
+    await AuditService.record(ctx.db, { ...actorOf(ctx), action: "preauth.quick_fix", resourceType: "preauth", resourceId: row.preauth.id, newState: { fields: Object.keys(patch) } });
+    return updated;
   },
 
   /** New Claim: drafts this insurer / TPA raised and can resume. */
@@ -462,6 +496,7 @@ export const PreauthService = {
         coverEnd: row.beneficiary.coverEnd,
         sumInsured: num(row.beneficiary.sumInsured),
         policyHasTpa: !!row.preauth.tpaId,
+        aadhaarHash: row.patient.aadhaarHash,
       },
       diagnosisCodes: diagnoses.map((x) => x.code),
     });
@@ -524,9 +559,11 @@ export const PreauthService = {
       requireSide(ctx, row, "hospital");
       if (!HOSPITAL_EDITABLE.has(row.preauth.status as PreauthStatus)) throw new ConflictError("This request can't be edited in its current status.");
       const cols = detailsToColumns(d);
-      // KYC & Policy is captured separately and kept across detail saves.
+      // KYC & Policy and the case registration (Register Case) are captured separately and kept across detail saves.
       const kyc = storedKyc(row.preauth);
       if (kyc) cols.clinical.kyc = kyc;
+      const registration = (row.preauth.clinical as Record<string, unknown>).registration;
+      if (registration) cols.clinical.registration = registration;
       // On a draft, any change invalidates the last rules check (re-run before submitting).
       const updated = await PreauthRepository.update(tx, row.preauth.id, { ...cols, ...(row.preauth.status === "draft" ? { latestEvaluationId: null } : {}) });
       await AuditService.record(tx, { ...actorOf(ctx), action: "preauth.updated", resourceType: "preauth", resourceId: row.preauth.id, previousState: auditView(row.preauth), newState: auditView(updated) });

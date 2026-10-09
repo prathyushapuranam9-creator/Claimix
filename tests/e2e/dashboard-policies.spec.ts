@@ -21,19 +21,19 @@ test.describe("Dashboard: Insurance Company + Policy narrows the whole portal", 
     await expect(page.locator("#policy-details")).toHaveCount(0); // the dropdown only selects; no details panel
 
     await policy(page).selectOption({ label: FLOATER });
-    await expect(banner(page)).toContainText(`Policy: ${FLOATER}`);
+    await expect(banner(page)).toContainText(FLOATER);
     await expect(policy(page).locator("option:checked")).toHaveText(FLOATER);
 
     // Across the portal: policies, pre-authorizations and claims follow the selection.
     await page.goto("/policies");
     await expect.poll(() => policyNames(page)).toEqual([FLOATER]);
     await page.goto("/pre-authorizations?view=all");
-    await expect(banner(page)).toContainText(`Policy: ${FLOATER}`);
+    await expect(banner(page)).toContainText(FLOATER);
 
     // Back on the dashboard, "All policies of this company" removes the narrowing.
     await page.goto("/dashboard");
     await policy(page).selectOption({ label: "All policies of this company" });
-    await expect(banner(page)).not.toContainText("Policy:");
+    await expect(banner(page)).not.toContainText(FLOATER);
     await page.goto("/policies");
     await expect.poll(async () => (await policyNames(page)).length).toBeGreaterThan(1);
   });
@@ -44,16 +44,16 @@ test.describe("Dashboard: Insurance Company + Policy narrows the whole portal", 
     await expect(policy(page)).toBeDisabled(); // "All Insurers": pick a company first
 
     await company(page).selectOption({ label: NAVJEEVAN });
-    await expect(banner(page)).toContainText(`Insurance: ${NAVJEEVAN}`); // no Switch Context click needed
+    await expect(banner(page)).toContainText(NAVJEEVAN); // no Switch Context click needed
     const names = (await policy(page).locator("option").allInnerTexts()).filter((t) => !t.startsWith("All policies"));
     expect(names).toContain("Navjeevan Super Top-Up 10L (DEMO DATA)");
     expect(names).not.toContain(FLOATER);
     await policy(page).selectOption({ label: "Navjeevan Super Top-Up 10L (DEMO DATA)" });
-    await expect(banner(page)).toContainText("Policy: Navjeevan Super Top-Up 10L (DEMO DATA)");
+    await expect(banner(page)).toContainText("Navjeevan Super Top-Up 10L (DEMO DATA)");
 
     await company(page).selectOption({ label: AAROGYA });
-    await expect(banner(page)).toContainText(`Insurance: ${AAROGYA}`);
-    await expect(banner(page)).not.toContainText("Policy:");
+    await expect(banner(page)).toContainText(AAROGYA);
+    await expect(banner(page)).not.toContainText("Navjeevan Super Top-Up");
     await expect(policy(page).locator("option:checked")).toHaveText("All policies of this company");
 
     // Leaving the context brings back the administrator's own view.

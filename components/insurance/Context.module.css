@@ -32,25 +32,135 @@
   grid-template-columns: minmax(0, 40rem);
 }
 
-.banner {
-  display: flex;
-  flex-wrap: wrap;
+
+
+
+/* Navbar testing-context pill: "🧪 TESTING CONTEXT: [Company] • [Role] | Switch Context | Exit". */
+.chip {
+  --chip-bg: #eff6ff;
+  --chip-border: #bfdbfe;
+  --chip-text: #334155;
+  --chip-label: #1e40af;
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: var(--sp-2) var(--sp-4);
-  padding: var(--sp-2) var(--sp-4);
-  margin-bottom: var(--sp-4);
-  background: var(--c-accent);
-  border: 1px solid var(--c-accent-edge);
-  border-radius: var(--radius-md);
-  color: var(--c-text);
-  font-size: var(--fs-sm);
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 4px 12px;
+  border: 1px solid var(--chip-border);
+  border-radius: 20px;
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
-.tag {
+:root[data-theme="dark"] .chip {
+  --chip-bg: #1a2b44;
+  --chip-border: #34507a;
+  --chip-text: #d6dee8;
+  --chip-label: #a9c8f5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .chip {
+    --chip-bg: #1a2b44;
+    --chip-border: #34507a;
+    --chip-text: #d6dee8;
+    --chip-label: #a9c8f5;
+  }
+}
+
+.chipLabel {
+  flex: none;
+  color: var(--chip-label);
+  font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.04em;
-  font-size: var(--fs-xs);
+  text-transform: uppercase;
 }
 
-.bannerActions { display: flex; align-items: center; gap: var(--sp-3); margin-left: auto; }
+/* The company / role shrinks (with an ellipsis) before anything overlaps the other navbar controls. */
+.chipText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chipSep {
+  flex: none;
+  color: var(--chip-border);
+}
+
+.chipSwitch {
+  position: static;
+  flex: none;
+}
+
+.chipAction {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--chip-label);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.chipAction:hover {
+  text-decoration: underline;
+}
+
+.chipAction:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.chipAction:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+/* The existing switcher, opened under the pill (it overlays the page; nothing below moves). */
+.chipPanel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: min(560px, calc(100vw - 32px));
+  white-space: normal;
+  font-size: var(--fs-md);
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--radius-lg);
+}
+
+.chipPanel > section {
+  margin-bottom: 0;
+}
+
+/* Narrow screens: keep the label and the actions; the company / role stays in the tooltip and the dropdown. */
+@media (max-width: 760px) {
+  .chipText,
+  .chipText + .chipSep {
+    display: none;
+  }
+
+  .chipLabel {
+    letter-spacing: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .chip {
+    gap: 4px;
+  }
+
+  .chipLabelText {
+    display: none;
+  }
+}

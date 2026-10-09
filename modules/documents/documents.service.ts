@@ -216,6 +216,14 @@ export const DocumentService = {
     return DocumentRepository.insuranceForPatient(ctx.db, found.patient.id);
   },
 
+  /** The patient's saved case registration forms (signed PDFs from Register Case) the caller may see. */
+  async registrationForms(ctx: ServiceContext, patientId: string) {
+    const scope = requirePermission(ctx.principal, "document:read");
+    const found = await PatientRepository.findScoped(ctx.db, ctx.principal, requirePermission(ctx.principal, "patient:read"), requireId(patientId, "Patient"));
+    if (!found) throw new NotFoundError("Patient not found.");
+    return DocumentRepository.registrationForms(ctx.db, ctx.principal, scope, found.patient.id);
+  },
+
   async forPreauth(ctx: ServiceContext, preauthId: string) {
     requirePermission(ctx.principal, "document:read");
     const subject = await PreauthRepository.findScoped(ctx.db, ctx.principal, requirePermission(ctx.principal, "preauth:read"), requireId(preauthId, "Pre-authorization"));
