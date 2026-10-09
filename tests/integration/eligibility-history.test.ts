@@ -29,14 +29,14 @@ const evaluationCount = async (beneficiaryId: string) => (await ctx.db.select({ 
 
 describe("eligibility history (recorded checks are readable again)", () => {
   it("returns every recorded check newest first, with the stored result, without running or recording anything", async () => {
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
-    expect(await EligibilityService.history(as("staffA"), coverage.id)).toEqual([]);
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
+    expect(await EligibilityService.history(as("deskA"), coverage.id)).toEqual([]);
 
-    const first = await EligibilityService.check(as("staffA"), { beneficiaryId: coverage.id, claimType: "cashless" });
-    const second = await EligibilityService.check(as("staffA"), complete(coverage.id));
+    const first = await EligibilityService.check(as("deskA"), { beneficiaryId: coverage.id, claimType: "cashless" });
+    const second = await EligibilityService.check(as("deskA"), complete(coverage.id));
     expect(await evaluationCount(coverage.id)).toBe(2);
 
-    const history = await EligibilityService.history(as("staffA"), coverage.id);
+    const history = await EligibilityService.history(as("deskA"), coverage.id);
     expect(history.map((h) => h.id)).toEqual([second.evaluationId, first.evaluationId]);
     expect(history[0]).toMatchObject({ overall: second.evaluation.overall, case: { claimType: "cashless", admissionDate: "2026-10-10", diagnosisCode: "K35" } });
     expect(history[0]!.evaluation).toEqual(second.evaluation);
@@ -44,24 +44,24 @@ describe("eligibility history (recorded checks are readable again)", () => {
     expect(history[0]!.checkedBy).toBeTruthy();
 
     // Reading it again (a refresh, returning to the page) never creates another evaluation.
-    await EligibilityService.history(as("staffA"), coverage.id);
-    await EligibilityService.latestChecks(as("staffA"), [coverage.id]);
+    await EligibilityService.history(as("deskA"), coverage.id);
+    await EligibilityService.latestChecks(as("deskA"), [coverage.id]);
     expect(await evaluationCount(coverage.id)).toBe(2);
   });
 
   it("latestChecks reports the newest check per coverage", async () => {
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
-    expect((await EligibilityService.latestChecks(as("staffA"), [coverage.id])).size).toBe(0);
-    await EligibilityService.check(as("staffA"), { beneficiaryId: coverage.id, claimType: "cashless" });
-    const latest = await EligibilityService.check(as("staffA"), complete(coverage.id));
-    const m = await EligibilityService.latestChecks(as("staffA"), [coverage.id]);
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
+    expect((await EligibilityService.latestChecks(as("deskA"), [coverage.id])).size).toBe(0);
+    await EligibilityService.check(as("deskA"), { beneficiaryId: coverage.id, claimType: "cashless" });
+    const latest = await EligibilityService.check(as("deskA"), complete(coverage.id));
+    const m = await EligibilityService.latestChecks(as("deskA"), [coverage.id]);
     expect(m.get(coverage.id)?.id).toBe(latest.evaluationId);
   });
 
   it("another hospital cannot read the history; users without the check permission cannot either", async () => {
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
-    await EligibilityService.check(as("staffA"), complete(coverage.id));
-    await expect(EligibilityService.history(as("staffB"), coverage.id)).rejects.toBeInstanceOf(NotFoundError);
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
+    await EligibilityService.check(as("deskA"), complete(coverage.id));
+    await expect(EligibilityService.history(as("deskB"), coverage.id)).rejects.toBeInstanceOf(NotFoundError);
     for (const k of ["insurerA", "tpaA", "patientA1", "readOnly"] as const) {
       await expect(EligibilityService.history(as(k), coverage.id)).rejects.toBeInstanceOf(ForbiddenError);
     }
@@ -71,9 +71,9 @@ describe("eligibility history (recorded checks are readable again)", () => {
   });
 
   it("only shows checks run by the viewer's own organization", async () => {
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
-    await EligibilityService.check(as("admin"), { ...complete(coverage.id), hospitalId: who.staffA.organizationId });
-    expect(await EligibilityService.history(as("staffA"), coverage.id)).toEqual([]);
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
+    await EligibilityService.check(as("admin"), { ...complete(coverage.id), hospitalId: who.deskA.organizationId });
+    expect(await EligibilityService.history(as("deskA"), coverage.id)).toEqual([]);
     expect((await EligibilityService.history(as("admin"), coverage.id)).length).toBe(1);
   });
 });

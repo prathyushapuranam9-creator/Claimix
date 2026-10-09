@@ -11,7 +11,7 @@ import { PatientService } from "@/modules/patients/patients.service";
 import { CHECKLIST } from "@/modules/preauth/preauth.checklist";
 import { PreauthService } from "@/modules/preauth/preauth.service";
 import type { Db } from "@/db/client";
-import { svc } from "./helpers";
+import { insuranceDesk, svc } from "./helpers";
 import type { Principal } from "@/lib/permissions/principal";
 
 export const PDF = new TextEncoder().encode("%PDF-1.7\n1 0 obj << /Type /Catalog >> endobj\n%%EOF");
@@ -32,9 +32,13 @@ export async function codes(db: Db) {
 
 const alpha = () => randomToken(6).replace(/[^a-zA-Z]/g, "x").slice(0, 6);
 
-/** A fresh patient at hospital A on the family floater (so balances aren't shared between runs). */
+/**
+ * A fresh patient at hospital A on the family floater (so balances aren't shared between runs).
+ * Recording coverage is an insurance action that Hospital Staff no longer holds, so the setup runs as the
+ * test-only insurance desk of the same hospital (see insuranceDesk); the patient is still the hospital's own.
+ */
 export async function freshFloaterPatient(db: Db, staffA: Principal, balance = 400000) {
-  const ctx = svc(db, staffA);
+  const ctx = svc(db, insuranceDesk(staffA));
   const p = await PatientService.create(ctx, { fullName: `Claims Test ${alpha()}`, dob: "1982-02-02", gender: "female" });
   const cov = await CoverageService.add(ctx, p.id, {
     policyId: DEMO.policy.aarogyaFloater, memberId: `CLT-${randomToken(8).replace(/[^A-Za-z0-9]/g, "")}`, relationship: "self",
@@ -48,7 +52,7 @@ const PREAUTH_DOCS = ["id_proof", "insurance_card", "doctor_consultation", "inve
 /** Full path to an approved cashless pre-authorization for a fresh patient. */
 export async function approvedPreauth(db: Db, who: { staffA: Principal; insurerA: Principal }, c: Awaited<ReturnType<typeof codes>>, amount = 100000) {
   const { coverage, patient } = await freshFloaterPatient(db, who.staffA);
-  const staff = svc(db, who.staffA);
+  const staff = svc(db, insuranceDesk(who.staffA));
   const p = await PreauthService.create(staff, {
     beneficiaryId: coverage.id, claimType: "cashless", diagnosisId: c.dx.K35, procedureId: c.px.APPENDECTOMY, admissionDate: "2026-09-20",
     isAccident: "no", pedDeclared: "no", pedRelated: "unknown", estimatedCost: amount, expectedInsuranceAmount: amount, roomRentPerDay: 4000,

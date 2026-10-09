@@ -43,13 +43,13 @@ const details = (coverageId: string) => ({
 
 /** A draft, and the same request after hospital staff complete the checks and submit it. */
 async function draftFor(coverageId: string) {
-  return PreauthService.create(as("staffA"), details(coverageId));
+  return PreauthService.create(as("deskA"), details(coverageId));
 }
 async function submit(preauthId: string) {
-  for (const t of PREAUTH_DOCS) await DocumentService.upload(as("staffA"), { subjectType: "preauth", subjectId: preauthId, docType: t, file: file() });
-  await PreauthService.runChecks(as("staffA"), preauthId);
-  for (const key of MANUAL) await PreauthService.confirmItem(as("staffA"), preauthId, { key, confirmed: true });
-  return PreauthService.submit(as("staffA"), preauthId, {});
+  for (const t of PREAUTH_DOCS) await DocumentService.upload(as("deskA"), { subjectType: "preauth", subjectId: preauthId, docType: t, file: file() });
+  await PreauthService.runChecks(as("deskA"), preauthId);
+  for (const key of MANUAL) await PreauthService.confirmItem(as("deskA"), preauthId, { key, confirmed: true });
+  return PreauthService.submit(as("deskA"), preauthId, {});
 }
 
 const AWAITING = ["submitted", "pending"] as const;
@@ -62,7 +62,7 @@ const listIds = async (k: keyof typeof who, status?: ("submitted" | "pending")[]
 
 describe("hospital submission → insurer / TPA reviewer", () => {
   it("persists a submitted pre-auth linked to the right patient, hospital, policy, insurer and TPA", async () => {
-    const { coverage, patient } = await freshFloaterPatient(ctx.db, who.staffA);
+    const { coverage, patient } = await freshFloaterPatient(ctx.db, who.deskA);
     const draft = await draftFor(coverage.id);
     expect(draft.status).toBe("draft");
     expect(draft.submittedAt).toBeNull();
@@ -96,7 +96,7 @@ describe("hospital submission → insurer / TPA reviewer", () => {
   it("the insurer reviewer's dashboard count, awaiting list and full list include it; a draft is invisible until submitted", async () => {
     const before = await awaitingCount("insurerA");
     expect(before.variant).toBe("payer");
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
     const draft = await draftFor(coverage.id);
 
     // A hospital draft is never visible to the payer.
@@ -116,7 +116,7 @@ describe("hospital submission → insurer / TPA reviewer", () => {
   });
 
   it("the TPA administering the policy sees it too; other insurers, other hospitals and patients do not", async () => {
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
     const draft = await draftFor(coverage.id);
     const tpaBefore = await awaitingCount("tpaA");
     const otherBefore = await awaitingCount("insurerB");
@@ -130,14 +130,14 @@ describe("hospital submission → insurer / TPA reviewer", () => {
     expect((await awaitingCount("insurerB")).rows).not.toContain(draft.id);
     await expect(PreauthService.workspace(as("insurerB"), draft.id)).rejects.toBeInstanceOf(NotFoundError);
 
-    expect(await listIds("staffB")).not.toContain(draft.id);
-    await expect(PreauthService.workspace(as("staffB"), draft.id)).rejects.toBeInstanceOf(NotFoundError);
+    expect(await listIds("deskB")).not.toContain(draft.id);
+    await expect(PreauthService.workspace(as("deskB"), draft.id)).rejects.toBeInstanceOf(NotFoundError);
     expect(await listIds("patientA2")).not.toContain(draft.id);
-    expect(await listIds("staffA")).toContain(draft.id);
+    expect(await listIds("deskA")).toContain(draft.id);
   });
 
   it("leaves the pending count and awaiting list once decided, but stays in the full list", async () => {
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
     const draft = await draftFor(coverage.id);
     await submit(draft.id);
     const pending = await awaitingCount("insurerA");
@@ -152,11 +152,11 @@ describe("hospital submission → insurer / TPA reviewer", () => {
   });
 
   it("a request the hospital cancels after submitting is no longer awaiting a decision", async () => {
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
     const draft = await draftFor(coverage.id);
     await submit(draft.id);
     const pending = await awaitingCount("insurerA");
-    await PreauthService.cancel(as("staffA"), draft.id, { message: "Patient chose another hospital" });
+    await PreauthService.cancel(as("deskA"), draft.id, { message: "Patient chose another hospital" });
     expect((await awaitingCount("insurerA")).count).toBe(pending.count - 1);
   });
 });
@@ -171,8 +171,8 @@ describe("a payer with no reviewer account", () => {
       .insert(policies)
       .values({ category: "private", insurerId: org!.id, name: `${name} Policy`, productType: "individual", isDemo: true })
       .returning();
-    const p = await PatientService.create(as("staffA"), { fullName: `Orphan Payer ${randomToken(5).replace(/[^a-zA-Z]/g, "x")}`, dob: "1980-01-01", gender: "male" });
-    const cov = await CoverageService.add(as("staffA"), p.id, {
+    const p = await PatientService.create(as("deskA"), { fullName: `Orphan Payer ${randomToken(5).replace(/[^a-zA-Z]/g, "x")}`, dob: "1980-01-01", gender: "male" });
+    const cov = await CoverageService.add(as("deskA"), p.id, {
       policyId: policy!.id, memberId: `ORPH-${randomToken(6).replace(/[^A-Za-z0-9]/g, "x")}`, relationship: "self", coverStart: "2026-04-01", coverEnd: "2027-03-31", sumInsured: 500000, sumInsuredAvailable: 500000,
     });
     return { org: org!, cov };
@@ -181,7 +181,7 @@ describe("a payer with no reviewer account", () => {
   it("hospital staff are told nobody can review the request; adding a Payer Reviewer clears it and makes the request visible to them", async () => {
     const { org, cov } = await insurerWithoutReviewers();
     const draft = await draftFor(cov.id);
-    expect((await PreauthService.workspace(as("staffA"), draft.id)).payersWithoutReviewer).toEqual([org.name]);
+    expect((await PreauthService.workspace(as("deskA"), draft.id)).payersWithoutReviewer).toEqual([org.name]);
 
     // The administrator adds a reviewer for that insurer (the request is submitted by then).
     const [role] = await ctx.db.select().from(roles).where(eq(roles.key, "payer_reviewer"));
@@ -189,7 +189,7 @@ describe("a payer with no reviewer account", () => {
     await ctx.db.insert(users).values({ email, fullName: "New Insurer Reviewer", organizationId: org.id, roleId: role!.id, passwordHash: await hashPassword(ctx.demoPassword), isDemo: true });
     await ctx.db.update(preAuthorizations).set({ status: "submitted", submittedAt: new Date() }).where(eq(preAuthorizations.id, draft.id));
 
-    expect((await PreauthService.workspace(as("staffA"), draft.id)).payersWithoutReviewer).toEqual([]);
+    expect((await PreauthService.workspace(as("deskA"), draft.id)).payersWithoutReviewer).toEqual([]);
     const reviewer = await principalFor(ctx.auth, email, ctx.demoPassword);
     const rc = svc(ctx.db, reviewer);
     const dash = await DashboardService.forCaller(rc);
@@ -204,6 +204,6 @@ describe("a payer with no reviewer account", () => {
     const { cov } = await insurerWithoutReviewers();
     const draft = await draftFor(cov.id);
     await ctx.db.update(preAuthorizations).set({ status: "approved", submittedAt: new Date() }).where(eq(preAuthorizations.id, draft.id));
-    expect((await PreauthService.workspace(as("staffA"), draft.id)).payersWithoutReviewer).toEqual([]);
+    expect((await PreauthService.workspace(as("deskA"), draft.id)).payersWithoutReviewer).toEqual([]);
   });
 });

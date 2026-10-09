@@ -56,20 +56,20 @@ afterAll(async () => {
 
 /** A submitted pre-authorization of Hospital A on a policy of the given insurer. */
 async function submittedOn(policyId: string) {
-  const patient = await PatientService.create(as("staffA"), { fullName: `Ctx Test ${letters()}`, dob: "1981-01-01", gender: "female" });
-  const cov = await CoverageService.add(as("staffA"), patient.id, {
+  const patient = await PatientService.create(as("deskA"), { fullName: `Ctx Test ${letters()}`, dob: "1981-01-01", gender: "female" });
+  const cov = await CoverageService.add(as("deskA"), patient.id, {
     policyId, memberId: `CTX-${randomToken(8).replace(/[^A-Za-z0-9]/g, "x")}`, relationship: "self", coverStart: "2026-04-01", coverEnd: "2027-03-31", inceptionDate: "2021-04-01", sumInsured: 500000, sumInsuredAvailable: 500000,
   });
-  const p = await PreauthService.create(as("staffA"), {
+  const p = await PreauthService.create(as("deskA"), {
     beneficiaryId: cov.id, claimType: "cashless", diagnosisId: c.dx.K35, procedureId: c.px.APPENDECTOMY, admissionDate: "2026-10-20",
     isAccident: "no", pedDeclared: "no", pedRelated: "unknown", estimatedCost: 90000, expectedInsuranceAmount: 90000, roomRentPerDay: 4000,
   });
-  for (const t of PREAUTH_DOCS) await DocumentService.upload(as("staffA"), { subjectType: "preauth", subjectId: p.id, docType: t, file: file() });
-  await PreauthService.runChecks(as("staffA"), p.id);
-  for (const key of MANUAL) await PreauthService.confirmItem(as("staffA"), p.id, { key, confirmed: true });
-  const open = (await PreauthService.workspace(as("staffA"), p.id)).checklist.items.filter((i) => !i.complete && i.confirmable);
-  for (const i of open) await PreauthService.confirmItem(as("staffA"), p.id, { key: i.key, confirmed: true, note: "Verified with the payer's network desk by phone." });
-  await PreauthService.submit(as("staffA"), p.id, { overrideReason: "Hospital confirms cover applies; the payer will decide." });
+  for (const t of PREAUTH_DOCS) await DocumentService.upload(as("deskA"), { subjectType: "preauth", subjectId: p.id, docType: t, file: file() });
+  await PreauthService.runChecks(as("deskA"), p.id);
+  for (const key of MANUAL) await PreauthService.confirmItem(as("deskA"), p.id, { key, confirmed: true });
+  const open = (await PreauthService.workspace(as("deskA"), p.id)).checklist.items.filter((i) => !i.complete && i.confirmable);
+  for (const i of open) await PreauthService.confirmItem(as("deskA"), p.id, { key: i.key, confirmed: true, note: "Verified with the payer's network desk by phone." });
+  await PreauthService.submit(as("deskA"), p.id, { overrideReason: "Hospital confirms cover applies; the payer will decide." });
   return { patient, cov, p };
 }
 const ids = async (cx: ReturnType<typeof svc>) => (await PreauthService.list(cx, ALL, {})).rows.map((r) => r.id);
@@ -80,7 +80,7 @@ describe("who may use the testing context", () => {
     const holders = ROLES.filter((r) => r.grants["insurance:context"]).map((r) => r.key);
     expect(holders).toEqual(["admin"]);
     expect(who.admin.permissions.has("insurance:context")).toBe(true);
-    for (const k of ["insurerA", "insurerB", "tpaA", "staffA", "readOnly", "patientA1"] as const) expect(who[k].permissions.has("insurance:context"), k).toBe(false);
+    for (const k of ["insurerA", "insurerB", "tpaA", "deskA", "readOnly", "patientA1"] as const) expect(who[k].permissions.has("insurance:context"), k).toBe(false);
     // The retired "Insurance Operations Admin" role no longer exists.
     expect(ROLES.some((r) => r.key === "insurance_ops_admin")).toBe(false);
   });
@@ -457,7 +457,7 @@ describe("the designated testing login (a payer reviewer an administrator has fl
     const [staff] = await ctx.db.select({ id: users.id, roleId: users.roleId, fullName: users.fullName }).from(users).where(eq(users.email, "staff.a@demo.claimix.invalid"));
     await expect(UserService.update(as("admin"), staff!.id, { fullName: staff!.fullName, roleId: staff!.roleId, isActive: true, insuranceContext: true })).rejects.toBeInstanceOf(ValidationError);
     const [rev] = await ctx.db.select({ id: users.id, roleId: users.roleId, fullName: users.fullName }).from(users).where(eq(users.email, "insurer.a@demo.claimix.invalid"));
-    for (const k of ["insurerA", "staffA", "portalReviewer"] as const) {
+    for (const k of ["insurerA", "deskA", "portalReviewer"] as const) {
       await expect(UserService.update(as(k), rev!.id, { fullName: rev!.fullName, roleId: rev!.roleId, isActive: true, insuranceContext: true }), k).rejects.toBeInstanceOf(ForbiddenError);
     }
     // Still its own company only.

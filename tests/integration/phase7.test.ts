@@ -33,14 +33,14 @@ afterAll(async () => {
 
 async function submittedPreauthDoc() {
   const { preauth } = await approvedPreauth(ctx.db, who, c);
-  const docs = await DocumentService.forPreauth(as("staffA"), preauth.id);
+  const docs = await DocumentService.forPreauth(as("deskA"), preauth.id);
   return { preauth, doc: docs.find((d) => d.docType === "insurance_card")! };
 }
 
 describe("document review", () => {
   it("only the assigned payer can review; a re-upload request needs a reason and notifies the hospital", async () => {
     const { preauth, doc } = await submittedPreauthDoc();
-    await expect(DocumentService.review(as("staffA"), doc.id, { status: "verified" })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(DocumentService.review(as("deskA"), doc.id, { status: "verified" })).rejects.toBeInstanceOf(ForbiddenError);
     await expect(DocumentService.review(as("patientA1"), doc.id, { status: "verified" })).rejects.toBeInstanceOf(ForbiddenError);
     await expect(DocumentService.review(as("insurerB"), doc.id, { status: "verified" })).rejects.toBeInstanceOf(NotFoundError);
     await expect(DocumentService.review(as("insurerA"), doc.id, { status: "requires_reupload" })).rejects.toBeInstanceOf(ValidationError);
@@ -57,7 +57,7 @@ describe("document review", () => {
     expect(a).toHaveLength(1);
 
     // Re-upload restores the evidence.
-    await DocumentService.upload(as("staffA"), { subjectType: "preauth", subjectId: preauth.id, docType: "insurance_card", file: file("card-clear.pdf") });
+    await DocumentService.upload(as("deskA"), { subjectType: "preauth", subjectId: preauth.id, docType: "insurance_card", file: file("card-clear.pdf") });
     expect(await DocumentRepository.usableTypes(ctx.db, "preauth", preauth.id)).toContain("insurance_card");
   });
 
@@ -67,11 +67,11 @@ describe("document review", () => {
     const [row] = await ctx.db.select().from(documents).where(eq(documents.id, doc.id));
     expect(row!.status).toBe("verified");
     // Close the request, then try again.
-    const draft = await PreauthService.create(as("staffA"), { beneficiaryId: (await freshFloaterPatient(ctx.db, who.staffA)).coverage.id, claimType: "cashless" });
-    await DocumentService.upload(as("staffA"), { subjectType: "preauth", subjectId: draft.id, docType: "id_proof", file: file() });
-    await PreauthService.cancel(as("staffA"), draft.id, { message: "Duplicate request" });
+    const draft = await PreauthService.create(as("deskA"), { beneficiaryId: (await freshFloaterPatient(ctx.db, who.deskA)).coverage.id, claimType: "cashless" });
+    await DocumentService.upload(as("deskA"), { subjectType: "preauth", subjectId: draft.id, docType: "id_proof", file: file() });
+    await PreauthService.cancel(as("deskA"), draft.id, { message: "Duplicate request" });
     void preauth;
-    const [d2] = await DocumentService.forPreauth(as("staffA"), draft.id);
+    const [d2] = await DocumentService.forPreauth(as("deskA"), draft.id);
     await expect(DocumentService.review(as("insurerA"), d2!.id, { status: "verified" })).rejects.toBeInstanceOf(NotFoundError); // never submitted: invisible to payer
   });
 });
@@ -82,7 +82,7 @@ describe("background document scan", () => {
     await documentScanJob(ctx.db, { scan: async () => ({ status: "infected", reason: "Test signature" }) })({ documentId: doc.id });
     const [row] = await ctx.db.select().from(documents).where(eq(documents.id, doc.id));
     expect(row).toMatchObject({ scanStatus: "infected", status: "rejected" });
-    await expect(DocumentService.download(as("staffA"), doc.id)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(DocumentService.download(as("deskA"), doc.id)).rejects.toBeInstanceOf(ForbiddenError);
     const a = await ctx.db.select().from(auditLogs).where(and(eq(auditLogs.resourceId, doc.id), eq(auditLogs.action, "document.quarantined")));
     expect(a).toHaveLength(1);
   });
@@ -97,13 +97,13 @@ describe("background document scan", () => {
 
 describe("missing documents", () => {
   it("lists open requests missing mandatory documents, within scope only", async () => {
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
-    const p = await PreauthService.create(as("staffA"), { beneficiaryId: coverage.id, claimType: "cashless", diagnosisId: c.dx.K35, procedureId: c.px.APPENDECTOMY, admissionDate: "2026-10-10", estimatedCost: 50000 });
-    await PreauthService.runChecks(as("staffA"), p.id);
-    const mine = await DocumentListService.missing(as("staffA"));
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
+    const p = await PreauthService.create(as("deskA"), { beneficiaryId: coverage.id, claimType: "cashless", diagnosisId: c.dx.K35, procedureId: c.px.APPENDECTOMY, admissionDate: "2026-10-10", estimatedCost: 50000 });
+    await PreauthService.runChecks(as("deskA"), p.id);
+    const mine = await DocumentListService.missing(as("deskA"));
     const row = mine.find((r) => r.id === p.id);
     expect(row?.missing).toEqual(expect.arrayContaining(["id_proof", "insurance_card"]));
-    expect((await DocumentListService.missing(as("staffB"))).some((r) => r.id === p.id)).toBe(false);
+    expect((await DocumentListService.missing(as("deskB"))).some((r) => r.id === p.id)).toBe(false);
     expect((await DocumentListService.missing(as("insurerA"))).some((r) => r.id === p.id)).toBe(false); // draft
   });
 });
@@ -117,7 +117,7 @@ describe("notifications", () => {
     const target = insurerList.rows[0]!;
 
     // Another user tries to mark it read (IDOR attempt): nothing changes.
-    expect(await InboxService.markRead(as("staffB"), [target.id])).toBe(0);
+    expect(await InboxService.markRead(as("deskB"), [target.id])).toBe(0);
     const [still] = await ctx.db.select().from(notifications).where(eq(notifications.id, target.id));
     expect(still!.readAt).toBeNull();
 
@@ -129,16 +129,16 @@ describe("notifications", () => {
   });
 
   it("links point to the right pages", async () => {
-    const list = await InboxService.list(as("staffA"), { page: 1, pageSize: 20 }, false);
+    const list = await InboxService.list(as("deskA"), { page: 1, pageSize: 20 }, false);
     for (const r of list.rows.filter((x) => x.resourceType === "preauth")) expect(r.href).toBe(`/pre-authorizations/${r.resourceId}`);
   });
 });
 
 describe("policy expiry reminders", () => {
   it("notifies the hospital once per coverage and expiry date, however often it runs", async () => {
-    const p = await PatientService.create(as("staffA"), { fullName: "Expiring Cover Patient", dob: "1970-07-07", gender: "male", confirmDuplicate: true });
+    const p = await PatientService.create(as("deskA"), { fullName: "Expiring Cover Patient", dob: "1970-07-07", gender: "male", confirmDuplicate: true });
     const end = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
-    await CoverageService.add(as("staffA"), p.id, { policyId: DEMO.policy.surakshaIndividual, memberId: `EXP-${p.id.slice(0, 8)}`, relationship: "self", coverStart: "2025-12-01", coverEnd: end, sumInsured: 300000, sumInsuredAvailable: 300000 });
+    await CoverageService.add(as("deskA"), p.id, { policyId: DEMO.policy.surakshaIndividual, memberId: `EXP-${p.id.slice(0, 8)}`, relationship: "self", coverStart: "2025-12-01", coverEnd: end, sumInsured: 300000, sumInsuredAvailable: 300000 });
     const today = new Date().toISOString().slice(0, 10);
     await sendPolicyExpiryReminders(ctx.db, today);
     await sendPolicyExpiryReminders(ctx.db, today);
@@ -147,14 +147,14 @@ describe("policy expiry reminders", () => {
     expect(n).toHaveLength(1);
     expect(n[0]!.body).toContain(end);
     // Other hospitals aren't told about this patient.
-    const [staffB] = await ctx.db.select({ id: users.id }).from(users).where(eq(users.email, "staff.b@demo.claimix.invalid"));
-    expect(await ctx.db.select().from(notifications).where(and(eq(notifications.resourceId, p.id), eq(notifications.userId, staffB!.id)))).toHaveLength(0);
+    const [deskB] = await ctx.db.select({ id: users.id }).from(users).where(eq(users.email, "staff.b@demo.claimix.invalid"));
+    expect(await ctx.db.select().from(notifications).where(and(eq(notifications.resourceId, p.id), eq(notifications.userId, deskB!.id)))).toHaveLength(0);
   });
 });
 
 describe("audit viewer", () => {
   it("is admin-only, filters, and records its own use", async () => {
-    for (const k of ["staffA", "insurerA", "patientA1", "readOnly"] as const) {
+    for (const k of ["deskA", "insurerA", "patientA1", "readOnly"] as const) {
       await expect(AuditViewer.list(as(k), { page: 1, pageSize: 10 }, {})).rejects.toBeInstanceOf(ForbiddenError);
     }
     const r = await AuditViewer.list(as("admin"), { page: 1, pageSize: 20 }, { action: "claim." });

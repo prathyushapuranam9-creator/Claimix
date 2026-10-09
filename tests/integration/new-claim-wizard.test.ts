@@ -78,7 +78,7 @@ const pkg = () => ({
 });
 
 async function raised(over: Record<string, unknown> = {}) {
-  const f = await freshFloaterPatient(ctx.db, who.staffA);
+  const f = await freshFloaterPatient(ctx.db, who.deskA);
   const draft = await PreauthService.raise(as("insurerA"), { beneficiaryId: f.coverage.id, kyc: kycFor(f, over) });
   return { ...f, draft };
 }
@@ -99,14 +99,14 @@ async function complete(id: string) {
 
 describe("New Claim: who may raise, and for whom", () => {
   it("finds only the reviewer's own members; other insurers and hospital staff can't use it", async () => {
-    const f = await freshFloaterPatient(ctx.db, who.staffA);
+    const f = await freshFloaterPatient(ctx.db, who.deskA);
     const mine = await PreauthService.members(as("insurerA"), f.patient.patientNo);
     expect(mine.find((m) => m.beneficiaryId === f.coverage.id)).toMatchObject({ hospitalId: DEMO.org.hospitalA, insurerId: DEMO.org.insurerA, tpaId: DEMO.org.tpaA });
 
     expect(await PreauthService.members(as("insurerB"), f.patient.patientNo)).toEqual([]);
     await expect(PreauthService.raise(as("insurerB"), { beneficiaryId: f.coverage.id, kyc: kycFor(f, { insurerId: DEMO.org.insurerB, tpaId: "" }) })).rejects.toBeInstanceOf(ValidationError);
-    await expect(PreauthService.members(as("staffA"), f.patient.patientNo)).rejects.toBeInstanceOf(ForbiddenError);
-    await expect(PreauthService.raise(as("staffA"), { beneficiaryId: f.coverage.id, kyc: kycFor(f) })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(PreauthService.members(as("deskA"), f.patient.patientNo)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(PreauthService.raise(as("deskA"), { beneficiaryId: f.coverage.id, kyc: kycFor(f) })).rejects.toBeInstanceOf(ForbiddenError);
     await expect(PreauthService.kycOptions(as("patientA1"))).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -115,7 +115,7 @@ describe("New Claim: who may raise, and for whom", () => {
     expect(opts.insurers.map((i) => i.id)).toEqual([DEMO.org.insurerA]);
     expect(opts.tpasByInsurer[DEMO.org.insurerA]!.map((t) => t.id)).toContain(DEMO.org.tpaA);
 
-    const f = await freshFloaterPatient(ctx.db, who.staffA);
+    const f = await freshFloaterPatient(ctx.db, who.deskA);
     await expect(PreauthService.raise(as("insurerA"), { beneficiaryId: f.coverage.id, kyc: kycFor(f, { insurerId: DEMO.org.insurerB }) })).rejects.toThrow(/policy is with/);
     await expect(PreauthService.raise(as("insurerA"), { kyc: kycFor(f, { memberId: "NO-SUCH-MEMBER" }) })).rejects.toThrow(/Find the member first/);
     await expect(PreauthService.raise(as("insurerA"), { beneficiaryId: f.coverage.id, kyc: kycFor(f, { mobile: "123" }) })).rejects.toBeInstanceOf(ValidationError);
@@ -140,9 +140,9 @@ describe("New Claim: who may raise, and for whom", () => {
   it("keeps the raised draft inside the raiser and the hospital; other payers can't see or touch it", async () => {
     const { draft } = await raised();
     expect((await PreauthService.wizard(as("insurerA"), draft.id)).preauth.id).toBe(draft.id);
-    expect((await PreauthService.workspace(as("staffA"), draft.id)).preauth.id).toBe(draft.id);
+    expect((await PreauthService.workspace(as("deskA"), draft.id)).preauth.id).toBe(draft.id);
     await expect(PreauthService.workspace(as("insurerB"), draft.id)).rejects.toBeInstanceOf(NotFoundError);
-    await expect(PreauthService.workspace(as("staffB"), draft.id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(PreauthService.workspace(as("deskB"), draft.id)).rejects.toBeInstanceOf(NotFoundError);
     await expect(PreauthService.wizard(as("insurerB"), draft.id)).rejects.toBeInstanceOf(NotFoundError);
     await expect(PreauthService.saveClinical(as("insurerB"), draft.id, pkg())).rejects.toThrow();
     await expect(PreauthService.saveKyc(as("insurerB"), draft.id, {})).rejects.toThrow();
@@ -198,7 +198,7 @@ describe("New Claim: steps and submission", () => {
     const pdf = new TextEncoder().encode("%PDF-1.4\n1 0 obj << /Length 60 >> stream\nBT (Policy No: POL-778899) Tj (Member ID: MEM-445566) Tj ET\nendstream endobj\n%%EOF");
     const r = await KycCardService.read(as("insurerA"), { name: "card.pdf", size: pdf.length, bytes: pdf });
     expect(r.hasText).toBe(true);
-    await expect(KycCardService.read(as("staffA"), { name: "card.png", size: png.length, bytes: png })).rejects.toThrow();
+    await expect(KycCardService.read(as("deskA"), { name: "card.png", size: png.length, bytes: png })).rejects.toThrow();
   });
 
   it("sends with acknowledged gaps (audited), refuses incomplete details or a missing acknowledgment", async () => {
@@ -235,8 +235,8 @@ describe("New Claim: steps and submission", () => {
   });
 
   it("hospital staff can still submit their own requests only with a complete checklist (no acknowledgment path)", async () => {
-    const f = await freshFloaterPatient(ctx.db, who.staffA);
-    const p = await PreauthService.create(as("staffA"), { beneficiaryId: f.coverage.id, claimType: "cashless", diagnosisId: c.dx.K35, procedureId: c.px.APPENDECTOMY, estimatedCost: 50000 });
-    await expect(PreauthService.submit(as("staffA"), p.id, { overrideReason: "I have seen these gaps and am sending anyway." })).rejects.toThrow(/Complete the checklist/);
+    const f = await freshFloaterPatient(ctx.db, who.deskA);
+    const p = await PreauthService.create(as("deskA"), { beneficiaryId: f.coverage.id, claimType: "cashless", diagnosisId: c.dx.K35, procedureId: c.px.APPENDECTOMY, estimatedCost: 50000 });
+    await expect(PreauthService.submit(as("deskA"), p.id, { overrideReason: "I have seen these gaps and am sending anyway." })).rejects.toThrow(/Complete the checklist/);
   });
 });

@@ -5,6 +5,7 @@ import { roles, users } from "@/db/schema";
 import { DEMO } from "@/tests/fixtures/seed/ids";
 import { hashPassword, randomToken } from "@/lib/security/crypto";
 import { createAuthService, type AuthService } from "@/modules/auth/auth.service";
+import { WITHDRAWN_HOSPITAL_STAFF_PERMISSIONS, type Scope } from "@/lib/permissions/catalog";
 import type { Principal } from "@/lib/permissions/principal";
 
 export const META = { ipAddress: "203.0.113.10", userAgent: "vitest", requestId: "test" };
@@ -46,6 +47,25 @@ export function svc(db: Db, principal: Principal) {
   return { db, principal, meta: META };
 }
 
+/**
+ * TEST-ONLY. A hospital-side principal that also holds the insurance permissions withdrawn from Hospital Staff.
+ *
+ * No seeded role can currently raise a pre-authorization or claim, record coverage, check eligibility or upload
+ * insurance documents, but that hospital-side service logic is still in the product and still needs coverage
+ * (the README: granting these permissions to a hospital-side role restores the flow). This builds such a principal
+ * in memory from a real hospital user, so the logic stays tested while `hospital_staff` itself keeps its
+ * registration-only grants in the seed and the database. Tests about what Hospital Staff may NOT do use the real
+ * `staffA` / `staffB` principals instead.
+ */
+export function insuranceDesk(base: Principal): Principal {
+  const granted = new Map(base.permissions);
+  for (const key of WITHDRAWN_HOSPITAL_STAFF_PERMISSIONS) {
+    const scope: Scope = key === "insurer:read" || key === "policy:read" ? "all" : "organization";
+    granted.set(key, scope);
+  }
+  return { ...base, permissions: granted };
+}
+
 /** Signs in all seeded demo users once and returns their principals by key. */
 export async function demoPrincipals(auth: AuthService, password: string) {
   const emails = {
@@ -65,5 +85,6 @@ export async function demoPrincipals(auth: AuthService, password: string) {
   for (const [k, email] of Object.entries(emails) as [keyof typeof emails, string][]) {
     out[k] = await principalFor(auth, email, password);
   }
-  return out;
+  // Test-only hospital insurance desks (see insuranceDesk); the real staff principals above are unchanged.
+  return { ...out, deskA: insuranceDesk(out.staffA), deskB: insuranceDesk(out.staffB) };
 }
