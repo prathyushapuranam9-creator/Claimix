@@ -10,6 +10,7 @@ import { COVER_PERIOD_LABEL, coverPeriodStatus } from "@/modules/patients/covera
 import { PATIENT_DEPARTMENTS } from "@/modules/patients/patients.validation";
 import type { MemberRow } from "@/modules/preauth/preauth.repository";
 import { checklistStep } from "@/modules/preauth/preauth.scrutiny";
+import { verifyAgainstRecord } from "@/modules/preauth/kyc-verification";
 import { PreauthService } from "@/modules/preauth/preauth.service";
 import type { WizardKycInput } from "@/modules/preauth/preauth.validation";
 import { NewCaseStart } from "@/components/preauth/wizard/NewCaseStart";
@@ -22,7 +23,7 @@ import { ButtonLink } from "@/components/ui/Button";
 import { CellText, DataTable } from "@/components/ui/DataTable";
 import { Badge, Card, EmptyState, PageHeader, Stack } from "@/components/ui/Surface";
 import {
-  confirmWizardItemAction, raiseCaseAction, removeWizardDocumentAction, runAuditChecksAction, saveClinicalAction, saveKycAction, submitWizardAction, suggestPatientsAction, quickFixAction,
+  confirmWizardItemAction, raiseCaseAction, removeWizardDocumentAction, runAuditChecksAction, saveClinicalAction, saveKycAction, submitWizardAction, suggestPatientsAction, quickFixAction, verifyKycAction, policyStatusAction,
   uploadWizardDocumentAction,
 } from "./actions";
 
@@ -54,6 +55,15 @@ function kycFromMember(m: MemberRow): Partial<WizardKycInput> {
   };
 }
 
+/** The demographics shown on arrival, checked against the patient record (the reviewer can Re-verify after edits). */
+function initialVerification(m: MemberRow) {
+  const k = kycFromMember(m);
+  return verifyAgainstRecord(
+    { uhid: k.uhid as string | undefined, patientName: m.fullName, gender: k.gender as string | undefined, dob: m.dob },
+    { patientNo: m.patientNo, fullName: m.fullName, gender: m.gender, dob: m.dob, aadhaarHash: null },
+  );
+}
+
 const matchedText = (m: MemberRow) => `${m.fullName} · ${m.patientNo} · member ${m.memberId} · ${m.policyName} · ${m.hospitalName}`;
 
 export default async function NewClaimPage({ searchParams }: { searchParams: SP }) {
@@ -65,7 +75,7 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
   // The full pre-authorization form (cases under way, reimbursements) belongs to the hospital desk, so reviewers get
   // the explanation rather than a link they can't open.
   const fullFormHref: string | null = null;
-  const kycActions = { raise: raiseCaseAction, saveKyc: saveKycAction, upload: uploadWizardDocumentAction, remove: removeWizardDocumentAction };
+  const kycActions = { verify: verifyKycAction, policyStatus: policyStatusAction, raise: raiseCaseAction, saveKyc: saveKycAction, upload: uploadWizardDocumentAction, remove: removeWizardDocumentAction };
   const header = <PageHeader title={TITLE} description={SUBTITLE} />;
   const today = todayIso();
 
@@ -77,7 +87,7 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
       return (
         <div className={styles.page}>
           {header}
-          <NewCaseStart defaults={kycFromMember(m)} aadhaarOnFile={maskAadhaar(m.aadhaarLast4)} beneficiaryId={m.beneficiaryId} matched={matchedText(m)} patientName={m.fullName} options={options} actions={kycActions} />
+          <NewCaseStart defaults={kycFromMember(m)} aadhaarOnFile={maskAadhaar(m.aadhaarLast4)} record={{ patientNo: m.patientNo, fullName: m.fullName, gender: m.gender, dob: m.dob, phone: m.phone }} initialVerification={initialVerification(m)} beneficiaryId={m.beneficiaryId} matched={matchedText(m)} patientName={m.fullName} options={options} actions={kycActions} />
         </div>
       );
     }
@@ -152,7 +162,8 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
   const m = w.member;
   const docCount = w.requirements.reduce((a, r) => a + r.uploaded, 0);
   // KYC as saved (its Aadhaar hash never leaves the server); a case raised before KYC was captured starts from the record.
-  const { aadhaarHash: _hash, aadhaarLast4: kycLast4, ...savedKyc } = w.kyc ?? {};
+  const { aadhaarHash: _hash, aadhaarLast4: kycLast4, verification: savedVerification, policyCheck: _policyCheck, ...savedKyc } = w.kyc ?? {};
+  void _policyCheck;
   void _hash;
   const kyc: Partial<WizardKycInput> = w.kyc ? (savedKyc as Partial<WizardKycInput>) : (m ? kycFromMember(m) : { uhid: w.patient.patientNo, patientName: w.patient.fullName, dob: w.patient.dob, memberId: w.beneficiary.memberId });
   const nhcx = nhcxStatus();
@@ -166,6 +177,8 @@ export default async function NewClaimPage({ searchParams }: { searchParams: SP 
     mobile: w.kyc?.mobile ?? w.patient.phone ?? null,
     kyc,
     aadhaarOnFile: maskAadhaar(kycLast4 ?? w.patient.aadhaarLast4),
+    record: { patientNo: w.patient.patientNo, fullName: w.patient.fullName, gender: w.patient.gender, dob: w.patient.dob, phone: w.patient.phone },
+    verification: savedVerification ?? null,
     beneficiaryId: w.preauth.beneficiaryId,
     matched: m ? matchedText(m) : `${w.patient.fullName} · member ${w.beneficiary.memberId}`,
     kycOptions: options,

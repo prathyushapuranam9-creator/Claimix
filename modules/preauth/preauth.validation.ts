@@ -164,11 +164,22 @@ export const wizardKycSchema = z
     memberId: zOptionalText(80),
     /** How the details were captured: read from the uploaded card, or typed. */
     mode: z.enum(["document", "typed"]).default("typed"),
+    /** Policy Verification: the reviewer has seen the policy warnings and continues anyway (checked on the server). */
+    policyWarningsAcknowledged: z.boolean().optional(),
   })
   .superRefine((v, ctx) => {
     if (v.policyTo < v.policyFrom) ctx.addIssue({ code: "custom", path: ["policyTo"], message: "Must be on or after Policy From." });
   });
 export type WizardKycInput = z.input<typeof wizardKycSchema>;
+
+/** Re-verify via Aadhaar / UHID: the patient part of the KYC. */
+export const kycVerifySchema = z.object({
+  uhid: zOptionalText(60),
+  aadhaar: zOptionalAadhaar,
+  patientName: z.string().trim().min(2, "Enter the patient's name.").max(120),
+  gender: z.preprocess((v) => (v === "" ? undefined : v), z.enum(["male", "female", "other"]).optional()),
+  dob: zDate,
+});
 export type WizardKyc = z.output<typeof wizardKycSchema>;
 
 /** Step 1 → a draft case: the member found on record (or identified by a unique member ID) and the KYC. */

@@ -2,12 +2,13 @@ import "server-only";
 import type { DbOrTx } from "@/db/client";
 import type { ServiceContext } from "@/lib/auth/context";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
+import { formatINR } from "@/lib/india";
 import { requirePermission } from "@/lib/permissions/principal";
 import { parseOrThrow, requireId } from "@/lib/validation";
 import { actorOf, AuditService } from "@/modules/audit/audit.service";
 import { PolicyRepository } from "@/modules/policies/policies.repository";
 import { evaluate } from "./engine/engine";
-import { parseRuleConfig, RULE_KINDS } from "./engine/kinds";
+import { describeRule, parseRuleConfig, RULE_KINDS } from "./engine/kinds";
 import type { CaseFacts, Evaluation, RuleCategory } from "./engine/types";
 import { RuleRepository } from "./rules.repository";
 import { publishSchema, ruleInputSchema } from "./rules.validation";
@@ -201,6 +202,63 @@ export async function evaluateAndRecord(
     newState: { policyId: args.policyId, ruleVersion: active.version.version, subjectType: args.subjectType, subjectId: args.subjectId ?? null, overall: evaluation.overall },
   });
   return { evaluation, evaluationId: row.id, ruleVersion: active.version.version };
+}
+
+/** Rule kinds shown as coverage clauses (limits a claim is paid under) and as notices (what must happen before admission). */
+const CLAUSE_KINDS = new Set(["deductible", "co_pay", "room_rent_limit", "sub_limit", "sum_insured"]);
+const NOTICE_KINDS = new Set(["preauth_required"]);
+
+/**
+ * A clause's short label and headline figure, read from the rule's own configuration (e.g. "Room Rent" ·
+ * "₹5,000/day"). The sum insured clause's figure is the member's available balance, which the caller supplies.
+ */
+function clauseFigure(raw: unknown, sumInsured: number | null): { label: string; value: string | null } {
+  const p = parseRuleConfig(raw);
+  if (!p.ok) return { label: "", value: null };
+  const c = p.config as Record<string, unknown>;
+  switch (p.kind) {
+    case "sum_insured":
+      return { label: "Available Sum Insured", value: null };
+    case "room_rent_limit": {
+      const v = c.value as number;
+      if (c.basis === "fixed_per_day") return { label: "Room Rent", value: `${formatINR(v)}/day` };
+      return { label: "Room Rent", value: sumInsured !== null ? `${formatINR((sumInsured * v) / 100)}/day (${v}% of SI)` : `${v}% of SI per day` };
+    }
+    case "sub_limit":
+      return { label: String(c.label), value: `Up to ${formatINR(c.maxAmount as number)}` };
+    case "co_pay":
+      return { label: "Co-pay", value: `${c.percent}%${c.minAge !== undefined ? ` from age ${c.minAge}` : ""}` };
+    case "deductible":
+      return { label: "Deductible", value: formatINR(c.amount as number) };
+    default:
+      return { label: "", value: null };
+  }
+}
+
+/**
+ * A policy's published clauses in plain language, from its active rules (no evaluation): coverage clauses and
+ * sub-limits (with their short label and figure), and pre-admission notices. Null when the policy has no published rules.
+ */
+export async function policyClauses(db: DbOrTx, policyId: string, sumInsured: number | null = null) {
+  const active = await RuleRepository.active(db, policyId);
+  if (!active) return null;
+  const pick = (kinds: Set<string>) =>
+    active.rules
+      .map((r) => ({ code: r.code, title: r.title, kind: String((r.config as { kind?: unknown }).kind ?? ""), text: describeRule(r.config), config: r.config }))
+      .filter((r) => kinds.has(r.kind) && r.text)
+      .map((r) => {
+        const f = clauseFigure(r.config, sumInsured);
+        return { code: r.code, title: r.title, kind: r.kind, text: r.text!, label: f.label || r.title, value: f.value };
+      });
+  const order = ["sum_insured", "room_rent_limit", "sub_limit", "co_pay", "deductible"];
+  return { clauses: pick(CLAUSE_KINDS).sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind)), notices: pick(NOTICE_KINDS) };
+}
+
+/** Runs a policy's published rules on case facts without recording an evaluation (null: no published rules). */
+export async function evaluateUnrecorded(db: DbOrTx, policyId: string, facts: CaseFacts): Promise<Evaluation | null> {
+  const active = await RuleRepository.active(db, policyId);
+  if (!active) return null;
+  return evaluate(active.rules.map((r) => ({ id: r.id, code: r.code, title: r.title, category: r.category, config: r.config })), facts);
 }
 
 /**

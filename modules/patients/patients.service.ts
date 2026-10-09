@@ -1,4 +1,5 @@
 import "server-only";
+import type { DbOrTx } from "@/db/client";
 import { aadhaarColumns } from "./aadhaar";
 import type { ServiceContext } from "@/lib/auth/context";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
@@ -8,7 +9,7 @@ import { randomToken } from "@/lib/security/crypto";
 import { parseOrThrow, requireId } from "@/lib/validation";
 import { actorOf, AuditService } from "@/modules/audit/audit.service";
 import { HospitalRepository } from "@/modules/hospitals/hospitals.repository";
-import { PatientRepository } from "./patients.repository";
+import { PatientRepository, type PatientView } from "./patients.repository";
 import { patientInputSchema } from "./patients.validation";
 
 /** Fields safe to put in audit state (no contact details or DOB). */
@@ -56,7 +57,13 @@ export async function insertPatient(tx: DbOrTx, ctx: ServiceContext, hospitalId:
   if (await PatientRepository.patientNoTaken(tx, hospitalId, patientNo)) {
     throw new ConflictError(`Patient number ${patientNo} is already in use at this hospital.`);
   }
+  const aadhaar = aadhaarColumns(data.aadhaar);
+  if (aadhaar) {
+    const taken = await PatientRepository.aadhaarTaken(tx, hospitalId, aadhaar.aadhaarHash);
+    if (taken) throw new ConflictError(`This Aadhaar number is already registered at this hospital as ${taken.patientNo}.`);
+  }
   const row = await PatientRepository.insert(tx, {
+    ...aadhaar,
     hospitalId,
     patientNo,
     fullName: data.fullName,
@@ -74,15 +81,15 @@ export async function insertPatient(tx: DbOrTx, ctx: ServiceContext, hospitalId:
     ...actorOf(ctx),
     resourceType: "patient",
     resourceId: row.id,
-    newState: { ...auditView(row), ...(data.confirmDuplicate ? { confirmedPossibleDuplicate: true } : {}) },
+    newState: { ...auditView(row), ...(aadhaar ? { aadhaarLast4: aadhaar.aadhaarLast4 } : {}), ...(data.confirmDuplicate ? { confirmedPossibleDuplicate: true } : {}) },
   });
   return row;
 }
 
 export const PatientService = {
-  async list(ctx: ServiceContext, q: ListQuery) {
+  async list(ctx: ServiceContext, q: ListQuery, view: PatientView = "patients") {
     const scope = requirePermission(ctx.principal, "patient:read");
-    return PatientRepository.list(ctx.db, ctx.principal, scope, q);
+    return PatientRepository.list(ctx.db, ctx.principal, scope, q, view);
   },
 
   /** Scoped fetch; records a "patient.viewed" access event. */
@@ -115,48 +122,7 @@ export const PatientService = {
       throw new ForbiddenError();
     }
 
-    const patientNo = data.patientNo ?? generatePatientNo();
-    return ctx.db.transaction(async (tx) => {
-      // Same person registered twice is a likely mistake, but two people can share a name and birth date,
-      // so this is a warning the user can confirm — not a rejection. Only this hospital's own records are checked.
-      if (!data.confirmDuplicate) {
-        const same = await PatientRepository.likelyDuplicates(tx, hospitalId, data.fullName, data.dob);
-        if (same.length) {
-          throw new ValidationError(
-            `A patient named ${data.fullName} with this date of birth is already registered at this hospital (${same.map((s) => s.patientNo).join(", ")}). Check the existing record before creating another.`,
-            { _duplicate: same.map((s) => `${s.id}|${s.patientNo}`) },
-          );
-        }
-      }
-      if (await PatientRepository.patientNoTaken(tx, hospitalId, patientNo)) {
-        throw new ConflictError(`Patient number ${patientNo} is already in use at this hospital.`);
-      }
-      const aadhaar = aadhaarColumns(data.aadhaar);
-      if (aadhaar) {
-        const taken = await PatientRepository.aadhaarTaken(tx, hospitalId, aadhaar.aadhaarHash);
-        if (taken) throw new ConflictError(`This Aadhaar number is already registered at this hospital as ${taken.patientNo}.`);
-      }
-      const row = await PatientRepository.insert(tx, {
-        ...aadhaar,
-        hospitalId,
-        patientNo,
-        fullName: data.fullName,
-        dob: data.dob,
-        gender: data.gender,
-        phone: data.phone ?? null,
-        email: data.email ?? null,
-        department: data.department ?? null,
-        visitReason: data.visitReason ?? null,
-      });
-      await AuditService.record(tx, {
-        action: "patient.created",
-        ...actorOf(ctx),
-        resourceType: "patient",
-        resourceId: row.id,
-        newState: { ...auditView(row), ...(aadhaar ? { aadhaarLast4: aadhaar.aadhaarLast4 } : {}), ...(data.confirmDuplicate ? { confirmedPossibleDuplicate: true } : {}) },
-      });
-      return row;
-    });
+    return ctx.db.transaction((tx) => insertPatient(tx, ctx, hospitalId, data));
   },
 
   async update(ctx: ServiceContext, id: string, input: unknown) {

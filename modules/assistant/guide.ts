@@ -347,7 +347,7 @@ function contextReply(w: Who): GuideReply {
   }
   if (w.payer) {
     return guide(
-      "Each insurer or TPA only sees requests addressed to its own organization; for example a Payer Reviewer for Aarogya Shield does not see Navjeevan's requests. Only designated testing accounts get the **Insurance portal testing** selector (Insurance Company + Role → **Switch Context**) on the Dashboard. If you don't see it, your account is not one of them.",
+      "Each insurer or TPA only sees requests addressed to its own organization; a Payer Reviewer never sees requests addressed to another insurer or TPA. Only designated testing accounts get the **Insurance portal testing** selector (Insurance Company + Role → **Switch Context**) on the Dashboard. If you don't see it, your account is not one of them.",
     );
   }
   return guide("Insurer data is isolated: an insurer or TPA user sees only their own organization's requests. The testing context switcher exists only for designated insurance-portal testing accounts, not for hospital staff.");

@@ -9,7 +9,8 @@ import { gapsAcknowledgment, type PreauthDetailsInput, type QuickFixInput, type 
 import { Button } from "@/components/ui/Button";
 import { Details } from "@/components/ui/Form";
 import { Alert, Badge, Card, Stack, type Tone } from "@/components/ui/Surface";
-import { KYC_FORM_ID, KycStep, type KycActions, type KycOptions } from "./KycStep";
+import { KYC_FORM_ID, KycStep, type KycActions, type KycOptions, type PatientOnRecord } from "./KycStep";
+import type { KycVerification } from "@/modules/preauth/kyc-verification";
 import { CaseBanner, FormPanel, FullFormNote, WIZARD_STEPS, WizardFooter, WizardStepper, type StepState } from "./WizardChrome";
 import { CLINICAL_FORM_ID, WizardClinicalForm } from "./WizardClinicalForm";
 import { ChecksDashboard, type ClearedCheck } from "./ChecksDashboard";
@@ -30,6 +31,10 @@ export interface WizardView {
   kyc: Partial<WizardKycInput>;
   /** The Aadhaar known for this case or patient, masked to its last 4 digits. */
   aadhaarOnFile: string | null;
+  /** The patient as recorded (Patient KYC shows it read-only). */
+  record: PatientOnRecord;
+  /** The last Re-verify result stored with the case, if any. */
+  verification: KycVerification | null;
   beneficiaryId: string;
   matched: string;
   kycOptions: KycOptions;
@@ -138,6 +143,8 @@ export function NewClaimWizard({ view, initialStep, actions }: { view: WizardVie
             matched={view.matched}
             options={view.kycOptions}
             aadhaarOnFile={view.aadhaarOnFile}
+            record={view.record}
+            initialVerification={view.verification}
             actions={actions}
             disabled={ro}
             onDirty={(d) => setDirty((x) => (x[1] === d ? x : { ...x, 1: d }))}
@@ -245,7 +252,11 @@ export function NewClaimWizard({ view, initialStep, actions }: { view: WizardVie
 
         <WizardFooter info={<>Case <span className="mono">{view.reference}</span> · Step {step} of {WIZARD_STEPS.length}{unsaved.length ? " · unsaved changes" : " · saved to the server"}</>}>
           {step > 1 && <Button type="button" variant="secondary" onClick={() => go(step - 1)} disabled={pending}>Back</Button>}
-          {step === 1 && (ro ? <Button type="button" onClick={() => go(2)}>Next</Button> : <Button type="submit" form={KYC_FORM_ID} disabled={pending}>Next</Button>)}
+          {step === 1 && (ro ? (
+            <Button type="button" onClick={() => go(2)}>Next</Button>
+          ) : (
+            <Button type="submit" form={KYC_FORM_ID} disabled={pending}>Continue to Clinical Details</Button>
+          ))}
           {step === 2 && (ro ? <Button type="button" onClick={() => go(3)}>Next</Button> : <Button type="submit" form={CLINICAL_FORM_ID} disabled={pending}>Register the Case</Button>)}
           {(step === 3 || step === 4) && <Button type="button" onClick={() => go(step + 1)} disabled={pending}>Next</Button>}
           {step === 5 && !ro && (

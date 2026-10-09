@@ -811,6 +811,13 @@
   margin-inline: auto;
 }
 
+/* Identity & Coverage only: while its form is on screen (not inside a hidden step) the page uses the shell's full content
+   width (centred, capped by --content-max) so the KYC and policy cards have room. Every other step keeps 1080px.
+   An attribute selector, so the id is not renamed by CSS Modules. */
+.page:has(form[id="wizard-kyc"]):not(:has([hidden] form[id="wizard-kyc"])) {
+  max-width: var(--content-max, 1280px);
+}
+
 .page > * {
   min-width: 0;
 }
@@ -929,11 +936,20 @@
   color: var(--c-text-muted);
 }
 
+/* "Choose a condition" (left) and "Or type another condition" + Add (right) on one row; they stack on narrow screens. */
 .illnessRow {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  flex: 1 1 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--sp-3);
+  width: 100%;
   align-items: end;
+}
+
+@media (max-width: 640px) {
+  .illnessRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .illnessOther {
@@ -948,6 +964,7 @@
 }
 
 .illnessChips {
+  flex: 1 1 100%;
   display: flex;
   flex-wrap: wrap;
   gap: var(--sp-2);
@@ -1311,4 +1328,135 @@
 .docGroup > summary:hover .docGroupTitle,
 .docGroup > summary:focus-visible .docGroupTitle {
   text-decoration: underline;
+}
+
+/* ---- KYC & Policy sub-steps ---- */
+
+.subSteps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  margin: 0;
+  padding: var(--sp-2) var(--sp-3);
+  list-style: none;
+  border: 1px dashed var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+
+.subSteps li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.subSteps li:not(:last-child)::after {
+  content: "→";
+  margin-left: var(--sp-2);
+  color: var(--c-text-subtle);
+}
+
+.subSteps li[data-state="active"] {
+  color: var(--c-text);
+}
+
+.subNum {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--c-border-strong);
+  border-radius: 50%;
+  font-size: var(--fs-xs);
+}
+
+.subSteps li[data-state="active"] .subNum {
+  border-color: var(--c-primary);
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+
+.subSteps li[data-state="done"] .subNum {
+  border-color: var(--c-success);
+  background: var(--c-success-bg);
+  color: var(--c-success);
+}
+
+.verifyHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.verifyList {
+  display: grid;
+  gap: var(--sp-1);
+  margin: var(--sp-3) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+
+.note {
+  margin: var(--sp-2) 0 0;
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+}
+
+.balance {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-left: 6px solid var(--c-success);
+  border-radius: var(--radius-md);
+  background: var(--c-surface-2);
+}
+
+.balanceLabel {
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.balanceValue {
+  font-size: var(--fs-3xl);
+  line-height: 1.1;
+}
+
+.policyWarnings {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.policyWarnings li {
+  display: grid;
+  gap: 2px;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-left: 4px solid var(--c-warning);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  font-size: var(--fs-sm);
+}
+
+.balanceFigures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3) var(--sp-6);
+}
+
+.balanceFigures > div {
+  display: grid;
+  gap: 2px;
 }

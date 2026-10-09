@@ -7,6 +7,10 @@ import { requirePermission, scopeFor, type Principal } from "@/lib/permissions/p
 import { randomToken } from "@/lib/security/crypto";
 import { aadhaarDigits } from "@/lib/india";
 import { aadhaarColumns, aadhaarHash } from "@/modules/patients/aadhaar";
+import { beneficiaries, patients, preAuthorizations } from "@/db/schema";
+import { and, eq, inArray } from "drizzle-orm";
+import { networkForPolicy } from "@/modules/hospitals/hospitals.repository";
+import { availableBalance, policyValidations, policyWarnings, verifyAgainstRecord, type KycVerification } from "./kyc-verification";
 import { parseOrThrow, requireId, todayIso } from "@/lib/validation";
 import { actorOf, AuditService } from "@/modules/audit/audit.service";
 import { DocumentRepository } from "@/modules/documents/documents.repository";
@@ -16,7 +20,7 @@ import { CoverageRepository } from "@/modules/patients/coverage.repository";
 import { coverPeriodStatus } from "@/modules/patients/coverage.validation";
 import { PolicyRepository } from "@/modules/policies/policies.repository";
 import { ClaimRepository } from "@/modules/claims/claims.repository";
-import { evaluateAndRecord, loadEvaluation, requiredDocumentsFor } from "@/modules/rules/rules.service";
+import { evaluateAndRecord, evaluateUnrecorded, loadEvaluation, policyClauses, requiredDocumentsFor } from "@/modules/rules/rules.service";
 import { NotificationService } from "@/modules/notifications/notifications.service";
 import { CHECKLIST, computePreauthChecklist } from "./preauth.checklist";
 import { buildPreauthFacts } from "./preauth.facts";
@@ -24,7 +28,7 @@ import { isNewborn, scrutinize, wizardDocuments } from "./preauth.scrutiny";
 import { PreauthRepository, type MemberRow } from "./preauth.repository";
 import { ClinicalRepository } from "@/modules/clinical/clinical.repository";
 import {
-  cancelSchema, CLINICAL_FIELDS, confirmItemSchema, decisionSchema, preauthCreateSchema, preauthDetailsSchema, queryResponseSchema, quickFixSchema, expectedCost, gapsAcknowledgment, stayDays, submitSchema, wizardClinicalSchema, wizardKycSchema, wizardRaiseSchema, wizardSubmitSchema, type PreauthDetailsInput, type WizardKyc,
+  cancelSchema, CLINICAL_FIELDS, confirmItemSchema, decisionSchema, preauthCreateSchema, preauthDetailsSchema, queryResponseSchema, quickFixSchema, expectedCost, gapsAcknowledgment, stayDays, submitSchema, wizardClinicalSchema, kycVerifySchema, wizardKycSchema, wizardRaiseSchema, wizardSubmitSchema, type PreauthDetailsInput, type WizardKyc,
 } from "./preauth.validation";
 import { allowedTransitions, canTransition, HOSPITAL_EDITABLE, PAYER_DECISIONS, STATUS_LABEL, TERMINAL, type PreauthStatus, type Side } from "./preauth.workflow";
 
@@ -64,6 +68,95 @@ function raisingPayer(p: Principal): { orgType: "insurer" | "tpa"; orgId: string
 function assertSamePayer(kyc: WizardKyc, m: MemberRow) {
   if (kyc.insurerId !== m.insurerId) throw new ValidationError(`This member's policy is with ${m.insurerName ?? "another insurer"}.`, { insurerId: ["Not the member's insurer."] });
   if (kyc.tpaId && kyc.tpaId !== m.tpaId) throw new ValidationError(`This member's policy is run by ${m.tpaName ?? "no TPA"}.`, { tpaId: ["Not the member's TPA."] });
+}
+
+/** The member's patient record and coverage details the KYC & Policy checks read (scoped by the caller already). */
+async function memberRecord(db: DbOrTx, m: MemberRow) {
+  const [p] = await db.select({ aadhaarHash: patients.aadhaarHash }).from(patients).where(eq(patients.id, m.patientId)).limit(1);
+  const [b] = await db.select({ inceptionDate: beneficiaries.inceptionDate }).from(beneficiaries).where(eq(beneficiaries.id, m.beneficiaryId)).limit(1);
+  return { aadhaarHash: p?.aadhaarHash ?? null, inceptionDate: b?.inceptionDate ?? null };
+}
+
+/** Re-verify via Aadhaar / UHID: the entered KYC against the patient's hospital record (no UIDAI service is involved). */
+async function kycVerification(db: DbOrTx, m: MemberRow, kyc: { uhid?: unknown; patientName: string; gender?: string; dob: string; aadhaar?: string }) {
+  const rec = await memberRecord(db, m);
+  return verifyAgainstRecord(
+    { uhid: typeof kyc.uhid === "string" ? kyc.uhid : undefined, patientName: kyc.patientName, gender: kyc.gender, dob: kyc.dob, aadhaarHash: kyc.aadhaar ? aadhaarHash(kyc.aadhaar) : undefined },
+    { patientNo: m.patientNo, fullName: m.fullName, gender: m.gender, dob: m.dob, aadhaarHash: rec.aadhaarHash },
+  );
+}
+
+/**
+ * Policy Rules & Balance Check: coverage, policy status, the available balance (recorded balance, already reduced by
+ * settled claims, less amounts approved on the member's other open pre-authorizations), the policy's published
+ * eligibility rules on the recorded data (not recorded as a check), and the warnings to handle before continuing.
+ */
+async function policyStatusFor(db: DbOrTx, m: MemberRow, typed: { policyNumber?: string; memberId?: string }, caseId?: string, estimate: number | null = null) {
+  const today = todayIso();
+  const [policy, rec, holds] = await Promise.all([
+    PolicyRepository.get(db, m.policyId),
+    memberRecord(db, m),
+    db
+      .select({ id: preAuthorizations.id, reference: preAuthorizations.reference, amount: preAuthorizations.approvedAmount })
+      .from(preAuthorizations)
+      .where(and(eq(preAuthorizations.beneficiaryId, m.beneficiaryId), inArray(preAuthorizations.status, ["approved", "partially_approved", "final_approved"]))),
+  ]);
+  if (!policy) throw new ValidationError("The member's policy is no longer available.");
+  const num = (v: string | null) => (v === null ? null : Number(v));
+  const openHolds = holds.filter((h) => h.id !== caseId && h.amount !== null).map((h) => ({ reference: h.reference, amount: Number(h.amount) }));
+  const recordedBalance = num(m.sumInsuredAvailable);
+  const available = availableBalance({ recordedBalance, holds: openHolds });
+  const net = await networkForPolicy(db, m.hospitalId, policy);
+  const summary = await policyClauses(db, policy.id, num(m.sumInsured));
+  const eligibility = await evaluateUnrecorded(db, policy.id, {
+    stage: "eligibility",
+    asOf: today,
+    claimType: "cashless",
+    patient: { dob: m.dob, relationship: m.relationship },
+    cover: { start: m.coverStart, end: m.coverEnd, inceptionDate: rec.inceptionDate ?? undefined, sumInsured: num(m.sumInsured) ?? undefined, availableBalance: available ?? undefined },
+    hospital: { networkStatus: net?.status ?? null, cashlessAvailable: net?.cashlessAvailable ?? false, lastVerifiedAt: net?.lastVerifiedAt?.toISOString() ?? null },
+  });
+  const facts = {
+    coverStatus: coverPeriodStatus({ coverStart: m.coverStart, coverEnd: m.coverEnd }, today),
+    coverStart: m.coverStart,
+    coverEnd: m.coverEnd,
+    policyActive: policy.isActive,
+    policyHasTpa: !!policy.tpaId,
+    sumInsured: num(m.sumInsured),
+    recordedBalance,
+    holds: openHolds,
+    estimate,
+    eligibility,
+    typed,
+  };
+  return {
+    insurerName: m.insurerName,
+    tpaName: m.tpaName,
+    policyName: m.policyName,
+    productType: policy.productType,
+    memberId: m.memberId,
+    hospitalName: m.hospitalName,
+    clauses: summary?.clauses ?? [],
+    notices: summary?.notices ?? [],
+    validations: policyValidations(eligibility),
+    ...facts,
+    available,
+    eligibilityOverall: eligibility?.overall ?? null,
+    warnings: policyWarnings(facts),
+  };
+}
+
+export type PolicyStatus = Awaited<ReturnType<typeof policyStatusFor>>;
+
+/** Saving KYC & Policy: blockers refuse; any other warning must have been acknowledged. Returns what is stored. */
+function policyGate(status: PolicyStatus, acknowledged: boolean | undefined) {
+  const blockers = status.warnings.filter((w) => w.severity === "blocker");
+  if (blockers.length) throw new ValidationError(blockers.map((b) => `${b.title}: ${b.explanation}`).join(" "), { policyTo: ["The cover period is not current."] });
+  const warnings = status.warnings.filter((w) => w.severity === "warning");
+  if (warnings.length && !acknowledged) {
+    throw new ValidationError(`Review the policy warnings and confirm before continuing: ${warnings.map((w) => w.title).join("; ")}.`, { policyWarningsAcknowledged: ["Confirm you have reviewed the warnings."] });
+  }
+  return { checkedAt: new Date().toISOString(), warnings: warnings.map((w) => w.key), acknowledged: warnings.length > 0, available: status.available };
 }
 
 /** Hospital staff record a government scheme's decision (made in the scheme's own system). */
@@ -165,7 +258,12 @@ export function storedKyc(p: Row["preauth"]): StoredKyc | null {
 }
 
 /** KYC as kept with the case: the Aadhaar (if given) only as a keyed hash and its last 4 digits, never in full. */
-export type StoredKyc = Omit<WizardKyc, "aadhaar"> & { aadhaarHash?: string; aadhaarLast4?: string };
+export type StoredKyc = Omit<WizardKyc, "aadhaar"> & {
+  aadhaarHash?: string;
+  aadhaarLast4?: string;
+  verification?: KycVerification;
+  policyCheck?: { checkedAt: string; warnings: string[]; acknowledged: boolean; available: number | null };
+};
 
 /** A blank Aadhaar keeps the one already on the case. */
 function kycForStorage(k: WizardKyc, prev?: StoredKyc | null): StoredKyc {
@@ -340,6 +438,31 @@ export const PreauthService = {
     return m;
   },
 
+  /** KYC & Policy → Re-verify via Aadhaar / UHID: the entered details against the patient's record (audited, nothing stored). */
+  async verifyKyc(ctx: ServiceContext, beneficiaryId: string, input: unknown) {
+    const payer = raisingPayer(ctx.principal);
+    const d = parseOrThrow(kycVerifySchema, input);
+    const m = await PreauthRepository.member(ctx.db, payer, requireId(beneficiaryId, "Member"));
+    if (!m) throw new NotFoundError("Member not found among your policies.");
+    const v = await kycVerification(ctx.db, m, d);
+    await AuditService.record(ctx.db, { ...actorOf(ctx), action: "kyc.reverified", resourceType: "patient", resourceId: m.patientId, newState: { status: v.status, items: v.items.map((i) => ({ field: i.field, result: i.result })) } });
+    return v;
+  },
+
+  /** KYC & Policy → Policy Verification: coverage, balance, rules and warnings for the member (and the case, if raised). */
+  async policyStatus(ctx: ServiceContext, beneficiaryId: string, typed: { policyNumber?: string; memberId?: string }, caseId?: string) {
+    const payer = raisingPayer(ctx.principal);
+    const m = await PreauthRepository.member(ctx.db, payer, requireId(beneficiaryId, "Member"));
+    if (!m) throw new NotFoundError("Member not found among your policies.");
+    let estimate: number | null = null;
+    if (caseId) {
+      const row = await load(ctx, caseId);
+      if (row.preauth.raisedByOrgId !== payer.orgId || row.preauth.beneficiaryId !== m.beneficiaryId) throw new NotFoundError("Pre-authorization not found.");
+      estimate = row.preauth.estimatedCost === null ? null : Number(row.preauth.estimatedCost);
+    }
+    return policyStatusFor(ctx.db, m, { policyNumber: String(typed.policyNumber ?? "").slice(0, 80), memberId: String(typed.memberId ?? "").slice(0, 80) }, caseId, estimate);
+  },
+
   /** New Claim, KYC & Policy: the Insurer / TPA dropdowns (the payer's own insurers and their TPAs). */
   async kycOptions(ctx: ServiceContext) {
     return PreauthRepository.kycOptions(ctx.db, raisingPayer(ctx.principal));
@@ -372,6 +495,8 @@ export const PreauthService = {
           { policyTo: ["The cover period is not current."] },
         );
       }
+      const verification = await kycVerification(tx, m, d.kyc);
+      const policyCheck = policyGate(await policyStatusFor(tx, m, { policyNumber: d.kyc.policyNumber, memberId: d.kyc.memberId as string | undefined }), d.kyc.policyWarningsAcknowledged);
       const policy = await PolicyRepository.get(tx, m.policyId);
       if (!policy) throw new ValidationError("The member's policy is no longer available.");
       const cols = detailsToColumns(parseOrThrow(preauthDetailsSchema, { claimType: "cashless" }));
@@ -386,7 +511,7 @@ export const PreauthService = {
         schemeId: policy.schemeId,
         status: "draft",
         ...cols,
-        clinical: { ...cols.clinical, kyc: kycForStorage(d.kyc) },
+        clinical: { ...cols.clinical, kyc: { ...kycForStorage(d.kyc), verification, policyCheck } },
         createdBy: ctx.principal.userId,
         raisedByOrgId: payer.orgId,
       });
@@ -422,7 +547,13 @@ export const PreauthService = {
       const m = await PreauthRepository.member(tx, payer, row.preauth.beneficiaryId);
       if (!m) throw new NotFoundError("Member not found among your policies.");
       assertSamePayer(kyc, m);
-      await PreauthRepository.update(tx, row.preauth.id, { clinical: { ...(row.preauth.clinical as Record<string, unknown>), kyc: kycForStorage(kyc, storedKyc(row.preauth)) }, latestEvaluationId: null });
+      const verification = await kycVerification(tx, m, kyc);
+      const estimate = row.preauth.estimatedCost === null ? null : Number(row.preauth.estimatedCost);
+      const policyCheck = policyGate(await policyStatusFor(tx, m, { policyNumber: kyc.policyNumber, memberId: kyc.memberId as string | undefined }, row.preauth.id, estimate), kyc.policyWarningsAcknowledged);
+      await PreauthRepository.update(tx, row.preauth.id, {
+        clinical: { ...(row.preauth.clinical as Record<string, unknown>), kyc: { ...kycForStorage(kyc, storedKyc(row.preauth)), verification, policyCheck } },
+        latestEvaluationId: null,
+      });
       await AuditService.record(tx, { ...actorOf(ctx), action: "preauth.kyc_updated", resourceType: "preauth", resourceId: row.preauth.id, newState: { kycMode: kyc.mode } });
     });
   },

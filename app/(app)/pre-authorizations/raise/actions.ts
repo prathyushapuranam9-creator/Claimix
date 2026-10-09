@@ -8,7 +8,8 @@ import { maskAadhaar } from "@/lib/india";
 import { todayIso } from "@/lib/validation";
 import { coverPeriodStatus } from "@/modules/patients/coverage.validation";
 import { DocumentService } from "@/modules/documents/documents.service";
-import { PreauthService } from "@/modules/preauth/preauth.service";
+import { PreauthService, type PolicyStatus } from "@/modules/preauth/preauth.service";
+import type { KycVerification } from "@/modules/preauth/kyc-verification";
 import { RegistrationService } from "@/modules/preauth/registration.service";
 import type { PatientSuggestion } from "@/components/preauth/wizard/PatientFinder";
 import type { PreauthDetailsInput, QuickFixInput, WizardKycInput } from "@/modules/preauth/preauth.validation";
@@ -53,6 +54,16 @@ export async function suggestPatientsAction(q: string): Promise<ActionResult<Pat
       inForce: coverPeriodStatus(m, today) === "in_force",
     }));
   });
+}
+
+/** KYC & Policy → Patient KYC → Re-verify via Aadhaar / UHID (against the patient record; nothing is stored). */
+export async function verifyKycAction(beneficiaryId: string, input: unknown): Promise<ActionResult<KycVerification>> {
+  return runAction("kyc.reverify", async () => PreauthService.verifyKyc(await actionContext(), beneficiaryId, input));
+}
+
+/** KYC & Policy → Policy Verification: coverage, balance, rules and warnings for the member. */
+export async function policyStatusAction(beneficiaryId: string, typed: { policyNumber?: string; memberId?: string }, caseId?: string): Promise<ActionResult<PolicyStatus>> {
+  return runAction("kyc.policy_status", async () => PreauthService.policyStatus(await actionContext(), beneficiaryId, typed, caseId));
 }
 
 /** KYC & Policy → Next: creates the draft case and returns its id. */

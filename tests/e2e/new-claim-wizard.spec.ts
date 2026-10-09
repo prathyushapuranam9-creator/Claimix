@@ -6,6 +6,12 @@ const pdf = (name: string) => ({ name, mimeType: "application/pdf", buffer: Buff
 const footer = (page: Page) => page.getByRole("group", { name: "Wizard actions" });
 const stepper = (page: Page) => page.getByRole("navigation", { name: "New claim steps" });
 const currentStep = (page: Page) => stepper(page).locator('[aria-current="step"]');
+/** The Live Policy Balance & Rules Engine panel is collapsed by default; its heading opens it. */
+async function openEngine(page: Page) {
+  const toggle = page.getByRole("button", { name: /^Live Policy Balance & Rules Engine/ });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+}
 const stepButton = (page: Page, name: string) => stepper(page).getByRole("button", { name: new RegExp(`^${name.replace(/[&]/g, "\\&")}`) });
 const FINDER = "UHID / IP Number / Patient Name / Aadhaar Number";
 
@@ -43,6 +49,13 @@ async function suggestAndPick(page: Page, typed: string, name: string) {
   await page.waitForURL(/\/pre-authorizations\/raise\?member=[0-9a-f-]{36}$/);
 }
 
+/** Opens 1A's demographics for editing, unless they are already open. */
+async function editDemographics(page: Page) {
+  const edit = page.getByRole("button", { name: /^(Edit Demographics|Done editing)$/ });
+  if ((await edit.getAttribute("aria-pressed")) !== "true") await edit.click();
+  await expect(edit).toHaveAttribute("aria-pressed", "true");
+}
+
 test.describe("New Claim (insurer reviewer)", () => {
   test("suggestions → optional KYC → clinical (pickers, conditions, cost) → documents → dashboard quick fix → submit", async ({ page }) => {
     test.setTimeout(300_000);
@@ -77,14 +90,39 @@ test.describe("New Claim (insurer reviewer)", () => {
     await expect(page.getByLabel("Patient Name")).toHaveValue(name);
     const aadhaarInput = page.getByLabel("Aadhaar Number");
     await expect(aadhaarInput).toHaveAttribute("placeholder", `XXXX XXXX ${aadhaar.slice(-4)}`);
+    // 1A Patient KYC Verification and 1B Policy Details side by side, the live rules engine panel under 1B.
+    await expect(page.getByRole("heading", { name: "Patient KYC Verification" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Policy Details & Coverage Identification" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Live Policy Balance & Rules Engine" })).toBeVisible();
+    // No invented OTP / ABHA statuses.
+    await expect(page.getByText("Mobile not OTP-verified")).toBeVisible();
+    await expect(page.getByText("Claimix has no ABDM connection", { exact: false })).toBeVisible();
+    // Demographics arrive verified against the patient record, read-only until Edit Demographics.
+    await expect(page.getByTestId("kyc-status")).toHaveText("Verified");
+    await editDemographics(page);
     await page.getByLabel("Gender").selectOption("female");
     await page.getByLabel("Mobile").fill("9876500000");
-    await page.getByLabel("Policy Number").fill("POL-E2E-001");
     await aadhaarInput.fill("12345");
-    await footer(page).getByRole("button", { name: "Next" }).click();
+    await footer(page).getByRole("button", { name: "Continue to Clinical Details" }).click();
     await expect(page.getByText("Aadhaar Number has exactly 12 digits.")).toBeVisible();
     await aadhaarInput.fill(`${aadhaar.slice(0, 4)} ${aadhaar.slice(4, 8)} ${aadhaar.slice(8)}`);
-    await footer(page).getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Re-verify via Aadhaar / UHID" }).click();
+    await expect(page.getByText("Re-verified against the patient record: Verified.")).toBeVisible();
+    await expect(page.getByTestId("kyc-status")).toHaveText("Verified");
+    await page.getByText(/^Verification details/).click();
+    await expect(page.getByRole("list", { name: "Verification results" })).toContainText("Aadhaar");
+    await expect(page.getByText("Nothing is sent to UIDAI", { exact: false })).toBeVisible();
+    // The live policy panel (collapsed by default; the heading opens it): real balances (INR), a measured response time and the engine status.
+    await openEngine(page);
+    await expect(page.getByTestId("sum-insured")).toHaveText("₹5,00,000");
+    await expect(page.getByText(/Response time: \d+ms/)).toBeVisible();
+    await expect(page.getByTestId("engine-status")).toHaveText(/Policy intact|Review warnings/);
+    await expect(page.getByTestId("balance-available")).toHaveText("₹4,00,000");
+    await page.getByLabel("Policy Number").fill("POL-E2E-001");
+    await expect(page.getByTestId("available-balance")).toBeVisible();
+    const policyAck = page.getByRole("checkbox", { name: /^I have reviewed these/ });
+    if (await policyAck.count()) await policyAck.check();
+    await footer(page).getByRole("button", { name: "Continue to Clinical Details" }).click();
     await page.waitForURL(/\/pre-authorizations\/raise\?id=[0-9a-f-]{36}&step=2$/);
     const id = new URL(page.url()).searchParams.get("id")!;
 
@@ -99,10 +137,10 @@ test.describe("New Claim (insurer reviewer)", () => {
 
     // Stay starts: typed in the display format.
     const start = page.getByRole("textbox", { name: "Stay starts Date and time" });
-    await start.fill("2026/12/20 09:00:00.000");
+    await start.fill("20/12/2026 09:00 AM");
     await start.press("Enter");
     await page.keyboard.press("Escape");
-    await expect(start).toHaveValue("2026/12/20 09:00:00.000");
+    await expect(start).toHaveValue("20/12/2026   09:00 AM");
     // Stay ends: through the popover (Escape first: nothing is saved without Confirm).
     const end = page.getByRole("textbox", { name: "Stay ends Date and time" });
     const endField = page.locator("[data-no-dirty]").filter({ has: end });
@@ -114,13 +152,23 @@ test.describe("New Claim (insurer reviewer)", () => {
     await expect(pop).toHaveCount(0);
     await expect(end).toHaveValue("");
     await endField.getByRole("button", { name: "Open the date and time picker" }).click();
-    for (let i = 0; i < 24 && !(await pop.getByText("December 2026").count()); i++) await pop.getByRole("button", { name: "Next month" }).click();
+    // Year and month are chosen directly from their lists (no paging month by month); no seconds / milliseconds.
+    await expect(pop.getByRole("listbox", { name: "Seconds" })).toHaveCount(0);
+    await expect(pop.getByRole("listbox", { name: "Milliseconds" })).toHaveCount(0);
+    await pop.getByRole("button", { name: /^Choose year, / }).click();
+    await pop.getByRole("button", { name: "Later years" }).click();
+    await pop.getByRole("button", { name: "Earlier years" }).click();
+    await pop.getByRole("listbox", { name: "Years" }).getByRole("option", { name: "2026" }).click();
+    await pop.getByRole("button", { name: /^Choose month, / }).click();
+    await expect(pop.getByRole("listbox", { name: "Months" }).getByRole("option")).toHaveCount(12);
+    await pop.getByRole("listbox", { name: "Months" }).getByRole("option", { name: "December" }).click();
+    await expect(pop.getByRole("grid", { name: "December 2026" })).toBeVisible();
     await pop.getByRole("button", { name: "23 December 2026" }).click();
     await pop.getByRole("listbox", { name: "Hours" }).getByRole("button", { name: "11", exact: true }).click();
     await pop.getByRole("listbox", { name: "Minutes" }).getByRole("button", { name: "30", exact: true }).click();
-    await pop.getByRole("listbox", { name: "Milliseconds" }).getByRole("button", { name: "500", exact: true }).click();
+    await pop.getByRole("listbox", { name: "AM or PM" }).getByRole("button", { name: "AM", exact: true }).click();
     await pop.getByRole("button", { name: "Confirm" }).click();
-    await expect(end).toHaveValue("2026/12/23 11:30:00.500");
+    await expect(end).toHaveValue("23/12/2026   11:30 AM");
     await expect(page.getByTestId("stay-total")).toHaveText("Total stay: 4 days");
     // Stay starts (left) and Stay ends (right) on one row, same height, on wide screens.
     const [a, b] = [await start.boundingBox(), await end.boundingBox()];
@@ -135,6 +183,11 @@ test.describe("New Claim (insurer reviewer)", () => {
     await page.getByLabel("Choose a condition").selectOption("Diabetes");
     await page.getByLabel("Or type another condition").fill("Thyroid disorder");
     await page.getByRole("button", { name: "Add", exact: true }).click();
+    // The list and the typed entry sit side by side on wide screens.
+    const pick = await page.getByLabel("Choose a condition").boundingBox();
+    const typedBox = await page.getByLabel("Or type another condition").boundingBox();
+    if ((page.viewportSize()?.width ?? 0) > 700) expect(Math.abs(pick!.y - typedBox!.y)).toBeLessThan(2);
+    else expect(typedBox!.y).toBeGreaterThan(pick!.y);
     const conditions = page.getByRole("list", { name: "Chosen conditions" });
     await expect(conditions).toContainText("Diabetes");
     await expect(conditions).toContainText("Thyroid disorder");
@@ -262,7 +315,7 @@ test.describe("New Claim (insurer reviewer)", () => {
 
     // Data kept across steps: back to Clinical Details shows what was saved.
     await stepButton(page, "Clinical Details & Package").click();
-    await expect(page.getByRole("textbox", { name: "Stay ends Date and time" })).toHaveValue("2026/12/23 11:30:00.500");
+    await expect(page.getByRole("textbox", { name: "Stay ends Date and time" })).toHaveValue("23/12/2026   11:30 AM");
     await expect(page.getByRole("list", { name: "Chosen conditions" })).toContainText("Thyroid disorder");
 
     // Review & Final Submission.
@@ -291,10 +344,15 @@ test.describe("New Claim (insurer reviewer)", () => {
     await expect(row).toHaveCount(1);
     await row.getByRole("link", { name: "Select" }).click();
     await page.waitForURL(/\?member=/);
+    await editDemographics(page);
     await page.getByLabel("Gender").selectOption("female");
     await page.getByLabel("Mobile").fill("9876500001");
     await page.getByLabel("Policy Number").fill("POL-E2E-002");
-    await footer(page).getByRole("button", { name: "Next" }).click();
+    await openEngine(page);
+    await expect(page.getByTestId("available-balance")).toBeVisible(); // the policy check has loaded
+    const ack2 = page.getByRole("checkbox", { name: /^I have reviewed these/ });
+    if (await ack2.count()) await ack2.check();
+    await footer(page).getByRole("button", { name: "Continue to Clinical Details" }).click();
     await page.waitForURL(/step=2$/);
 
     // A quick fix from the engine view: Add Diagnosis, without filling the rest of Clinical Details first.
@@ -311,7 +369,7 @@ test.describe("New Claim (insurer reviewer)", () => {
 
     await stepButton(page, "Clinical Details & Package").click();
     await footer(page).getByRole("button", { name: "Back" }).click();
-    await expect(currentStep(page)).toContainText("KYC & Policy");
+    await expect(currentStep(page)).toContainText("Identity & Coverage");
     await expect(page.getByLabel("Policy Number")).toHaveValue("POL-E2E-002");
     await page.reload();
     await expect(page.getByTestId("case-banner")).toContainText(name);

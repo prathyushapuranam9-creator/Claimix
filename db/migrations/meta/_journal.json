@@ -113,6 +113,27 @@
       "when": 1791518814734,
       "tag": "0015_patient_aadhaar",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791518874734,
+      "tag": "0015_coverage_policy_number",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791518934734,
+      "tag": "0016_registration_scheduling",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1791518994734,
+      "tag": "0017_admissions_abha_payment",
+      "breakpoints": true
     }
   ]
 }

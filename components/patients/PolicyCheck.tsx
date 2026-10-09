@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { ageOn, formatDate, formatDateTime, formatINR } from "@/lib/india";
 import { CLAIM_STATUS_LABEL, CLAIM_STATUS_TONE, type ClaimStatus } from "@/modules/claims/claims.workflow";
 import { documentLabel } from "@/modules/documents/document-types";
-import { RELATIONSHIP_LABEL } from "@/modules/patients/coverage.validation";
+import { RELATIONSHIP_LABEL, VERIFICATION_LABEL } from "@/modules/patients/coverage.validation";
 import type { PolicyCheckData } from "@/modules/patients/policy-check.service";
 import { departmentLabel, GENDER_LABEL, NO_VISIT_REASON } from "@/modules/patients/patients.validation";
 import { STATUS_LABEL, STATUS_TONE, type PreauthStatus } from "@/modules/preauth/preauth.workflow";
@@ -13,6 +13,7 @@ import { ButtonTabs } from "@/components/ui/ButtonTabs";
 import { CellText, DataTable } from "@/components/ui/DataTable";
 import { Details } from "@/components/ui/Form";
 import { Badge, EmptyState } from "@/components/ui/Surface";
+import { OpenOnHash } from "./OpenOnHash";
 import styles from "./PolicyCheck.module.css";
 
 interface PatientInfo {
@@ -39,6 +40,9 @@ interface CoverageRow {
   coverEnd: string;
   sumInsured: string | null;
   sumInsuredAvailable: string | null;
+  policyNumber?: string | null;
+  policyholderName?: string | null;
+  verificationStatus?: string;
 }
 
 const TRI: Record<string, string> = { yes: "Yes", no: "No", unknown: "Not known" };
@@ -62,7 +66,20 @@ function NoAccess({ what }: { what: string }) {
  * information. Switching views never navigates; all data is this patient's only,
  * already filtered to what the viewer may see.
  */
-export function PolicyCheck({ patient, coverage, data, today }: { patient: PatientInfo; coverage: CoverageRow[]; data: PolicyCheckData; today: string }) {
+export function PolicyCheck({
+  patient,
+  coverage,
+  data,
+  today,
+  insuranceDocuments,
+}: {
+  patient: PatientInfo;
+  coverage: CoverageRow[];
+  data: PolicyCheckData;
+  today: string;
+  /** The patient's Insurance Documents block (upload / view), shown inside Patient & Policy when the viewer may read documents. */
+  insuranceDocuments?: ReactNode;
+}) {
   const coverStatus = (c: CoverageRow) =>
     c.coverEnd < today ? <Badge tone="danger">Expired</Badge> : c.coverStart > today ? <Badge tone="warning">Not started</Badge> : <Badge tone="success">In force</Badge>;
 
@@ -108,6 +125,51 @@ export function PolicyCheck({ patient, coverage, data, today }: { patient: Patie
           </div>
         )}
       </Section>
+      {/* Directly below Insurance & policy: what each coverage pays — insurer or government scheme, balance, verification. */}
+      <Section title="Insurance & scheme coverage">
+        <DataTable
+          caption={`Insurance and scheme coverage for ${patient.fullName}`}
+          rows={coverage}
+          rowKey={(c) => c.id}
+          empty={<EmptyState title="No insurance or scheme coverage recorded for this patient." />}
+          columns={[
+            {
+              key: "k",
+              header: "Coverage",
+              cell: (c) => (
+                <CellText sub={c.category === "government" ? "Government scheme" : "Private insurance"}>
+                  {(c.category === "government" ? c.schemeName : c.insurerName) ?? c.policyName}
+                </CellText>
+              ),
+            },
+            { key: "p", header: "Policy / scheme", cell: (c) => <CellText sub={c.policyNumber ? `Policy ${c.policyNumber}` : undefined}>{c.policyName}</CellText> },
+            {
+              key: "m",
+              header: "Member",
+              cell: (c) => (
+                <CellText sub={[RELATIONSHIP_LABEL[c.relationship as keyof typeof RELATIONSHIP_LABEL] ?? c.relationship, c.policyholderName].filter(Boolean).join(" · ")}>
+                  <span className="mono">{c.memberId}</span>
+                </CellText>
+              ),
+            },
+            { key: "d", header: "Cover period", nowrap: true, cell: (c) => <CellText sub={coverStatus(c)}>{`${formatDate(c.coverStart)} – ${formatDate(c.coverEnd)}`}</CellText> },
+            { key: "b", header: "Available", align: "right", cell: (c) => <CellText sub={`of ${formatINR(c.sumInsured)}`}>{formatINR(c.sumInsuredAvailable)}</CellText> },
+            {
+              key: "v",
+              header: "Verification",
+              cell: (c) =>
+                c.verificationStatus === "verified" ? (
+                  <Badge tone="success">Verified</Badge>
+                ) : c.verificationStatus ? (
+                  <Badge tone="warning">{VERIFICATION_LABEL[c.verificationStatus as keyof typeof VERIFICATION_LABEL] ?? c.verificationStatus}</Badge>
+                ) : (
+                  "—"
+                ),
+            },
+          ]}
+        />
+      </Section>
+      {insuranceDocuments && <div id="insurance-documents">{insuranceDocuments}</div>}
     </div>
   );
 
@@ -215,13 +277,14 @@ export function PolicyCheck({ patient, coverage, data, today }: { patient: Patie
   );
 
   return (
-    <details className={styles.block} data-patient-id={patient.id}>
+    <details className={styles.block} data-patient-id={patient.id} id="policy-check">
       <summary className={styles.summary}>
         <span>Policy Check</span>
         <svg className={styles.chev} width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="m6 9 6 6 6-6" />
         </svg>
       </summary>
+      <OpenOnHash detailsId="policy-check" />
       <div className={styles.body}>
         <p className={styles.scope}>
           Showing records for <strong>{patient.fullName}</strong> (<span className="mono">{patient.patientNo}</span>) only.

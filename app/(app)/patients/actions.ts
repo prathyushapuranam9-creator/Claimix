@@ -7,6 +7,8 @@ import { runAction, type ActionResult } from "@/lib/actions";
 import { ValidationError } from "@/lib/errors";
 import { DocumentService } from "@/modules/documents/documents.service";
 import { PatientService } from "@/modules/patients/patients.service";
+import { PolicyCheckService } from "@/modules/patients/policy-check.service";
+import { ClaimService } from "@/modules/claims/claims.service";
 import type { PatientInput } from "@/modules/patients/patients.validation";
 import { CoverageService } from "@/modules/patients/coverage.service";
 import type { CoverageInput } from "@/modules/patients/coverage.validation";
@@ -62,5 +64,24 @@ export async function uploadInsuranceDocumentAction(patientId: string, form: For
     return undefined;
   });
   if (r.ok) revalidatePath(`/patients/${patientId}`);
+  return r;
+}
+
+/**
+ * Patient Details "Submit": starts the (draft) cashless claim from this patient's approved pre-authorization, which
+ * moves the patient from Patients → Pre-Auth to Patients → Claims. The pre-auth must be this patient's;
+ * ClaimService.createCashless enforces the rest (hospital staff, approved status, no live claim on it).
+ */
+export async function submitPatientToClaimsAction(patientId: string, preAuthId: string): Promise<ActionResult<string>> {
+  const r = await runAction("patient.submit_to_claims", async () => {
+    const ctx = await actionContext();
+    const { preauths } = await PolicyCheckService.forPatient(ctx, patientId);
+    if (!preauths?.some((p) => p.id === preAuthId)) throw new ValidationError("That pre-authorization isn't this patient's.");
+    return (await ClaimService.createCashless(ctx, { preAuthId })).id;
+  });
+  if (r.ok) {
+    revalidatePath(`/patients/${patientId}`);
+    revalidatePath("/patients");
+  }
   return r;
 }

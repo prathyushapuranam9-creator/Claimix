@@ -237,7 +237,7 @@ export function scrutinize(i: ScrutinyInput): Scrutiny {
       f.push({ key: "kyc:sum", severity: "low", title: "Sum insured differs from the policy record", explanation: `Typed ${inr(k.sumInsured)}; the record has ${inr(r.sumInsured)}.`, resolution: "The payer goes by its record; check the card or schedule.", step: 1 });
     }
     if (r.policyHasTpa && !k.memberId) {
-      f.push({ key: "kyc:tpa_card", severity: "medium", title: "Missing TPA cashless card number", explanation: "This policy is run by a TPA, and its cashless card / member ID was not recorded.", resolution: "Enter the TPA card / member ID in KYC & Policy.", step: 1 });
+      f.push({ key: "kyc:tpa_card", severity: "medium", title: "Missing TPA cashless card number", explanation: "This policy is run by a TPA, and its cashless card / member ID was not recorded.", resolution: "Enter the TPA card / member ID in Identity & Coverage.", step: 1 });
     }
   }
   if (r && i.admissionDate && (i.admissionDate < r.coverStart || i.admissionDate > r.coverEnd)) {

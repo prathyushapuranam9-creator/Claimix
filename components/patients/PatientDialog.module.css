@@ -1,0 +1,143 @@
+/* Patient Details popups (Bill Breakup, Pre-Form): the same surface, border and backdrop as the document viewer.
+   Sized by its content, never larger than the screen; the body scrolls, the header with the X stays in view. */
+.dialog {
+  width: min(880px, calc(100vw - 2 * var(--sp-4)));
+  max-width: none;
+  max-height: min(88dvh, 1000px);
+  padding: 0;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  background: var(--c-surface);
+  color: var(--c-text);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.dialog[data-size="lg"] {
+  width: min(1040px, calc(100vw - 2 * var(--sp-4)));
+}
+
+.dialog::backdrop {
+  background: var(--scrim);
+}
+
+.frame {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  max-height: inherit;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--fs-md);
+  font-weight: 650;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.close {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-text-muted);
+  cursor: pointer;
+}
+
+.close:hover {
+  background: var(--c-accent);
+  color: var(--c-text);
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.body {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-4);
+  min-height: 0;
+  padding: var(--sp-4) var(--sp-5) var(--sp-5);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* One pre-auth / claim inside a popup. */
+.case {
+  display: grid;
+  gap: var(--sp-3);
+  min-width: 0;
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-input);
+}
+
+.caseHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2) var(--sp-3);
+}
+
+.caseTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: 650;
+}
+
+.sectionTitle {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.note {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.total td,
+.total th {
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .head {
+    padding-left: var(--sp-4);
+  }
+
+  .body {
+    padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  }
+
+  .case {
+    padding: var(--sp-3);
+  }
+}

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { orNotFound, pageContext } from "@/lib/auth/context";
-import { ageOn, formatDate, formatDateTime, formatINR } from "@/lib/india";
+import { ageOn, formatDate, formatDateTime, formatINR, maskAadhaar } from "@/lib/india";
 import { param } from "@/lib/pagination";
 import { can } from "@/lib/permissions/principal";
 import { todayIso } from "@/lib/validation";
@@ -13,6 +13,7 @@ import { coverageWorkflowSteps } from "@/modules/eligibility/workflow";
 import { CoverageService } from "@/modules/patients/coverage.service";
 import { COVER_PERIOD_LABEL, coverPeriodStatus, RELATIONSHIP_LABEL, VERIFICATION_LABEL } from "@/modules/patients/coverage.validation";
 import { PatientService } from "@/modules/patients/patients.service";
+import { PREAUTH_APPROVED } from "@/modules/patients/patients.repository";
 import { RegistrationService } from "@/modules/scheduling/scheduling.service";
 import { PatientEligibilityService } from "@/modules/eligibility/patient-eligibility.service";
 import { PolicyCheckService } from "@/modules/patients/policy-check.service";
@@ -21,7 +22,10 @@ import { PolicyService } from "@/modules/policies/policies.service";
 import { CoverageForm } from "@/components/patients/CoverageForm";
 import { ExtractedDetailsNotice, InsuranceDocumentsCard } from "@/components/patients/InsuranceDocuments";
 import { EligibilityCheckButton, EligibilityCheckProvider, EligibilityResultCard } from "@/components/patients/PatientEligibility";
+import { BillBreakup, PreForms } from "@/components/patients/PatientCaseViews";
+import { PatientDialogButton } from "@/components/patients/PatientDialog";
 import { PatientVisits } from "@/components/patients/PatientVisits";
+import { SubmitToClaims } from "@/components/patients/SubmitToClaims";
 import { PolicyCheck } from "@/components/patients/PolicyCheck";
 import { OUTCOME_TONE } from "@/components/eligibility/EligibilityResult";
 import { ButtonLink } from "@/components/ui/Button";
@@ -31,7 +35,7 @@ import { Alert, Badge, Card, EmptyState, PageHeader, Stack } from "@/components/
 import { WorkflowStepper } from "@/components/workflow/WorkflowStepper";
 import { DocumentViewButton } from "@/components/documents/DocumentViewer";
 import { deleteDocumentAction } from "@/app/(app)/documents/actions";
-import { addCoverageAction, uploadInsuranceDocumentAction } from "../actions";
+import { addCoverageAction, submitPatientToClaimsAction, uploadInsuranceDocumentAction } from "../actions";
 import { dischargeAction } from "../registration-actions";
 
 export const metadata: Metadata = { title: "Patient · Claimix" };
@@ -56,12 +60,13 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
   const canSeePolicyCheck = can(ctx.principal, "preauth:read") || can(ctx.principal, "claim:read") || can(ctx.principal, "document:read");
   // The profile check is also offered to payer reviewers, for their own policies only (enforced server-side).
   const canProfileCheck = PatientEligibilityService.canCheck(ctx.principal);
-  const [coverage, policyOptions, policyCheck, insuranceDocs, visits] = await Promise.all([
+  const [coverage, policyOptions, policyCheck, insuranceDocs, visits, registrationForms] = await Promise.all([
     canSeeInsurance ? CoverageService.forPatient(ctx, p.id) : Promise.resolve([]),
     canManageCoverage ? PolicyService.options(ctx) : Promise.resolve([]),
     canSeePolicyCheck ? PolicyCheckService.forPatient(ctx, p.id) : Promise.resolve({ preauths: null, claims: null, documents: null }),
     canReadDocs ? DocumentService.insuranceDocuments(ctx, p.id) : Promise.resolve([]),
     RegistrationService.forPatient(ctx, p.id),
+    canReadDocs ? DocumentService.registrationForms(ctx, p.id) : Promise.resolve([]),
   ]);
   // Contact details are shown to the registering hospital and the patient only.
   const showContact = ctx.principal.orgType === "hospital" || ctx.principal.orgType === "platform";
@@ -79,6 +84,19 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
   const requestCount = (policyCheck.preauths?.length ?? 0) + (policyCheck.claims?.length ?? 0);
   const inForceCoverage = coverage.filter((c) => coverPeriodStatus(c, today) === "in_force");
 
+  // Submit (Pre-Auth → Claims) follows the existing claim rule: hospital staff with claim:create, from an approved
+  // pre-auth that has no live claim. The server checks all of it again.
+  const canSubmit = can(ctx.principal, "claim:create") && ctx.principal.orgType === "hospital" && ctx.principal.roleKey !== "patient";
+  const approved = new Set<string>(PREAUTH_APPROVED);
+  const submittable = policyCheck.preauths?.find((r) => approved.has(r.status) && !r.liveClaimId) ?? null;
+  const submitReason = policyCheck.preauths?.some((r) => approved.has(r.status))
+    ? "This patient's approved pre-authorization is already in Claims."
+    : "Submit is available once the patient's pre-authorization is approved.";
+  // After Submit: the claim that was started (only when it is one of this patient's claims).
+  const claimParam = param(sp, "claim");
+  const startedClaim = claimParam ? policyCheck.claims?.find((c) => c.id === claimParam) ?? null : null;
+  const hasCaseData = policyCheck.preauths !== null || policyCheck.claims !== null;
+
   const content = (
     <>
       <PageHeader
@@ -88,11 +106,27 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
           <>
             {canWrite && <ButtonLink href={`/patients/${p.id}/edit`} variant="secondary">Edit details</ButtonLink>}
             <ButtonLink href={`/api/patients/${p.id}/export`} variant="secondary">Download details</ButtonLink>
-            {canProfileCheck && <EligibilityCheckButton />}
+            {canSubmit && (
+              <SubmitToClaims
+                patientId={p.id}
+                preauth={submittable ? { reference: submittable.reference } : null}
+                reason={submitReason}
+                submit={submittable ? submitPatientToClaimsAction.bind(null, p.id, submittable.id) : undefined}
+              />
+            )}
           </>
         }
       />
       <Stack>
+        {startedClaim && (
+          <Alert tone="success" title="Patient moved to Claims.">
+            <p>
+              Claim <Link href={`/claims/${startedClaim.id}`} className="mono">{startedClaim.reference}</Link> was started from
+              {startedClaim.preauthReference ? <> pre-authorization <span className="mono">{startedClaim.preauthReference}</span></> : " the approved pre-authorization"}. The
+              patient now appears under <Link href="/patients?view=claims">Patients → Claims</Link>.
+            </p>
+          </Alert>
+        )}
         {coverageAdded && (
           <Alert tone="success" title="Coverage added successfully.">
             <p>Next step: check eligibility against the policy&apos;s own rules, below.</p>
@@ -110,7 +144,26 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
             />
           </Card>
         )}
-        <Card title="Details">
+        <Card
+          title="Details"
+          actions={
+            canProfileCheck || hasCaseData ? (
+              <span className={formStyles.actionsInline}>
+                {hasCaseData && (
+                  <PatientDialogButton label="Bill Breakup" title={`Bill breakup · ${p.fullName}`} size="lg">
+                    <BillBreakup preauths={policyCheck.preauths} claims={policyCheck.claims} />
+                  </PatientDialogButton>
+                )}
+                {policyCheck.preauths !== null && (
+                  <PatientDialogButton label="Pre-Form" title={`Pre-authorization form · ${p.fullName}`} size="lg">
+                    <PreForms preauths={policyCheck.preauths} />
+                  </PatientDialogButton>
+                )}
+                {canProfileCheck && <EligibilityCheckButton />}
+              </span>
+            ) : undefined
+          }
+        >
           <Details
             columns={3}
             items={[
@@ -120,6 +173,8 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
               ["Reason for Visit", p.visitReason ?? NO_VISIT_REASON],
               ["Date of birth", `${formatDate(p.dob)} (${ageOn(p.dob)} years)`],
               ["Gender", GENDER_LABEL[p.gender]],
+              // Only the last 4 digits are ever stored next to a keyed hash, so the number is always shown masked.
+              ["Aadhaar Number", maskAadhaar(p.aadhaarLast4) ?? "Not provided"],
               ...(p.abhaNumber || p.abhaAddress
                 ? ([["ABHA", [p.abhaAddress, p.abhaNumber && p.abhaNumber.replace(/^(\d{2})(\d{4})(\d{4})(\d{4})$/, "$1-$2-$3-$4")].filter(Boolean).join(" · ")]] as [string, string][])
                 : []),
@@ -170,17 +225,6 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
         />
         {canSeeInsurance && (
           <>
-        {canReadDocs && (
-          <div id="insurance-documents">
-            <InsuranceDocumentsCard
-              patientId={p.id}
-              docs={insuranceDocs}
-              canUpload={canUploadDocs}
-              upload={canUploadDocs ? uploadInsuranceDocumentAction.bind(null, p.id) : undefined}
-              remove={canUploadDocs ? deleteDocumentAction : undefined}
-            />
-          </div>
-        )}
         <Card
           title="Insurance & scheme coverage"
           padded={false}
@@ -313,6 +357,17 @@ export default async function PatientPage({ params, searchParams }: { params: Pr
           coverage={coverage}
           data={policyCheck}
           today={today}
+          insuranceDocuments={
+            canReadDocs ? (
+              <InsuranceDocumentsCard
+                patientId={p.id}
+                docs={insuranceDocs}
+                canUpload={canUploadDocs}
+                upload={canUploadDocs ? uploadInsuranceDocumentAction.bind(null, p.id) : undefined}
+                remove={canUploadDocs ? deleteDocumentAction : undefined}
+              />
+            ) : undefined
+          }
         />
         )}
         {canManageCoverage && (

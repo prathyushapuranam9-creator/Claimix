@@ -69,6 +69,12 @@
   font-weight: 650;
   font-size: var(--fs-lg);
 }
+.stateBody {
+  display: grid;
+  gap: var(--sp-2);
+  justify-items: center;
+  max-width: 40rem;
+}
 .stateIcon {
   display: grid;
   place-items: center;

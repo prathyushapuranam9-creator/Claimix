@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { roles, users } from "@/db/schema";
 import type { ServiceContext } from "@/lib/auth/context";
 import { ConflictError, ForbiddenError, ValidationError } from "@/lib/errors";
-import { ageOn, formatDate, formatDateTime, formatINR } from "@/lib/india";
+import { ageOn, formatDate, formatDateTime, formatINR, formatTime12 } from "@/lib/india";
 import { sha256Hex } from "@/lib/security/crypto";
 import { actorOf, AuditService } from "@/modules/audit/audit.service";
 import { DocumentService } from "@/modules/documents/documents.service";
@@ -49,7 +49,7 @@ const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 type Wizard = Awaited<ReturnType<typeof PreauthService.wizard>>;
 
 const blank = (v: unknown) => (v === undefined || v === null || v === "" ? "" : Array.isArray(v) ? v.join(", ") : String(v));
-const at = (date: unknown, time: unknown) => (date ? `${formatDate(String(date))}${time ? ` ${String(time)}` : ""}` : "");
+const at = (date: unknown, time: unknown) => (date ? `${formatDate(String(date))}${time ? ` ${formatTime12(String(time))}` : ""}` : "");
 
 function storedRegistration(w: Wizard): StoredRegistration | null {
   const r = (w.preauth.clinical as Record<string, unknown>).registration;

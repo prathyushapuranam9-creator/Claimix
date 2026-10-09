@@ -35,7 +35,8 @@ export function EmptyState({ title, children, action, icon = "○" }: { title: s
     <div className={styles.state}>
       <span className={styles.stateIcon} aria-hidden="true">{icon}</span>
       <p className={styles.stateTitle}>{title}</p>
-      {children && <p>{children}</p>}
+      {/* A div, not a p: the content may itself hold blocks (an Alert, paragraphs). */}
+      {children && <div className={styles.stateBody}>{children}</div>}
       {action}
     </div>
   );

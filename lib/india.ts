@@ -65,3 +65,11 @@ export function isValidAadhaar(v: string): boolean {
 
 /** The only form Aadhaar is ever shown in: the last 4 digits. */
 export const maskAadhaar = (last4: string | null | undefined) => (last4 ? `XXXX XXXX ${last4}` : null);
+
+/** "14:05" (or "14:05:00.000") → "02:05 PM"; empty when no time. */
+export function formatTime12(t: string | null | undefined): string {
+  const m = /^(\d{2}):(\d{2})/.exec(t ?? "");
+  if (!m) return "";
+  const h = Number(m[1]);
+  return `${String(h % 12 === 0 ? 12 : h % 12).padStart(2, "0")}:${m[2]} ${h < 12 ? "AM" : "PM"}`;
+}

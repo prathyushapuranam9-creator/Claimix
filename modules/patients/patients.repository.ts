@@ -1,11 +1,13 @@
 import "server-only";
-import { and, asc, count, desc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
 import { claims, organizations, patients, preAuthorizations } from "@/db/schema";
 import type { Scope } from "@/lib/permissions/catalog";
-import type { Principal } from "@/lib/permissions/principal";
+import { scopeFor, type Principal } from "@/lib/permissions/principal";
 import { andAll, scopePredicate, type ScopeColumns } from "@/lib/permissions/scope";
 import { likeContains, offsetOf, type ListQuery, type Paged } from "@/lib/pagination";
+import { CLAIM_SCOPE } from "@/modules/claims/claims.repository";
+import { PREAUTH_SCOPE } from "@/modules/preauth/preauth.repository";
 
 /**
  * Patients belong to the registering hospital. Payers (insurer/TPA) reach a
@@ -45,7 +47,47 @@ const listColumns = {
   createdAt: patients.createdAt,
 };
 
-export type PatientListRow = { [K in keyof typeof listColumns]: (typeof listColumns)[K]["_"]["data"] };
+export type PatientListRow = { [K in keyof typeof listColumns]: (typeof listColumns)[K]["_"]["data"] } & {
+  /** Pre-Auth / Claims views: the patient's latest case in that view (null in the Patients view). */
+  caseId: string | null;
+  caseRef: string | null;
+  caseStatus: string | null;
+};
+
+/** Patients | Pre-Auth | Claims on the Patients page. Existing statuses only; nothing is duplicated. */
+export const PATIENT_VIEWS = ["patients", "preauth", "claims"] as const;
+export type PatientView = (typeof PATIENT_VIEWS)[number];
+
+/** Awaiting the payer's decision. */
+const PREAUTH_AWAITING = ["submitted", "pending", "query"] as const;
+/** Approved: the patient moves on to Claims once a claim is started from it (Submit). */
+export const PREAUTH_APPROVED = ["approved", "partially_approved", "final_approved"] as const;
+
+/** A live claim on this pre-auth (the same rule as the unique index claims_preauth_live_uq). */
+/** Written with explicit table names: an unqualified "id" inside the subquery would bind to the claim's own id. */
+const liveClaimForPreauth = sql`exists (select 1 from ${claims} lc where lc.pre_auth_id = "pre_authorizations"."id" and lc.status <> 'cancelled')`;
+
+/**
+ * The cases behind a view, limited to the cases the viewer may open (their own pre-auth / claim scope).
+ * Pre-Auth: awaiting a decision, or approved with no live claim yet. Claims: any claim that isn't cancelled.
+ */
+function viewCases(principal: Principal, view: PatientView) {
+  if (view === "preauth") {
+    const scope = scopeFor(principal, "preauth:read");
+    if (!scope) return null;
+    return and(
+      eq(preAuthorizations.patientId, patients.id),
+      or(inArray(preAuthorizations.status, [...PREAUTH_AWAITING]), and(inArray(preAuthorizations.status, [...PREAUTH_APPROVED]), sql`not ${liveClaimForPreauth}`)),
+      scopePredicate(principal, scope, PREAUTH_SCOPE),
+    );
+  }
+  if (view === "claims") {
+    const scope = scopeFor(principal, "claim:read");
+    if (!scope) return null;
+    return and(eq(claims.patientId, patients.id), ne(claims.status, "cancelled"), scopePredicate(principal, scope, CLAIM_SCOPE));
+  }
+  return undefined;
+}
 
 /**
  * Matches a search term against the mobile number by digits alone, so a number typed without the
@@ -58,15 +100,30 @@ function phoneMatches(term: string) {
 }
 
 export const PatientRepository = {
-  async list(db: DbOrTx, principal: Principal, scope: Scope, q: ListQuery): Promise<Paged<PatientListRow>> {
+  async list(db: DbOrTx, principal: Principal, scope: Scope, q: ListQuery, view: PatientView = "patients"): Promise<Paged<PatientListRow>> {
+    const cases = viewCases(principal, view);
+    // No access to that kind of case: the view is simply empty.
+    if (cases === null) return { rows: [], total: 0, page: q.page, pageSize: q.pageSize };
+    const table = view === "claims" ? claims : preAuthorizations;
+    const inView = cases ? sql`exists (select 1 from ${table} where ${cases})` : undefined;
+    // The latest case of the view (reference + status), from the same scoped set of cases.
+    const latest = (col: SQL) =>
+      cases ? sql<string | null>`(select ${col} from ${table} where ${cases} order by ${view === "claims" ? claims.updatedAt : preAuthorizations.updatedAt} desc limit 1)` : sql<string | null>`null`;
     const where = andAll(
       isNull(patients.deletedAt),
       scopePredicate(principal, scope, PATIENT_SCOPE),
+      inView,
       q.q ? or(ilike(patients.fullName, likeContains(q.q)), ilike(patients.patientNo, likeContains(q.q)), phoneMatches(q.q)) : undefined,
     );
+    const ref = view === "claims" ? claims : preAuthorizations;
     const [rows, [total]] = await Promise.all([
       db
-        .select(listColumns)
+        .select({
+          ...listColumns,
+          caseId: latest(sql`${ref.id}::text`),
+          caseRef: latest(sql`${ref.reference}`),
+          caseStatus: latest(sql`${ref.status}::text`),
+        })
         .from(patients)
         .innerJoin(organizations, eq(organizations.id, patients.hospitalId))
         .where(where)

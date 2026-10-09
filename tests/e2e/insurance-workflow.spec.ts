@@ -20,6 +20,13 @@ async function registerPatient(page: Page, name: string) {
   return new URL(page.url()).pathname;
 }
 
+/** Insurance Documents sit inside the Policy Check block on the patient page: open it (idempotent). */
+async function openPolicyCheck(page: Page) {
+  const block = page.locator("details#policy-check");
+  if (!(await block.evaluate((d) => (d as HTMLDetailsElement).open))) await block.locator("summary").click();
+  await expect(block).toHaveAttribute("open", "");
+}
+
 async function uploadRequestDoc(page: Page, label: string) {
   await page.getByLabel("Document type").selectOption({ label });
   await page.getByLabel(/^File/).setInputFiles({ name: `${label.replace(/\W+/g, "-")}.pdf`, mimeType: "application/pdf", buffer: PDF });
@@ -53,6 +60,7 @@ test.describe("Hospital Staff: patient to pre-authorization", () => {
     await expect(page.getByText("Patient registered successfully.")).toBeVisible();
     await expect(page.locator("#main")).toContainText("Next step: add insurance coverage");
     await expect(page.getByText("No coverage recorded")).toBeVisible();
+    await openPolicyCheck(page);
     await expect(page.getByText("No insurance document uploaded")).toBeVisible();
 
     // Step 2: the insurance card is filed against this patient.
@@ -201,6 +209,7 @@ test.describe("Hospital Staff: patient to pre-authorization", () => {
     await expect(page.getByRole("row", { name: new RegExp(memberId) })).toContainText("Requires verification");
 
     // The document arrives later.
+    await openPolicyCheck(page);
     await page.getByLabel("Document type").selectOption({ label: "Insurance / health card" });
     await page.getByLabel(/^File/).setInputFiles({ name: "late-card.pdf", mimeType: "application/pdf", buffer: CARD });
     await page.getByRole("button", { name: "Upload insurance document" }).click();

@@ -297,3 +297,62 @@
     height: 160px;
   }
 }
+
+/* Month and year in the header are buttons that open the month / year lists. */
+.headBtn {
+  min-height: 30px;
+  padding: 0 var(--sp-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--c-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.headBtn:hover {
+  background: var(--c-surface-2);
+  text-decoration: underline;
+}
+
+.headBtn:focus-visible,
+.pickItem:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 1px;
+}
+
+.pickGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-2);
+  width: calc(7 * 36px + 6 * 2px);
+}
+
+.pickItem {
+  min-height: 44px;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.pickItem:hover {
+  background: var(--c-surface-2);
+}
+
+.pickItem[aria-selected="true"] {
+  border-color: var(--c-primary);
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .pickGrid {
+    width: 100%;
+  }
+}

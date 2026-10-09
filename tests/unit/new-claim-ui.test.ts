@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isValidAadhaar, maskAadhaar } from "@/lib/india";
-import { formatDateTime, parseDateTime } from "@/components/ui/DateTimePicker";
+import { clampDate, formatDateTime, fromClock, parseDateTime, toClock } from "@/components/ui/DateTimePicker";
+import { availableBalance, policyWarnings, verifyAgainstRecord, type PolicyFacts } from "@/modules/preauth/kyc-verification";
 import { riskLevel } from "@/components/preauth/wizard/ChecksDashboard";
 import { checklistStep, docCategory } from "@/modules/preauth/preauth.scrutiny";
 import { wizardClinicalSchema } from "@/modules/preauth/preauth.validation";
@@ -37,14 +38,25 @@ describe("Aadhaar", () => {
 });
 
 describe("Date and time picker format", () => {
-  it("shows YYYY/MM/DD HH:mm:ss.SSS and reads it back", () => {
-    expect(formatDateTime({ date: "2026-05-14", time: "09:30:00.500" })).toBe("2026/05/14 09:30:00.500");
-    expect(formatDateTime({ date: "2026-05-14", time: "09:30" })).toBe("2026/05/14 09:30:00.000");
+  it("shows DD/MM/YYYY hh:mm AM/PM (no seconds) and reads it back as 24-hour HH:mm", () => {
+    expect(formatDateTime({ date: "2026-10-01", time: "10:20" })).toBe("01/10/2026   10:20 AM");
+    expect(formatDateTime({ date: "2026-10-01", time: "22:05:00.000" })).toBe("01/10/2026   10:05 PM");
+    expect(formatDateTime({ date: "2026-10-01", time: "00:15" })).toBe("01/10/2026   12:15 AM");
+    expect(formatDateTime({ date: "2026-10-01", time: "12:00" })).toBe("01/10/2026   12:00 PM");
     expect(formatDateTime({})).toBe("");
-    expect(parseDateTime("2026/05/14 09:30:00.500")).toEqual({ date: "2026-05-14", time: "09:30:00.500" });
-    expect(parseDateTime("2026/02/30 09:30:00.000")).toBeNull();
-    expect(parseDateTime("2026/05/14 24:00:00.000")).toBeNull();
-    expect(parseDateTime("14/05/2026")).toBeNull();
+    expect(parseDateTime("01/10/2026 10:20 AM")).toEqual({ date: "2026-10-01", time: "10:20" });
+    expect(parseDateTime("01/10/2026     10:20 pm")).toEqual({ date: "2026-10-01", time: "22:20" });
+    expect(parseDateTime("01/10/2026 12:00 AM")).toEqual({ date: "2026-10-01", time: "00:00" });
+    expect(parseDateTime("01/10/2026 12:30 PM")).toEqual({ date: "2026-10-01", time: "12:30" });
+    expect(parseDateTime("30/02/2026 10:20 AM")).toBeNull();
+    expect(parseDateTime("01/10/2026 13:20 PM")).toBeNull();
+    expect(parseDateTime("2026/10/01 10:20:00.000")).toBeNull();
+    expect(toClock("17:45")).toEqual({ h: "05", m: "45", ap: "PM" });
+    expect(fromClock({ h: "12", m: "00", ap: "AM" })).toBe("00:00");
+    // Choosing another month / year keeps the day where it exists, else the month's last day.
+    expect(clampDate("2026-01-31", 2026, 1)).toBe("2026-02-28");
+    expect(clampDate("2026-01-31", 2028, 1)).toBe("2028-02-29");
+    expect(clampDate("2026-01-15", 2027, 5)).toBe("2027-06-15");
   });
 
   it("the stay accepts times with seconds and milliseconds, and its end must follow its start", () => {
@@ -126,4 +138,80 @@ describe("KYC Aadhaar and the registration form", () => {
     expect(Buffer.from(pdf.slice(0, 5)).toString()).toBe("%PDF-");
     expect(pdf.length).toBeGreaterThan(1000);
   }, 30_000);
+});
+
+describe("Patient KYC verification and the policy check", () => {
+  const record = { patientNo: "PT-1", fullName: "Asha Rao", gender: "female", dob: "1980-01-01", aadhaarHash: "h1" };
+  const entered = { uhid: "PT-1", patientName: "asha  rao", gender: "female", dob: "1980-01-01" };
+
+  it("Verified when UHID, name and date of birth match; Failed on any difference; Pending when something isn't checkable", () => {
+    expect(verifyAgainstRecord(entered, record).status).toBe("verified");
+    expect(verifyAgainstRecord({ ...entered, aadhaarHash: "h1" }, record).status).toBe("verified");
+    expect(verifyAgainstRecord({ ...entered, aadhaarHash: "other" }, record).status).toBe("failed");
+    expect(verifyAgainstRecord({ ...entered, dob: "1981-01-01" }, record).status).toBe("failed");
+    expect(verifyAgainstRecord({ ...entered, aadhaarHash: "h1" }, { ...record, aadhaarHash: null }).status).toBe("pending");
+    expect(verifyAgainstRecord({ ...entered, uhid: undefined }, record).status).toBe("pending");
+    const undisclosed = verifyAgainstRecord(entered, { ...record, gender: "undisclosed" });
+    expect(undisclosed.status).toBe("verified");
+    expect(undisclosed.items.find((i) => i.field === "gender")?.result).toBe("not_checked");
+  });
+
+  const facts = (over: Partial<PolicyFacts> = {}): PolicyFacts => ({
+    coverStatus: "in_force",
+    coverStart: "2026-04-01",
+    coverEnd: "2027-03-31",
+    policyActive: true,
+    policyHasTpa: false,
+    sumInsured: 500000,
+    recordedBalance: 400000,
+    holds: [],
+    estimate: null,
+    eligibility: { overall: "PASS", results: [], missingInformation: [], requiredDocuments: [], preauthRequired: null, estimate: null },
+    typed: { policyNumber: "P-1", memberId: "M-1" },
+    ...over,
+  });
+
+  it("available balance is the recorded balance less open approvals", () => {
+    expect(availableBalance({ recordedBalance: 400000, holds: [{ reference: "PA-1", amount: 150000 }] })).toBe(250000);
+    expect(availableBalance({ recordedBalance: 100000, holds: [{ reference: "PA-1", amount: 150000 }] })).toBe(0);
+    expect(availableBalance({ recordedBalance: null, holds: [] })).toBeNull();
+  });
+
+  it("warns on coverage, balance, rules and missing information; expired cover blocks", () => {
+    expect(policyWarnings(facts())).toEqual([]);
+    const keys = (f: PolicyFacts) => policyWarnings(f).map((w) => `${w.key}:${w.severity}`);
+    expect(keys(facts({ coverStatus: "expired" }))).toContain("cover_period:blocker");
+    expect(keys(facts({ policyActive: false }))).toContain("policy_inactive:warning");
+    expect(keys(facts({ recordedBalance: 0 }))).toContain("balance_exhausted:warning");
+    expect(keys(facts({ estimate: 450000 }))).toContain("balance_insufficient:warning");
+    expect(keys(facts({ recordedBalance: null }))).toContain("balance_unknown:warning");
+    expect(keys(facts({ policyHasTpa: true, typed: { policyNumber: "P", memberId: "" } }))).toContain("tpa_card_missing:warning");
+    expect(keys(facts({ eligibility: null }))).toContain("rules_missing:warning");
+    const ev = {
+      overall: "FAIL" as const,
+      results: [{ code: "AGE", title: "Age", category: "eligibility" as const, kind: "age_range", outcome: "FAIL" as const, message: "Too old.", missing: [], applicable: true }],
+      missingInformation: [],
+      requiredDocuments: [],
+      preauthRequired: null,
+      estimate: null,
+    };
+    expect(keys(facts({ eligibility: ev }))).toContain("eligibility:AGE:warning");
+    // Every warning and blocker carries a corrective action.
+    for (const over of [{ coverStatus: "expired" as const }, { policyActive: false }, { recordedBalance: 0 }, { eligibility: ev }, { eligibility: null }]) {
+      for (const w of policyWarnings(facts(over))) expect(w.action.length).toBeGreaterThan(5);
+    }
+  });
+});
+
+describe("Policy Verification leaves case-dependent rules to Pre-Scrutiny", () => {
+  it("raises rules missing member / policy facts, not those that only lack admission or diagnosis", () => {
+    const res = (code: string, outcome: "FAIL" | "NEEDS_VERIFICATION", missing: string[]) => ({ code, title: code, category: "eligibility" as const, kind: "x", outcome, message: code, missing, applicable: true });
+    const ev = { overall: "NEEDS_VERIFICATION" as const, missingInformation: [], requiredDocuments: [], preauthRequired: null, estimate: null, results: [
+      res("WAIT", "NEEDS_VERIFICATION", ["Expected admission date"]),
+      res("AGE", "NEEDS_VERIFICATION", ["Patient date of birth", "Expected admission date"]),
+      res("NET", "FAIL", []),
+    ] };
+    const keys = policyWarnings({ coverStatus: "in_force", coverStart: "2026-04-01", coverEnd: "2027-03-31", policyActive: true, policyHasTpa: false, sumInsured: 1, recordedBalance: 1, holds: [], estimate: null, eligibility: ev, typed: { policyNumber: "P" } }).map((w) => w.key);
+    expect(keys).toEqual(["eligibility:AGE", "eligibility:NET"]);
+  });
 });

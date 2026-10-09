@@ -1,0 +1,955 @@
+/* Step 1 — KYC & Policy: 1A / 1B cards side by side, with the live policy balance & rules panel under 1B. */
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.stack {
+  display: grid;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--c-input);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--c-border);
+}
+
+.stepTag {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 1.6rem;
+  padding: 0 var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.cardTitle {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+}
+
+.cardBody {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+}
+
+.cardFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-top: auto;
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--c-border);
+  background: var(--c-surface);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-3);
+}
+
+.full {
+  grid-column: 1 / -1;
+}
+
+.plain {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Status pills (text colour is the status ink on its tint, never colour alone: each carries a word). */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.pill[data-tone="ok"],
+.tag[data-tone="ok"] {
+  background: var(--c-success-bg);
+  color: var(--c-success);
+}
+
+.pill[data-tone="warn"],
+.tag[data-tone="warn"] {
+  background: var(--c-warning-bg);
+  color: var(--c-warning);
+}
+
+.pill[data-tone="bad"],
+.tag[data-tone="bad"] {
+  background: var(--c-danger-bg);
+  color: var(--c-danger);
+}
+
+.pill[data-tone="muted"],
+.tag[data-tone="muted"] {
+  background: var(--c-neutral-bg);
+  color: var(--c-neutral);
+}
+
+/* An input with a trailing tag and/or a leading prefix (+91). */
+.control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.control > input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.control:has(.tag) > input {
+  padding-right: 7.5rem;
+}
+
+.control[data-prefixed] > input {
+  padding-left: 3rem;
+}
+
+.prefix {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--c-text-muted);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.tag {
+  position: absolute;
+  right: 0.5rem;
+  max-width: 7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* Read-only demographics look locked. */
+.card input[readonly],
+.card select[data-readonly] {
+  background: var(--c-surface);
+  cursor: default;
+}
+
+.matched {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: 0.85rem;
+}
+
+.statusLine {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: 0.85rem;
+}
+
+.subtle {
+  display: grid;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  border: 1px dashed var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+}
+
+.subtleHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.muted {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: 0.85rem;
+}
+
+.muted svg {
+  vertical-align: -3px;
+  color: var(--c-success);
+}
+
+.note {
+  margin: 0;
+  color: var(--c-text-subtle);
+  font-size: 0.8rem;
+}
+
+.details summary {
+  cursor: pointer;
+  color: var(--c-link);
+  font-size: 0.85rem;
+}
+
+.details summary:hover {
+  text-decoration: underline;
+}
+
+.verifyList {
+  display: grid;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.btn,
+.linkBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: 2.25rem;
+  padding: 0 var(--sp-3);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.btn {
+  border: 1px solid var(--c-primary-edge);
+  background: var(--c-primary);
+  color: var(--c-on-primary);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--c-primary-hover);
+}
+
+.btn:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.linkBtn {
+  border: 1px solid var(--c-border-strong);
+  background: var(--c-input);
+  color: var(--c-link);
+}
+
+.linkBtn:hover,
+.linkBtn[aria-pressed="true"] {
+  background: var(--c-accent);
+  border-color: var(--c-accent-edge);
+}
+
+.btn:focus-visible,
+.linkBtn:focus-visible,
+.inlineLink:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+/* Live Policy Balance & Rules Engine — the header band is light blue (#93bdd7cf) in both themes; the body keeps the normal card surface.
+   Text is black in the light theme; in dark mode the body keeps the theme text colour so it stays readable on the dark surface. */
+.engine {
+  --engine-ink: light-dark(#000000, var(--c-text));
+  min-width: 0;
+  overflow: hidden;
+  background: var(--c-input);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.engineHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  padding: 0;
+  background: #93bdd7cf;
+  color: #000000;
+}
+
+/* The heading is one full-width toggle button (h3 > button keeps the heading for screen-reader navigation). */
+.engineHeadTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font: inherit;
+}
+
+.engineToggle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--sp-3) var(--sp-4);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.engineToggle:hover {
+  background: rgb(255 255 255 / 0.2);
+}
+
+.engineToggle:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: -3px;
+  border-radius: var(--radius-md);
+}
+
+.engineTitle {
+  display: block;
+}
+
+.chevron {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-left: auto;
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 0.55);
+  color: #000000;
+  transition: transform 0.2s ease;
+}
+
+.engineToggle[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+/* Collapsed: no line under the heading. */
+.engine:has(.engineToggle[aria-expanded="false"]) .engineHead {
+  border-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
+
+.engineIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 0.55);
+  color: #000000;
+}
+
+.engineHeading {
+  display: grid;
+  flex: 1 1 12rem;
+  gap: 2px;
+}
+
+.engineTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #0f172a;
+}
+
+.engineSub {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.enginePill {
+  flex: none;
+  padding: 2px 10px;
+  border: 1px solid rgb(0 0 0 / 0.08);
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: rgb(255 255 255 / 0.55);
+  color: #000000;
+}
+
+.enginePill[data-tone="ok"] {
+  background: #d7f5e3;
+  color: #0e5a30;
+}
+
+.enginePill[data-tone="warn"] {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.enginePill[data-tone="bad"] {
+  background: #fde3e1;
+  color: #9e1f15;
+}
+
+.engineBody {
+  display: grid;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  color: var(--engine-ink);
+  container-type: inline-size;
+}
+
+.engineBody[hidden] {
+  display: none;
+}
+
+/* Expanded: every text in the body is black (light theme; the dark theme keeps its readable text colour).
+   Exceptions that carry meaning: a zero balance (red), status pills, icons and error messages. */
+.engineBody :is(.metricHint, .passedMsg, .auditNone, .engineFoot, .muted, .note, .groupTitle, .auditLink) {
+  color: var(--engine-ink);
+}
+
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  gap: var(--sp-3);
+}
+
+.metric {
+  display: grid;
+  align-content: start;
+  gap: var(--sp-1);
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+}
+
+.metric[data-tone="ok"] {
+  border-left: 3px solid var(--c-success);
+}
+
+.metric[data-tone="bad"] {
+  border-left: 3px solid var(--c-danger);
+}
+
+.metric[data-tone="warn"] {
+  border-left: 3px solid var(--c-warning);
+}
+
+.metricLabel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--engine-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.metricLabel .pill {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.metricValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--engine-ink);
+}
+
+.metricValue[data-tone="bad"] {
+  color: var(--c-danger);
+}
+
+.metricHint {
+  color: var(--c-text-muted);
+  font-size: 0.8rem;
+}
+
+/* Remaining coverage: the filled share is the available balance over the sum insured. */
+.bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--c-surface-2);
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--c-success);
+  transition: width 0.3s ease;
+}
+
+.bar[data-tone="warn"] > span {
+  background: var(--c-warning);
+}
+
+.bar[data-tone="bad"] > span {
+  background: var(--c-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar > span {
+    transition: none;
+  }
+}
+
+/* Approvals held against this cover: one summary line, the references on request. */
+.audit {
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  font-size: 0.85rem;
+}
+
+.audit summary {
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--engine-ink);
+  cursor: pointer;
+}
+
+.audit summary:focus-visible {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.auditLink {
+  color: var(--c-link);
+  text-decoration: underline;
+}
+
+.auditList {
+  display: grid;
+  gap: 2px;
+  max-height: 12rem;
+  margin: 0;
+  padding: 0 var(--sp-3) var(--sp-2);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.auditList li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 4px 0;
+  border-top: 1px solid var(--c-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.auditNone {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: 0.85rem;
+}
+
+.auditNone svg {
+  color: var(--c-success);
+}
+
+.sectionTitle {
+  margin: var(--sp-2) 0 0;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--engine-ink);
+}
+
+.clauses {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.clause {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.clause > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.clause span:not(.clauseIcon) {
+  color: var(--engine-ink);
+}
+
+/* Compact metric card: small label, the figure, then the clause in one muted line. */
+.clauses {
+  grid-auto-rows: 1fr;
+}
+
+.clauseLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.clauseValue {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--engine-ink);
+}
+
+.clauseValue[data-tone="bad"] {
+  color: var(--c-danger);
+}
+
+.clause .clauseText {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.75rem;
+  color: var(--c-text-muted);
+}
+
+/* The corrective action under a warning or blocker. */
+.check .action {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.clauseIcon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--c-info-bg);
+  color: var(--c-info);
+}
+
+.checks {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checks:empty {
+  display: none;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid;
+  font-size: 0.85rem;
+}
+
+.check > svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.check[data-tone="ok"] {
+  background: var(--c-success-bg);
+  border-color: var(--c-success);
+  color: var(--c-success);
+}
+
+.check[data-tone="warn"] {
+  background: var(--c-warning-bg);
+  border-color: var(--c-warning);
+  color: var(--c-warning);
+}
+
+.check[data-tone="bad"] {
+  background: var(--c-danger-bg);
+  border-color: var(--c-danger);
+  color: var(--c-danger);
+}
+
+.check span {
+  color: var(--engine-ink);
+}
+
+.ack {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 2px solid var(--c-warning);
+  box-shadow: inset 4px 0 0 var(--c-warning);
+  border-radius: var(--radius-sm);
+  background: var(--c-warning-bg);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.ack input {
+  flex: none;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 2px;
+  accent-color: var(--c-primary);
+}
+
+.ack:focus-within {
+  outline: 2px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+.groupTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.passed {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid color-mix(in srgb, var(--c-success) 35%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--c-success-bg);
+}
+
+.passed .groupTitle {
+  color: var(--c-success);
+}
+
+.passedList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-1) var(--sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.passedItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  min-width: 0;
+  font-size: 0.82rem;
+  color: var(--engine-ink);
+}
+
+.passedItem > svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--c-success);
+}
+
+.passedItem > span {
+  display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.passedMsg {
+  color: var(--c-text-muted);
+  font-size: 0.78rem;
+}
+
+.issues {
+  display: grid;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--c-warning);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--c-warning-bg) 60%, var(--c-input));
+}
+
+.issues[data-tone="bad"] {
+  border-color: var(--c-danger);
+  background: color-mix(in srgb, var(--c-danger-bg) 60%, var(--c-input));
+}
+
+.issues .groupTitle {
+  color: var(--c-warning);
+}
+
+.issues[data-tone="bad"] .groupTitle {
+  color: var(--c-danger);
+}
+
+.engineFoot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--sp-2);
+  margin: 0;
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--c-border);
+  color: light-dark(#64748b, #94a3b8);
+  font-size: 12px;
+}
+
+.error {
+  color: var(--c-danger);
+  font-size: 0.85rem;
+}
+
+.inlineLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.engine .error {
+  color: var(--c-danger);
+}
+
+/* ---- Patient KYC Verification: every control the same size and always inside its card ---- */
+.card {
+  container-type: inline-size;
+}
+
+/* Grid children may shrink below their content (a native date input has a wide minimum size, which pushed it over the border). */
+.grid > *,
+.full > * {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.card input:not([type="checkbox"]):not([type="radio"]),
+.card select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--tap);
+  padding-block: var(--sp-2);
+}
+
+.control {
+  width: 100%;
+  min-width: 0;
+}
+
+/* The "34 yrs" tag shares the date field with the browser's calendar button: less padding, and the tag sits clear of it. */
+.control:has(input[type="date"]):has(.tag) > input {
+  padding-right: 5.25rem;
+}
+
+.control:has(input[type="date"]) .tag {
+  right: 2.25rem;
+  max-width: 3.5rem;
+}
+
+/* Narrow card (small screens, or desktop with the sidebar open): fields stack instead of squeezing past the border. */
+@container (max-width: 32rem) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 960px) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .grid,
+  .metrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cardFoot > button {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
+
+/* Narrow engine panel (phones): one column. Kept last so it overrides the 2-column grids above. */
+@container (max-width: 26rem) {
+  .metrics,
+  .clauses,
+  .passedList {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metrics,
+  .clauses {
+    grid-auto-rows: auto;
+  }
+}

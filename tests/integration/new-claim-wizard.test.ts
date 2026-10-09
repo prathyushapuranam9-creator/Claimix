@@ -49,6 +49,8 @@ const kycFor = (f: Fresh, over: Record<string, unknown> = {}) => ({
   sumInsured: 500000,
   memberId: f.coverage.memberId,
   mode: "typed",
+  // Policy Verification: warnings (if any) are acknowledged unless a test says otherwise.
+  policyWarningsAcknowledged: true,
   ...over,
 });
 
@@ -361,9 +363,11 @@ describe("KYC Aadhaar and Register Case", () => {
     const again = await RegistrationService.submit(as("insurerA"), draft.id, { signature: SIGNATURE });
     expect(again).toEqual({ documentId: first.documentId, duplicate: true });
 
-    // On the patient's record for the raiser and the hospital; never for another insurer.
+    // On the patient's record for the raiser and the hospital's insurance desk; never for front-desk staff
+    // (no document access) or another insurer.
     expect((await DocumentService.registrationForms(as("insurerA"), patient.id)).map((r) => r.id)).toContain(first.documentId);
-    expect((await DocumentService.registrationForms(as("staffA"), patient.id)).map((r) => r.id)).toContain(first.documentId);
+    expect((await DocumentService.registrationForms(as("deskA"), patient.id)).map((r) => r.id)).toContain(first.documentId);
+    await expect(DocumentService.registrationForms(as("staffA"), patient.id)).rejects.toBeInstanceOf(ForbiddenError);
     await expect(DocumentService.registrationForms(as("insurerB"), patient.id)).rejects.toBeInstanceOf(NotFoundError);
     await expect(RegistrationService.submit(as("insurerB"), draft.id, { signature: SIGNATURE })).rejects.toThrow();
 
@@ -374,5 +378,47 @@ describe("KYC Aadhaar and Register Case", () => {
     expect(Buffer.from(pdf.slice(0, 5)).toString()).toBe("%PDF-");
     const copy = await RegistrationService.saveCopy(as("insurerA"), draft.id, { signature: null });
     expect(copy.documentId).toBeTruthy();
+  });
+});
+
+describe("KYC & Policy sub-steps: Re-verify and the policy check", () => {
+  it("Re-verify compares the entered details with the patient record: Verified, Failed or Pending (audited, nothing stored)", async () => {
+    const f = await freshFloaterPatient(ctx.db, who.staffA);
+    const base = { uhid: f.patient.patientNo, patientName: f.patient.fullName, gender: "female", dob: "1982-02-02" };
+    expect((await PreauthService.verifyKyc(as("insurerA"), f.coverage.id, base)).status).toBe("verified");
+    expect((await PreauthService.verifyKyc(as("insurerA"), f.coverage.id, { ...base, dob: "1990-01-01" })).status).toBe("failed");
+    const aadhaar = (() => { for (let d = 0; d <= 9; d++) if (isValidAadhaar("5" + String(Date.now()).slice(-10) + d)) return "5" + String(Date.now()).slice(-10) + d; throw new Error("x"); })();
+    const pending = await PreauthService.verifyKyc(as("insurerA"), f.coverage.id, { ...base, aadhaar });
+    expect(pending.status).toBe("pending");
+    expect(pending.items.find((i) => i.field === "aadhaar")?.result).toBe("not_checked");
+    await expect(PreauthService.verifyKyc(as("insurerB"), f.coverage.id, base)).rejects.toBeInstanceOf(NotFoundError);
+    const audit = await ctx.db.select().from(auditLogs).where(and(eq(auditLogs.action, "kyc.reverified"), eq(auditLogs.resourceId, f.patient.id)));
+    expect(audit.length).toBe(3);
+    expect(JSON.stringify(audit)).not.toContain(aadhaar);
+  });
+
+  it("the policy check shows real coverage and balance; warnings must be acknowledged on the server; the result is stored", async () => {
+    const f = await freshFloaterPatient(ctx.db, who.staffA, 250000);
+    const st = await PreauthService.policyStatus(as("insurerA"), f.coverage.id, { policyNumber: "POL-1", memberId: "" });
+    expect(st).toMatchObject({ coverStatus: "in_force", recordedBalance: 250000, available: 250000, sumInsured: 500000 });
+    expect(st.warnings.map((w) => w.key)).toContain("tpa_card_missing");
+    // Each warning says what to do; clauses carry their real figures from the policy rules (1% of ₹5,00,000 = ₹5,000/day).
+    for (const w of st.warnings) expect(w.action.length).toBeGreaterThan(5);
+    expect(st.clauses).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: "room_rent_limit", label: "Room Rent", value: "₹5,000/day (1% of SI)" }),
+        expect.objectContaining({ kind: "sub_limit", label: "Cataract (per eye)", value: "Up to ₹40,000" }),
+        expect.objectContaining({ kind: "co_pay", label: "Co-pay", value: "20% from age 60" }),
+      ]),
+    );
+    // Not acknowledged: refused.
+    await expect(PreauthService.raise(as("insurerA"), { beneficiaryId: f.coverage.id, kyc: kycFor(f, { memberId: "", policyWarningsAcknowledged: false }) })).rejects.toThrow(/Review the policy warnings/);
+    // Acknowledged: raised, with the checks stored.
+    const draft = await PreauthService.raise(as("insurerA"), { beneficiaryId: f.coverage.id, kyc: kycFor(f, { memberId: "" }) });
+    const kyc = (await PreauthService.wizard(as("insurerA"), draft.id)).kyc as Record<string, unknown>;
+    expect(kyc.verification).toMatchObject({ status: "verified" });
+    expect(kyc.policyCheck).toMatchObject({ acknowledged: true, available: 250000 });
+    expect((kyc.policyCheck as { warnings: string[] }).warnings).toContain("tpa_card_missing");
+    await expect(PreauthService.policyStatus(as("insurerB"), f.coverage.id, {})).rejects.toBeInstanceOf(NotFoundError);
   });
 });

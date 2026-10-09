@@ -1335,6 +1335,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "aadhaar_hash": {
+          "name": "aadhaar_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "aadhaar_last4": {
+          "name": "aadhaar_last4",
+          "type": "varchar(4)",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_demo": {
           "name": "is_demo",
           "type": "boolean",
@@ -1390,6 +1402,36 @@
           "columns": [
             {
               "expression": "full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "patients_aadhaar_hash_idx": {
+          "name": "patients_aadhaar_hash_idx",
+          "columns": [
+            {
+              "expression": "aadhaar_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "patients_aadhaar_last4_idx": {
+          "name": "patients_aadhaar_last4_idx",
+          "columns": [
+            {
+              "expression": "aadhaar_last4",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

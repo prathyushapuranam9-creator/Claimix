@@ -67,6 +67,13 @@ export const patients = pgTable("patients", {
   department: varchar("department", { length: 40 }),
   // Plain-language reason for the visit, as recorded by the hospital; null = not recorded.
   visitReason: varchar("visit_reason", { length: 300 }),
+  /**
+   * The patient's ABHA (Ayushman Bharat Health Account), when they have one and gave it. Recorded as
+   * presented: Claimix has no ABDM integration, so nothing here is verified against ABDM or created
+   * there. Registration never requires it.
+   */
+  abhaNumber: varchar("abha_number", { length: 17 }),
+  abhaAddress: varchar("abha_address", { length: 120 }),
   // Aadhaar is never stored in full: a keyed hash for exact lookups and the last 4 digits for masked display / partial search.
   aadhaarHash: varchar("aadhaar_hash", { length: 64 }),
   aadhaarLast4: varchar("aadhaar_last4", { length: 4 }),
