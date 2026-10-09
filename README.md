@@ -59,15 +59,24 @@ Hospital Staff is **front-desk registration only**. Registration is a three-step
 `/patients/new` and the patient is created by the **last** step, not by the details form:
 
 1. **Identify & details** — search by name, patient number or mobile and select the existing patient
-   (no duplicate), or enter a new one; choose the visit type (OPD consultation / IP admission).
-2. **Doctor & slot** — department (only those with a doctor), doctor, booking date, free slot. Booked
+   (no duplicate), or register a new one with **Register New ABHA** or **Register Without ABHA ID**; choose the
+   visit type: **OPD consultation**, **IP admission** (opens an inpatient stay: ward, bed, expected days, ended
+   by *Record discharge*) or **Pre-auth** (recorded as a visit; raising the payer request is insurance-side).
+2. **Doctor & slot** — department (only those with a doctor), doctor, then the doctor's configured
+   **consultation fee** is shown (never typed, never beside the name), booking date, free slot. Booked
    slots are shown and disabled; the slot row is locked in the transaction and a unique index makes one
    live appointment per slot.
-3. **Payment & register** — the summary of what was already entered, payment (Cash / UPI / Card, or
-   collect later), the Patient Rights & Responsibilities acknowledgement, then **Register patient**.
+3. **Payment & register** — the summary of what was already entered, payment (Cash; UPI with a QR area;
+   Card with a form that keeps only `****1234`; or collect later; a doctor with no fee settles with no method), the Patient Rights & Responsibilities acknowledgement, then **Register patient**.
    The patient (when new) and the visit are written in one transaction.
 
-Doctors and their slots are administrator reference data (`/admin/doctors`, `hospital:manage`).
+Doctors and their slots are administrator reference data (`/admin/doctors`, `hospital:manage`). The front
+desk's day sheet is `/appointments` (date, to collect, collected, in hospital); every figure under
+"Today at the front desk" opens it.
+
+Two honest limits: there is **no payment gateway** (the UPI QR area is a demo, nothing is settled, and the
+card form never sends full card details), and there is **no ABDM integration** (ABHA numbers/addresses are
+recorded as presented, never verified or created).
 
 > **The insurance side was withdrawn from this role.** Coverage, eligibility, pre-authorizations,
 > claims, their documents, the case reports and the Insurance Assistant are no longer granted to

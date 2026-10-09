@@ -119,3 +119,25 @@ export async function registerPatient(page: Page, o: RegisterOptions): Promise<s
   await page.waitForURL(/\/patients\/[0-9a-f-]{36}$/);
   return new URL(page.url()).pathname;
 }
+
+/**
+ * Registers a fresh patient at the signed-in hospital and adds family-floater
+ * coverage through the UI. Returns the coverage (beneficiary) id.
+ */
+export async function freshPatientWithCover(page: Page, balance = "400000") {
+  const suffix = alphaId();
+  await registerPatient(page, { name: `Journey Patient ${suffix}` });
+  await page.getByRole("button", { name: "Add coverage" }).click();
+  await page.getByLabel("Policy / scheme").selectOption({ label: "Aarogya Family Floater Plus (DEMO DATA)" });
+  await page.getByLabel("Member / beneficiary ID").fill(`E2E-${suffix}`.toUpperCase());
+  await page.getByLabel("First inception date").fill("2021-04-01");
+  await page.getByLabel("Cover start").fill("2026-04-01");
+  await page.getByLabel("Cover end").fill("2027-03-31");
+  await page.getByLabel("Sum insured (₹)").fill("500000");
+  await page.getByLabel("Available balance (₹)").fill(balance);
+  await page.getByRole("button", { name: "Save coverage" }).click();
+  const link = page.getByRole("link", { name: "Check eligibility" }).first();
+  await link.waitFor();
+  const href = await link.getAttribute("href");
+  return new URL(href!, "http://x").searchParams.get("beneficiary")!;
+}

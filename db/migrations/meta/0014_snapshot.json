@@ -1,5 +1,5 @@
 {
-  "id": "d2f4cb82-d427-4d1d-8573-eeea48a4dcb4",
+  "id": "e7097bbc-9f3f-419d-b7e3-ef59f0635b25",
   "prevId": "2f0aae32-410b-43ed-8515-0fdd38e1a1f0",
   "version": "7",
   "dialect": "postgresql",
@@ -1551,18 +1551,6 @@
           "type": "varchar(80)",
           "primaryKey": false,
           "notNull": true
-        },
-        "policy_number": {
-          "name": "policy_number",
-          "type": "varchar(80)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "policyholder_name": {
-          "name": "policyholder_name",
-          "type": "varchar(200)",
-          "primaryKey": false,
-          "notNull": false
         },
         "relationship": {
           "name": "relationship",
@@ -3393,6 +3381,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "raised_by_org_id": {
+          "name": "raised_by_org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_demo": {
           "name": "is_demo",
           "type": "boolean",
@@ -3632,6 +3626,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pre_authorizations_raised_by_org_id_organizations_id_fk": {
+          "name": "pre_authorizations_raised_by_org_id_organizations_id_fk",
+          "tableFrom": "pre_authorizations",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "raised_by_org_id"
           ],
           "columnsTo": [
             "id"

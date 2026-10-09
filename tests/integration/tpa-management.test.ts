@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { and, count, eq, isNull, isNotNull } from "drizzle-orm";
+import { and, count, eq, isNull, isNotNull, or } from "drizzle-orm";
 import { claims, policies, preAuthorizations } from "@/db/schema";
 import { ForbiddenError } from "@/lib/errors";
 import { ClaimService } from "@/modules/claims/claims.service";
@@ -57,7 +57,8 @@ describe("TPA management", () => {
   it("pre-auths and claims for a TPA come from the existing case scope", async () => {
     // Payer: only cases submitted to it and run by that TPA.
     const pa = await PreauthService.list(as("insurerA"), Q, { tpaId: DEMO.org.tpaA });
-    const [expected] = await ctx.db.select({ n: count() }).from(preAuthorizations).where(and(eq(preAuthorizations.tpaId, DEMO.org.tpaA), eq(preAuthorizations.insurerId, DEMO.org.insurerA), isNotNull(preAuthorizations.submittedAt)));
+    // (plus any New Claim drafts the insurer raised itself)
+    const [expected] = await ctx.db.select({ n: count() }).from(preAuthorizations).where(and(eq(preAuthorizations.tpaId, DEMO.org.tpaA), or(and(eq(preAuthorizations.insurerId, DEMO.org.insurerA), isNotNull(preAuthorizations.submittedAt)), eq(preAuthorizations.raisedByOrgId, DEMO.org.insurerA))));
     expect(pa.total).toBe(expected!.n);
     const cl = await ClaimService.list(as("insurerA"), Q, { tpaId: DEMO.org.tpaA });
     const [ce] = await ctx.db.select({ n: count() }).from(claims).where(and(eq(claims.tpaId, DEMO.org.tpaA), eq(claims.insurerId, DEMO.org.insurerA), isNotNull(claims.submittedAt)));

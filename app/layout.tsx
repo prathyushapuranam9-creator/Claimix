@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import Script from "next/script";
-import { THEME_INIT_SCRIPT } from "@/components/theme/ThemeToggle";
+import { cookies } from "next/headers";
+import { THEME_COOKIE } from "@/components/theme/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,15 +19,13 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // The saved light / dark choice is rendered on the server (no pre-paint script); without one, CSS follows the OS.
+  const saved = (await cookies()).get(THEME_COOKIE)?.value;
+  const theme = saved === "light" || saved === "dark" ? saved : undefined;
   return (
-    <html lang="en-IN" suppressHydrationWarning>
+    <html lang="en-IN" data-theme={theme} suppressHydrationWarning>
       <body>
-        {/* Sets light/dark before first paint (no flash). next/script puts it in the server HTML
-            ahead of hydration, so React never renders a <script> element on the client. */}
-        <Script id="theme-init" strategy="beforeInteractive">
-          {THEME_INIT_SCRIPT}
-        </Script>
         {children}
       </body>
     </html>

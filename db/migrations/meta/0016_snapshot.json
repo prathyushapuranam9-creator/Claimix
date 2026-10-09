@@ -1,6 +1,6 @@
 {
-  "id": "642411b4-5b19-4491-bffa-e76befcd1075",
-  "prevId": "28485a72-a50d-4b12-b92e-ee0cd3f9545b",
+  "id": "28485a72-a50d-4b12-b92e-ee0cd3f9545b",
+  "prevId": "d2f4cb82-d427-4d1d-8573-eeea48a4dcb4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1320,18 +1320,6 @@
         "visit_reason": {
           "name": "visit_reason",
           "type": "varchar(300)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "abha_number": {
-          "name": "abha_number",
-          "type": "varchar(17)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "abha_address": {
-          "name": "abha_address",
-          "type": "varchar(120)",
           "primaryKey": false,
           "notNull": false
         },
@@ -3431,6 +3419,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "raised_by_org_id": {
+          "name": "raised_by_org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -3644,6 +3638,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pre_authorizations_raised_by_org_id_organizations_id_fk": {
+          "name": "pre_authorizations_raised_by_org_id_organizations_id_fk",
+          "tableFrom": "pre_authorizations",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "raised_by_org_id"
           ],
           "columnsTo": [
             "id"
@@ -5362,249 +5369,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.admissions": {
-      "name": "admissions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "appointment_id": {
-          "name": "appointment_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "hospital_id": {
-          "name": "hospital_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "patient_id": {
-          "name": "patient_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "admission_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'admitted'"
-        },
-        "ward": {
-          "name": "ward",
-          "type": "varchar(80)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "bed": {
-          "name": "bed",
-          "type": "varchar(40)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "expected_stay_days": {
-          "name": "expected_stay_days",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "admitted_at": {
-          "name": "admitted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "discharged_at": {
-          "name": "discharged_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "discharge_note": {
-          "name": "discharge_note",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "admitted_by": {
-          "name": "admitted_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "discharged_by": {
-          "name": "discharged_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "is_demo": {
-          "name": "is_demo",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "admissions_appointment_uq": {
-          "name": "admissions_appointment_uq",
-          "columns": [
-            {
-              "expression": "appointment_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "admissions_hospital_status_idx": {
-          "name": "admissions_hospital_status_idx",
-          "columns": [
-            {
-              "expression": "hospital_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "admissions_patient_idx": {
-          "name": "admissions_patient_idx",
-          "columns": [
-            {
-              "expression": "patient_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "admissions_appointment_id_appointments_id_fk": {
-          "name": "admissions_appointment_id_appointments_id_fk",
-          "tableFrom": "admissions",
-          "tableTo": "appointments",
-          "columnsFrom": [
-            "appointment_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "admissions_hospital_id_hospitals_id_fk": {
-          "name": "admissions_hospital_id_hospitals_id_fk",
-          "tableFrom": "admissions",
-          "tableTo": "hospitals",
-          "columnsFrom": [
-            "hospital_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "admissions_patient_id_patients_id_fk": {
-          "name": "admissions_patient_id_patients_id_fk",
-          "tableFrom": "admissions",
-          "tableTo": "patients",
-          "columnsFrom": [
-            "patient_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "admissions_admitted_by_users_id_fk": {
-          "name": "admissions_admitted_by_users_id_fk",
-          "tableFrom": "admissions",
-          "tableTo": "users",
-          "columnsFrom": [
-            "admitted_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "admissions_discharged_by_users_id_fk": {
-          "name": "admissions_discharged_by_users_id_fk",
-          "tableFrom": "admissions",
-          "tableTo": "users",
-          "columnsFrom": [
-            "discharged_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "admissions_stay_chk": {
-          "name": "admissions_stay_chk",
-          "value": "\"admissions\".\"expected_stay_days\" IS NULL OR (\"admissions\".\"expected_stay_days\" >= 1 AND \"admissions\".\"expected_stay_days\" <= 365)"
-        },
-        "admissions_discharge_chk": {
-          "name": "admissions_discharge_chk",
-          "value": "(\"admissions\".\"status\" = 'discharged' AND \"admissions\".\"discharged_at\" IS NOT NULL AND \"admissions\".\"discharged_by\" IS NOT NULL) OR (\"admissions\".\"status\" <> 'discharged' AND \"admissions\".\"discharged_at\" IS NULL)"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.appointments": {
       "name": "appointments",
       "schema": "",
@@ -5683,12 +5447,6 @@
           "name": "payment_method",
           "type": "payment_method",
           "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payment_reference": {
-          "name": "payment_reference",
-          "type": "varchar(40)",
           "primaryKey": false,
           "notNull": false
         },
@@ -5912,7 +5670,7 @@
         },
         "appointments_payment_chk": {
           "name": "appointments_payment_chk",
-          "value": "(\"appointments\".\"payment_state\" = 'paid' AND \"appointments\".\"amount_collected\" IS NOT NULL AND (\"appointments\".\"payment_method\" IS NOT NULL OR \"appointments\".\"amount_collected\" = 0)) OR (\"appointments\".\"payment_state\" = 'pending' AND \"appointments\".\"payment_method\" IS NULL AND \"appointments\".\"amount_collected\" IS NULL)"
+          "value": "(\"appointments\".\"payment_state\" = 'paid' AND \"appointments\".\"payment_method\" IS NOT NULL AND \"appointments\".\"amount_collected\" IS NOT NULL) OR (\"appointments\".\"payment_state\" = 'pending' AND \"appointments\".\"payment_method\" IS NULL AND \"appointments\".\"amount_collected\" IS NULL)"
         }
       },
       "isRLSEnabled": false
@@ -6186,15 +5944,6 @@
         "declined"
       ]
     },
-    "public.admission_status": {
-      "name": "admission_status",
-      "schema": "public",
-      "values": [
-        "admitted",
-        "discharged",
-        "cancelled"
-      ]
-    },
     "public.appointment_status": {
       "name": "appointment_status",
       "schema": "public",
@@ -6434,8 +6183,7 @@
       "schema": "public",
       "values": [
         "opd_consultation",
-        "ip_admission",
-        "pre_auth"
+        "ip_admission"
       ]
     }
   },

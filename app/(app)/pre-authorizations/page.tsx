@@ -51,13 +51,21 @@ export default async function PreauthListPage({ searchParams }: { searchParams: 
   // Only when this view is empty: are there any requests at all? (decides the empty-state wording)
   const anyPreauths = data.total > 0 || (await PreauthService.list(ctx, { page: 1, pageSize: 1 }, {})).total > 0;
   const isHospital = ctx.principal.orgType === "hospital" && ctx.principal.roleKey !== "patient";
+  // Insurer / TPA reviewers raise a cashless request on the hospital's behalf (New Claim wizard).
+  const canRaise = (ctx.principal.orgType === "insurer" || ctx.principal.orgType === "tpa") && !!scopeFor(ctx.principal, "preauth:raise");
 
   return (
     <>
       <PageHeader
         title="Pre-authorizations"
         description={isHospital ? "Cashless requests raised by your hospital." : ctx.principal.orgType === "hospital" ? "Your cashless requests." : crossOrg ? "Submitted requests across insurers and TPAs." : "Requests submitted to your organization."}
-        actions={isHospital && <ButtonLink href="/pre-authorizations/new">New pre-authorization</ButtonLink>}
+        actions={
+          isHospital ? (
+            <ButtonLink href="/pre-authorizations/new">New pre-authorization</ButtonLink>
+          ) : canRaise ? (
+            <ButtonLink href="/pre-authorizations/raise">New Claim</ButtonLink>
+          ) : null
+        }
       />
       <Segmented
         current={viewKey}

@@ -1,6 +1,6 @@
 {
-  "id": "28485a72-a50d-4b12-b92e-ee0cd3f9545b",
-  "prevId": "d2f4cb82-d427-4d1d-8573-eeea48a4dcb4",
+  "id": "d2f4cb82-d427-4d1d-8573-eeea48a4dcb4",
+  "prevId": "e7097bbc-9f3f-419d-b7e3-ef59f0635b25",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3419,6 +3419,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "raised_by_org_id": {
+          "name": "raised_by_org_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -3632,6 +3638,19 @@
           "tableTo": "users",
           "columnsFrom": [
             "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pre_authorizations_raised_by_org_id_organizations_id_fk": {
+          "name": "pre_authorizations_raised_by_org_id_organizations_id_fk",
+          "tableFrom": "pre_authorizations",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "raised_by_org_id"
           ],
           "columnsTo": [
             "id"
@@ -5349,570 +5368,6 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
-    },
-    "public.appointments": {
-      "name": "appointments",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "reference": {
-          "name": "reference",
-          "type": "varchar(40)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "hospital_id": {
-          "name": "hospital_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "patient_id": {
-          "name": "patient_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "doctor_id": {
-          "name": "doctor_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "slot_id": {
-          "name": "slot_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "department": {
-          "name": "department",
-          "type": "varchar(40)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "visit_type": {
-          "name": "visit_type",
-          "type": "visit_type",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "status": {
-          "name": "status",
-          "type": "appointment_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'booked'"
-        },
-        "consultation_fee": {
-          "name": "consultation_fee",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "amount_collected": {
-          "name": "amount_collected",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payment_method": {
-          "name": "payment_method",
-          "type": "payment_method",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "payment_state": {
-          "name": "payment_state",
-          "type": "payment_state",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "consent_acknowledged_at": {
-          "name": "consent_acknowledged_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "consent_acknowledged_by": {
-          "name": "consent_acknowledged_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by": {
-          "name": "created_by",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_demo": {
-          "name": "is_demo",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "appointments_slot_live_uq": {
-          "name": "appointments_slot_live_uq",
-          "columns": [
-            {
-              "expression": "slot_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"appointments\".\"status\" <> 'cancelled'",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "appointments_hospital_status_idx": {
-          "name": "appointments_hospital_status_idx",
-          "columns": [
-            {
-              "expression": "hospital_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "appointments_patient_idx": {
-          "name": "appointments_patient_idx",
-          "columns": [
-            {
-              "expression": "patient_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "appointments_doctor_day_idx": {
-          "name": "appointments_doctor_day_idx",
-          "columns": [
-            {
-              "expression": "doctor_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "appointments_hospital_id_hospitals_id_fk": {
-          "name": "appointments_hospital_id_hospitals_id_fk",
-          "tableFrom": "appointments",
-          "tableTo": "hospitals",
-          "columnsFrom": [
-            "hospital_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "appointments_patient_id_patients_id_fk": {
-          "name": "appointments_patient_id_patients_id_fk",
-          "tableFrom": "appointments",
-          "tableTo": "patients",
-          "columnsFrom": [
-            "patient_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "appointments_doctor_id_doctors_id_fk": {
-          "name": "appointments_doctor_id_doctors_id_fk",
-          "tableFrom": "appointments",
-          "tableTo": "doctors",
-          "columnsFrom": [
-            "doctor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "appointments_slot_id_doctor_slots_id_fk": {
-          "name": "appointments_slot_id_doctor_slots_id_fk",
-          "tableFrom": "appointments",
-          "tableTo": "doctor_slots",
-          "columnsFrom": [
-            "slot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "appointments_consent_acknowledged_by_users_id_fk": {
-          "name": "appointments_consent_acknowledged_by_users_id_fk",
-          "tableFrom": "appointments",
-          "tableTo": "users",
-          "columnsFrom": [
-            "consent_acknowledged_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "appointments_created_by_users_id_fk": {
-          "name": "appointments_created_by_users_id_fk",
-          "tableFrom": "appointments",
-          "tableTo": "users",
-          "columnsFrom": [
-            "created_by"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "appointments_reference_unique": {
-          "name": "appointments_reference_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "reference"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "appointments_fee_chk": {
-          "name": "appointments_fee_chk",
-          "value": "\"appointments\".\"consultation_fee\" >= 0 AND (\"appointments\".\"amount_collected\" IS NULL OR \"appointments\".\"amount_collected\" >= 0)"
-        },
-        "appointments_payment_chk": {
-          "name": "appointments_payment_chk",
-          "value": "(\"appointments\".\"payment_state\" = 'paid' AND \"appointments\".\"payment_method\" IS NOT NULL AND \"appointments\".\"amount_collected\" IS NOT NULL) OR (\"appointments\".\"payment_state\" = 'pending' AND \"appointments\".\"payment_method\" IS NULL AND \"appointments\".\"amount_collected\" IS NULL)"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.doctor_slots": {
-      "name": "doctor_slots",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "doctor_id": {
-          "name": "doctor_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "slot_date": {
-          "name": "slot_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "starts_at": {
-          "name": "starts_at",
-          "type": "time",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ends_at": {
-          "name": "ends_at",
-          "type": "time",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_demo": {
-          "name": "is_demo",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "doctor_slots_uq": {
-          "name": "doctor_slots_uq",
-          "columns": [
-            {
-              "expression": "doctor_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "slot_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "starts_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "doctor_slots_day_idx": {
-          "name": "doctor_slots_day_idx",
-          "columns": [
-            {
-              "expression": "doctor_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "slot_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "doctor_slots_doctor_id_doctors_id_fk": {
-          "name": "doctor_slots_doctor_id_doctors_id_fk",
-          "tableFrom": "doctor_slots",
-          "tableTo": "doctors",
-          "columnsFrom": [
-            "doctor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "doctor_slots_period_chk": {
-          "name": "doctor_slots_period_chk",
-          "value": "\"doctor_slots\".\"ends_at\" > \"doctor_slots\".\"starts_at\""
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.doctors": {
-      "name": "doctors",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "hospital_id": {
-          "name": "hospital_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "full_name": {
-          "name": "full_name",
-          "type": "varchar(200)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "department": {
-          "name": "department",
-          "type": "varchar(40)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "registration_no": {
-          "name": "registration_no",
-          "type": "varchar(60)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "consultation_fee": {
-          "name": "consultation_fee",
-          "type": "numeric(14, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "is_active": {
-          "name": "is_active",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "is_demo": {
-          "name": "is_demo",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "deleted_at": {
-          "name": "deleted_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "doctors_hospital_dept_idx": {
-          "name": "doctors_hospital_dept_idx",
-          "columns": [
-            {
-              "expression": "hospital_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "department",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "doctors_hospital_id_hospitals_id_fk": {
-          "name": "doctors_hospital_id_hospitals_id_fk",
-          "tableFrom": "doctors",
-          "tableTo": "hospitals",
-          "columnsFrom": [
-            "hospital_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "doctors_fee_chk": {
-          "name": "doctors_fee_chk",
-          "value": "\"doctors\".\"consultation_fee\" >= 0"
-        }
-      },
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -5923,15 +5378,6 @@
         "pending",
         "approved",
         "declined"
-      ]
-    },
-    "public.appointment_status": {
-      "name": "appointment_status",
-      "schema": "public",
-      "values": [
-        "booked",
-        "cancelled",
-        "completed"
       ]
     },
     "public.claim_status": {
@@ -6048,23 +5494,6 @@
         "pending"
       ]
     },
-    "public.payment_method": {
-      "name": "payment_method",
-      "schema": "public",
-      "values": [
-        "cash",
-        "upi",
-        "card"
-      ]
-    },
-    "public.payment_state": {
-      "name": "payment_state",
-      "schema": "public",
-      "values": [
-        "paid",
-        "pending"
-      ]
-    },
     "public.permission_scope": {
       "name": "permission_scope",
       "schema": "public",
@@ -6157,14 +5586,6 @@
         "processing",
         "paid",
         "failed"
-      ]
-    },
-    "public.visit_type": {
-      "name": "visit_type",
-      "schema": "public",
-      "values": [
-        "opd_consultation",
-        "ip_admission"
       ]
     }
   },

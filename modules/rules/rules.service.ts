@@ -204,6 +204,17 @@ export async function evaluateAndRecord(
 }
 
 /**
+ * The documents a policy's published rules ask for at one stage, read without recording an evaluation
+ * (the engine is pure). Null when the policy has no published rules.
+ */
+export async function requiredDocumentsFor(db: DbOrTx, policyId: string, stage: "preauth" | "claim", asOf: string) {
+  const active = await RuleRepository.active(db, policyId);
+  if (!active) return null;
+  const ev = evaluate(active.rules.map((r) => ({ id: r.id, code: r.code, title: r.title, category: r.category, config: r.config })), { stage, asOf });
+  return ev.requiredDocuments.filter((d) => d.stage === stage);
+}
+
+/**
  * Reloads a recorded evaluation. The engine is deterministic, so re-running the
  * exact rule version on the stored input snapshot reproduces the original result.
  */

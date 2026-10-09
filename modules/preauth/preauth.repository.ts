@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql, type AnyColumn } from "drizzle-orm";
+import { aliasedTable, and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql, type AnyColumn, type SQL } from "drizzle-orm";
 import type { DbOrTx } from "@/db/client";
 import { lookup } from "@/db/lookup";
 import {
@@ -11,8 +11,12 @@ import { andAll, scopePredicate, type ScopeColumns } from "@/lib/permissions/sco
 import { likeContains, offsetOf, type ListQuery } from "@/lib/pagination";
 import type { PreauthStatus } from "./preauth.workflow";
 
-/** Payers see a request only once the hospital has submitted it (never drafts, even cancelled ones). */
-const submittedTo = (col: AnyColumn) => (orgId: string) => and(eq(col, orgId), isNotNull(preAuthorizations.submittedAt))!;
+/**
+ * Payers see a request once the hospital has submitted it (never a hospital's drafts, even cancelled ones),
+ * and the requests they raised themselves on a hospital's behalf (New Claim wizard), drafts included.
+ */
+const submittedTo = (col: AnyColumn) => (orgId: string) =>
+  or(and(eq(col, orgId), isNotNull(preAuthorizations.submittedAt)), eq(preAuthorizations.raisedByOrgId, orgId))!;
 
 export const PREAUTH_SCOPE: ScopeColumns = {
   hospitalId: preAuthorizations.hospitalId,
@@ -23,7 +27,136 @@ export const PREAUTH_SCOPE: ScopeColumns = {
 };
 
 
+const memberInsurer = aliasedTable(organizations, "member_insurer");
+const memberTpa = aliasedTable(organizations, "member_tpa");
+const memberHospital = aliasedTable(organizations, "member_hospital");
+
+const memberColumns = {
+  beneficiaryId: beneficiaries.id,
+  memberId: beneficiaries.memberId,
+  relationship: beneficiaries.relationship,
+  coverStart: beneficiaries.coverStart,
+  coverEnd: beneficiaries.coverEnd,
+  sumInsured: beneficiaries.sumInsured,
+  sumInsuredAvailable: beneficiaries.sumInsuredAvailable,
+  patientId: patients.id,
+  patientNo: patients.patientNo,
+  fullName: patients.fullName,
+  gender: patients.gender,
+  dob: patients.dob,
+  phone: patients.phone,
+  department: patients.department,
+  hospitalId: patients.hospitalId,
+  hospitalName: memberHospital.name,
+  policyId: policies.id,
+  policyName: policies.name,
+  insurerId: policies.insurerId,
+  tpaId: policies.tpaId,
+  insurerName: memberInsurer.name,
+  tpaName: memberTpa.name,
+};
+
+/** A payer's member as the New Claim wizard shows it (patient + coverage + policy). */
+export interface MemberRow {
+  beneficiaryId: string;
+  memberId: string;
+  relationship: string;
+  coverStart: string;
+  coverEnd: string;
+  sumInsured: string | null;
+  sumInsuredAvailable: string | null;
+  patientId: string;
+  patientNo: string;
+  fullName: string;
+  gender: string;
+  dob: string;
+  phone: string | null;
+  department: string | null;
+  hospitalId: string;
+  hospitalName: string;
+  policyId: string;
+  policyName: string;
+  insurerId: string | null;
+  tpaId: string | null;
+  insurerName: string | null;
+  tpaName: string | null;
+}
+
+/** Members (recorded coverage) under policies of one insurer / TPA — the only people it may raise a request for. */
+function members(db: DbOrTx, payer: { orgType: "insurer" | "tpa"; orgId: string }, extra: SQL) {
+  return db
+    .select(memberColumns)
+    .from(beneficiaries)
+    .innerJoin(patients, eq(patients.id, beneficiaries.patientId))
+    .innerJoin(policies, eq(policies.id, beneficiaries.policyId))
+    .innerJoin(memberHospital, eq(memberHospital.id, patients.hospitalId))
+    .leftJoin(memberInsurer, eq(memberInsurer.id, policies.insurerId))
+    .leftJoin(memberTpa, eq(memberTpa.id, policies.tpaId))
+    .where(and(
+      isNull(beneficiaries.deletedAt),
+      isNull(patients.deletedAt),
+      isNull(policies.deletedAt),
+      payer.orgType === "insurer" ? eq(policies.insurerId, payer.orgId) : eq(policies.tpaId, payer.orgId),
+      extra,
+    ));
+}
+
 export const PreauthRepository = {
+  /** Look up the payer's own members by UHID (hospital patient number), member ID or name. */
+  async findMembers(db: DbOrTx, payer: { orgType: "insurer" | "tpa"; orgId: string }, q: string): Promise<MemberRow[]> {
+    const term = likeContains(q);
+    return members(db, payer, or(ilike(patients.patientNo, term), ilike(beneficiaries.memberId, term), ilike(patients.fullName, term))!)
+      .orderBy(asc(patients.fullName))
+      .limit(20) as Promise<MemberRow[]>;
+  },
+
+  /** The payer's members with exactly this member ID (case-insensitive). */
+  async membersByMemberId(db: DbOrTx, payer: { orgType: "insurer" | "tpa"; orgId: string }, memberId: string): Promise<MemberRow[]> {
+    return members(db, payer, sql`lower(${beneficiaries.memberId}) = lower(${memberId})`).limit(5) as Promise<MemberRow[]>;
+  },
+
+  /**
+   * KYC & Policy dropdowns: the insurers the payer works with (an insurer: itself; a TPA: the insurers whose policies it
+   * runs) and, per insurer, the TPAs on those policies.
+   */
+  async kycOptions(db: DbOrTx, payer: { orgType: "insurer" | "tpa"; orgId: string }) {
+    const rows = (await db
+      .selectDistinct({ insurerId: policies.insurerId, insurerName: memberInsurer.name, tpaId: policies.tpaId, tpaName: memberTpa.name })
+      .from(policies)
+      .innerJoin(memberInsurer, eq(memberInsurer.id, policies.insurerId))
+      .leftJoin(memberTpa, eq(memberTpa.id, policies.tpaId))
+      .where(and(isNull(policies.deletedAt), payer.orgType === "insurer" ? eq(policies.insurerId, payer.orgId) : eq(policies.tpaId, payer.orgId)))) as { insurerId: string | null; insurerName: string; tpaId: string | null; tpaName: string | null }[];
+    const insurers = new Map<string, string>();
+    const tpas: Record<string, { id: string; name: string }[]> = {};
+    for (const r of rows) {
+      if (!r.insurerId) continue;
+      insurers.set(r.insurerId, r.insurerName);
+      tpas[r.insurerId] ??= [];
+      if (r.tpaId && r.tpaName && !tpas[r.insurerId]!.some((t) => t.id === r.tpaId)) tpas[r.insurerId]!.push({ id: r.tpaId, name: r.tpaName });
+    }
+    return {
+      insurers: [...insurers].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
+      tpasByInsurer: tpas,
+    };
+  },
+
+  /** Drafts an insurer / TPA raised and has not submitted yet (New Claim wizard: resume). */
+  async raisedDrafts(db: DbOrTx, orgId: string) {
+    return db
+      .select({ id: preAuthorizations.id, reference: preAuthorizations.reference, patientName: patients.fullName, patientNo: patients.patientNo, updatedAt: preAuthorizations.updatedAt })
+      .from(preAuthorizations)
+      .innerJoin(patients, eq(patients.id, preAuthorizations.patientId))
+      .where(and(eq(preAuthorizations.raisedByOrgId, orgId), eq(preAuthorizations.status, "draft")))
+      .orderBy(desc(preAuthorizations.updatedAt))
+      .limit(20);
+  },
+
+  /** One member (coverage) of the payer, or undefined if it isn't theirs. */
+  async member(db: DbOrTx, payer: { orgType: "insurer" | "tpa"; orgId: string }, beneficiaryId: string): Promise<MemberRow | undefined> {
+    const [row] = (await members(db, payer, eq(beneficiaries.id, beneficiaryId)).limit(1)) as MemberRow[];
+    return row;
+  },
+
   /**
    * Names of these payer organizations (insurer / TPA) that have no active user who can review pre-authorizations.
    * A request routed to such an organization is stored correctly but nobody can see it, so the hospital is told.

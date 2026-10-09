@@ -18,8 +18,8 @@ import { PerformanceGraphs } from "@/components/reports/PerformanceCharts";
 import r from "@/components/reports/Reports.module.css";
 import { ActionLink, BarMetric, Card as GlassCard, Col, Donut, HospitalPage, Icons, KV, Layout, Metric, Panel, Perf, Queues, RingMetric, Rings, TrendChart, WelcomeCard } from "@/components/dashboard/HospitalDashboard";
 import { Disclaimer } from "@/components/ui/Disclaimer";
-import { Badge, Card, EmptyState, PageHeader, Stack, Stat } from "@/components/ui/Surface";
 import { ButtonLink } from "@/components/ui/Button";
+import { Badge, Card, EmptyState, PageHeader, Stack, Stat } from "@/components/ui/Surface";
 import { departmentLabel } from "@/modules/patients/patients.validation";
 import { VISIT_TYPE_LABEL, type VisitType } from "@/modules/scheduling/scheduling.validation";
 import fd from "@/components/dashboard/FrontDesk.module.css";
@@ -269,7 +269,14 @@ async function DashboardContent({ switcher }: { switcher?: React.ReactNode }) {
         <PageHeader
           title={`Welcome, ${first}`}
           description={`${ctx.user.roleName} · ${ctx.user.orgName}`}
-          actions={<PipelinePill label="Decision pipeline" when={`as of ${formatDateTime(new Date())}`} />}
+          actions={
+            <>
+              {(ctx.principal.orgType === "insurer" || ctx.principal.orgType === "tpa") && can(ctx.principal, "preauth:raise") && (
+                <ButtonLink href="/pre-authorizations/raise">New Claim</ButtonLink>
+              )}
+              <PipelinePill label="Decision pipeline" when={`as of ${formatDateTime(new Date())}`} />
+            </>
+          }
         />
         <Stack>
           {switcher}

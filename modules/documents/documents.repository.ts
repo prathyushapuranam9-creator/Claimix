@@ -11,7 +11,8 @@ import { scopePredicate, type ScopeColumns } from "@/lib/permissions/scope";
  * document only through a pre-auth or claim assigned to them.
  */
 const viaSubject = (col: "insurer_id" | "tpa_id") => (orgId: string) => sql`(
-  (${documents.subjectType} = 'preauth' and exists (select 1 from ${preAuthorizations} p where p.id = ${documents.subjectId} and p.${sql.raw(col)} = ${orgId} and p.submitted_at is not null))
+  (${documents.subjectType} = 'preauth' and exists (select 1 from ${preAuthorizations} p where p.id = ${documents.subjectId}
+    and ((p.${sql.raw(col)} = ${orgId} and p.submitted_at is not null) or p.raised_by_org_id = ${orgId})))
   or (${documents.subjectType} = 'claim' and exists (select 1 from ${claims} c where c.id = ${documents.subjectId} and c.${sql.raw(col)} = ${orgId} and c.submitted_at is not null))
 )`;
 
