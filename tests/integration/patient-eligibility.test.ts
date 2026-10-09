@@ -24,7 +24,7 @@ afterAll(() => ctx.close());
 describe("patient profile eligibility check", () => {
   it("checks the selected patient's own coverage and returns real record values", async () => {
     const cov = await coverageOf(DEMO.patient.a1);
-    const r = await PatientEligibilityService.check(as("staffA"), DEMO.patient.a1, cov);
+    const r = await PatientEligibilityService.check(as("deskA"), DEMO.patient.a1, cov);
     expect(r.patientId).toBe(DEMO.patient.a1);
     expect(r.beneficiaryId).toBe(cov);
     expect(["eligible", "not_eligible", "expired", "unable_to_verify"]).toContain(r.status);
@@ -38,12 +38,12 @@ describe("patient profile eligibility check", () => {
 
   it("refuses another patient's coverage, even within the same hospital", async () => {
     const otherCov = await coverageOf(DEMO.patient.a2);
-    await expect(PatientEligibilityService.check(as("staffA"), DEMO.patient.a1, otherCov)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(PatientEligibilityService.check(as("deskA"), DEMO.patient.a1, otherCov)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("is refused across organizations and without the eligibility permission", async () => {
     const cov = await coverageOf(DEMO.patient.a1);
-    await expect(PatientEligibilityService.check(as("staffB"), DEMO.patient.a1, cov)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(PatientEligibilityService.check(as("deskB"), DEMO.patient.a1, cov)).rejects.toBeInstanceOf(NotFoundError);
     await expect(PatientEligibilityService.check(as("patientA1"), DEMO.patient.a1, cov)).rejects.toBeInstanceOf(ForbiddenError);
   });
 

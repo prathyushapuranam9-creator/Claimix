@@ -12,12 +12,71 @@ import { PatientRepository } from "./patients.repository";
 import { patientInputSchema } from "./patients.validation";
 
 /** Fields safe to put in audit state (no contact details or DOB). */
-function auditView(p: { patientNo: string; fullName: string; gender: string; hospitalId: string; department?: string | null }) {
-  return { patientNo: p.patientNo, fullName: p.fullName, gender: p.gender, hospitalId: p.hospitalId, department: p.department ?? null };
+function auditView(p: { patientNo: string; fullName: string; gender: string; hospitalId: string; department?: string | null; abhaNumber?: string | null }) {
+  // The ABHA number itself is a health identifier, so only whether one was recorded is audited.
+  return { patientNo: p.patientNo, fullName: p.fullName, gender: p.gender, hospitalId: p.hospitalId, department: p.department ?? null, hasAbha: !!p.abhaNumber };
 }
 
 function generatePatientNo() {
   return `PT-${randomToken(6).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8)}`;
+}
+
+/**
+ * The hospital a patient is registered into: always the caller's own, unless a platform administrator
+ * chooses one. A client-sent hospitalId is ignored for hospital staff.
+ */
+export async function resolveRegisteringHospital(ctx: ServiceContext, scope: string, requested: string | undefined): Promise<string> {
+  if (scope === "all") {
+    if (!requested) throw new ValidationError("Select the registering hospital.", { hospitalId: ["Select a hospital."] });
+    if (!(await HospitalRepository.exists(ctx.db, requested))) throw new ValidationError("Select a valid hospital.", { hospitalId: ["Select a valid hospital."] });
+    return requested;
+  }
+  if (scope === "organization" && ctx.principal.orgType === "hospital") return ctx.principal.organizationId;
+  throw new ForbiddenError();
+}
+
+/**
+ * Inserts one patient with the duplicate and patient-number checks, inside the caller's transaction.
+ * Front-desk registration creates the patient and their first visit in a single transaction, so this
+ * has to be callable from there as well as from the patient form.
+ */
+export async function insertPatient(tx: DbOrTx, ctx: ServiceContext, hospitalId: string, data: ReturnType<typeof patientInputSchema.parse>) {
+  const patientNo = data.patientNo ?? generatePatientNo();
+  // Same person registered twice is a likely mistake, but two people can share a name and birth date,
+  // so this is a warning the user can confirm — not a rejection. Only this hospital's own records are checked.
+  if (!data.confirmDuplicate) {
+    const same = await PatientRepository.likelyDuplicates(tx, hospitalId, data.fullName, data.dob);
+    if (same.length) {
+      throw new ValidationError(
+        `A patient named ${data.fullName} with this date of birth is already registered at this hospital (${same.map((s) => s.patientNo).join(", ")}). Check the existing record before creating another.`,
+        { _duplicate: same.map((s) => `${s.id}|${s.patientNo}`) },
+      );
+    }
+  }
+  if (await PatientRepository.patientNoTaken(tx, hospitalId, patientNo)) {
+    throw new ConflictError(`Patient number ${patientNo} is already in use at this hospital.`);
+  }
+  const row = await PatientRepository.insert(tx, {
+    hospitalId,
+    patientNo,
+    fullName: data.fullName,
+    dob: data.dob,
+    gender: data.gender,
+    phone: data.phone ?? null,
+    email: data.email ?? null,
+    department: data.department ?? null,
+    visitReason: data.visitReason ?? null,
+    abhaNumber: data.abhaNumber ?? null,
+    abhaAddress: data.abhaAddress ?? null,
+  });
+  await AuditService.record(tx, {
+    action: "patient.created",
+    ...actorOf(ctx),
+    resourceType: "patient",
+    resourceId: row.id,
+    newState: { ...auditView(row), ...(data.confirmDuplicate ? { confirmedPossibleDuplicate: true } : {}) },
+  });
+  return row;
 }
 
 export const PatientService = {
@@ -128,6 +187,8 @@ export const PatientService = {
         email: data.email ?? null,
         department: data.department ?? null,
         visitReason: data.visitReason ?? null,
+        abhaNumber: data.abhaNumber ?? null,
+        abhaAddress: data.abhaAddress ?? null,
       });
       await AuditService.record(tx, {
         action: "patient.updated",

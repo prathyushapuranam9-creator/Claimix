@@ -1,0 +1,94 @@
+/* Payment at the desk: method choice, the demo UPI QR area and the card capture form. */
+.amount {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+}
+
+.amount strong {
+  color: var(--c-text);
+  font-size: var(--fs-md);
+}
+
+.methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.method {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--tap);
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.method[data-picked="true"] {
+  border-color: var(--c-info);
+  background: var(--c-info-bg);
+  color: var(--c-info);
+}
+
+.method:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.qr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: center;
+  padding: var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+
+@media (min-width: 640px) {
+  .qr { grid-template-columns: auto minmax(0, 1fr); }
+}
+
+/* A clearly artificial stand-in: this build has no QR encoder and settles nothing. */
+.qrFrame {
+  display: grid;
+  place-items: center;
+  width: 136px;
+  height: 136px;
+  border: 2px dashed var(--c-border-strong);
+  border-radius: var(--radius-sm);
+  background:
+    repeating-linear-gradient(0deg, var(--c-border) 0 6px, transparent 6px 12px),
+    repeating-linear-gradient(90deg, var(--c-border) 0 6px, transparent 6px 12px);
+  background-blend-mode: multiply;
+}
+
+.qrMark {
+  padding: 0 var(--sp-2);
+  background: var(--c-surface);
+  color: var(--c-text-muted);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.08em;
+}
+
+.qrSide { min-width: 0; }
+
+.qrTitle {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+}
+
+.qrUri {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}

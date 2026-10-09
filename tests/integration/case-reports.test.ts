@@ -27,7 +27,7 @@ const countClaims = async (...conds: ReturnType<typeof eq>[]) => {
 
 describe("cases report", () => {
   it("shows a hospital exactly its own cases, with a dynamic count", async () => {
-    const r = await CaseReportService.cases(as("staffA"), ALL, parseCaseOptions({}));
+    const r = await CaseReportService.cases(as("deskA"), ALL, parseCaseOptions({}));
     expect(r.total).toBe(await countClaims(eq(claims.hospitalId, DEMO.org.hospitalA)));
     expect(r.rows.length).toBe(Math.min(r.total, CASES_PAGE_SIZE));
   });
@@ -57,7 +57,7 @@ describe("cases report", () => {
   });
 
   it("puts every submitted case in exactly one TAT bucket; drafts are counted separately", async () => {
-    const d = (await CaseReportService.tatDistribution(as("staffA"), ALL))!;
+    const d = (await CaseReportService.tatDistribution(as("deskA"), ALL))!;
     expect(d.buckets.map((b) => b.label)).toEqual(["0–15 days", "16–30 days", "31–45 days", "46–60 days", "61–90 days", "90+ days"]);
     const submitted = await countClaims(eq(claims.hospitalId, DEMO.org.hospitalA), isNotNull(claims.submittedAt) as never);
     expect(d.totalCases).toBe(submitted);
@@ -77,13 +77,13 @@ describe("cases report", () => {
 
 describe("policy check", () => {
   it("loads only the selected patient's data, within the viewer's scope", async () => {
-    const own = await PolicyCheckService.forPatient(as("staffA"), DEMO.patient.a1);
+    const own = await PolicyCheckService.forPatient(as("deskA"), DEMO.patient.a1);
     expect(own.preauths).not.toBeNull();
     const [mine] = await ctx.db.select({ n: count() }).from(claims).where(eq(claims.patientId, DEMO.patient.a1));
     expect(own.claims!.length).toBe(Math.min(mine!.n, 50));
 
     // Another hospital can't open this patient at all.
-    await expect(PolicyCheckService.forPatient(as("staffB"), DEMO.patient.a1)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(PolicyCheckService.forPatient(as("deskB"), DEMO.patient.a1)).rejects.toBeInstanceOf(NotFoundError);
     // A patient sees their own record, not someone else's.
     await expect(PolicyCheckService.forPatient(as("patientA1"), DEMO.patient.a1)).resolves.toBeTruthy();
     await expect(PolicyCheckService.forPatient(as("patientA1"), DEMO.patient.a2)).rejects.toBeInstanceOf(NotFoundError);
@@ -96,7 +96,7 @@ describe("policy check data isolation", () => {
       ids.length ? (await ctx.db.execute<{ patient_id: string }>(sql`select distinct patient_id::text from ${sql.raw(table)} where id in ${ids}`)).map((r) => r.patient_id) : [];
     const seen = new Map<string, Set<string>>();
     for (const patientId of [DEMO.patient.a1, DEMO.patient.a2]) {
-      const d = await PolicyCheckService.forPatient(as("staffA"), patientId);
+      const d = await PolicyCheckService.forPatient(as("deskA"), patientId);
       const ids = [...d.preauths!.map((r) => r.id), ...d.claims!.map((r) => r.id), ...d.documents!.map((r) => r.id)];
       for (const [table, rows] of [["pre_authorizations", d.preauths!], ["claims", d.claims!], ["documents", d.documents!]] as const) {
         const owners = await owner(table, rows.map((r) => r.id));

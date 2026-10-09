@@ -15,6 +15,8 @@ import { getStorage } from "./storage";
 export interface CoverageSuggestion {
   policyId?: string;
   memberId?: string;
+  policyNumber?: string;
+  policyholderName?: string;
   relationship?: Relationship;
   inceptionDate?: string;
   coverStart?: string;
@@ -47,6 +49,8 @@ export interface InsuranceExtraction {
 const FORM_FIELDS: [keyof CoverageSuggestion, string][] = [
   ["policyId", "Policy / scheme"],
   ["memberId", "Member / beneficiary ID"],
+  ["policyNumber", "Policy number"],
+  ["policyholderName", "Policyholder"],
   ["relationship", "Relationship to policyholder"],
   ["inceptionDate", "First inception date"],
   ["coverStart", "Cover start"],
@@ -86,7 +90,11 @@ export const InsuranceExtractionService = {
     const d = parsed.details;
     const values: CoverageSuggestion = {
       ...(match ? { policyId: match.policy.id } : {}),
+      // The member ID is required, so a document that prints only a policy number offers that as the
+      // candidate; both fields are shown and either can be corrected before saving.
       ...(d.memberId ?? d.policyNumber ? { memberId: d.memberId ?? d.policyNumber } : {}),
+      ...(d.policyNumber ? { policyNumber: d.policyNumber } : {}),
+      ...(d.policyHolderName ? { policyholderName: d.policyHolderName } : {}),
       ...(d.relationship ? { relationship: d.relationship } : {}),
       ...(d.inceptionDate ? { inceptionDate: d.inceptionDate } : {}),
       ...(d.coverStart ? { coverStart: d.coverStart } : {}),
@@ -95,7 +103,9 @@ export const InsuranceExtractionService = {
       ...(d.availableBalance !== undefined ? { sumInsuredAvailable: money(d.availableBalance) } : {}),
     };
 
-    const NAME_FIELDS = ["patientName", "policyHolderName"] as const;
+    // The policyholder now has a coverage field of its own; only the patient/member name on the card
+    // stays purely informational (it is checked against the registered patient, never saved).
+    const NAME_FIELDS = ["patientName"] as const;
     const read = parsed.read
       .filter((r) => !(NAME_FIELDS as readonly string[]).includes(r.field))
       .map((r) => ({ label: r.label, value: String(d[r.field] ?? ""), from: r.raw }));

@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { IDS, openMenuIfCollapsed, signIn } from "./helpers";
+import { IDS, openMenuIfCollapsed, registerPatient, signIn } from "./helpers";
 
 test.describe("patients", () => {
-  test("hospital staff register a patient with validation feedback", async ({ page }) => {
+  test("hospital staff register a patient through the three steps, with validation feedback", async ({ page }) => {
     await signIn(page, "staff.a@demo.claimix.invalid");
     await page.goto("/patients/new");
-    await page.getByRole("button", { name: "Register patient" }).click();
+    await page.getByRole("button", { name: "Register Without ABHA ID" }).click();
+    await page.getByRole("button", { name: "Continue to doctor & slot" }).click();
     await expect(page.getByText("Enter at least 2 characters.")).toBeVisible();
 
     // Names allow letters only, so make the unique suffix alphabetic.
@@ -13,12 +14,12 @@ test.describe("patients", () => {
     await page.getByLabel("Full name").fill(name);
     await page.getByLabel("Date of birth").fill("1992-03-04");
     await page.getByLabel("Mobile number").fill("not-a-phone");
-    await page.getByRole("button", { name: "Register patient" }).click();
+    await page.getByRole("button", { name: "Continue to doctor & slot" }).click();
     await expect(page.getByText(/Enter a valid phone number/)).toBeVisible();
 
-    await page.getByLabel("Mobile number").fill("+91 98765 43210");
-    await page.getByRole("button", { name: "Register patient" }).click();
-    await expect(page).toHaveURL(/\/patients\/[0-9a-f-]{36}\?registered=1$/);
+    // The whole wizard, ending on the registered patient's own page.
+    const path = await registerPatient(page, { name, dob: "1992-03-04", phone: "+91 98765 43210" });
+    await expect(page).toHaveURL(new RegExp(`${path}$`));
     await expect(page.getByRole("heading", { name })).toBeVisible();
     await expect(page.getByText("Sunrise Multispeciality Hospital").first()).toBeVisible();
   });
@@ -53,7 +54,8 @@ test.describe("patients", () => {
 
 test.describe("hospitals & network", () => {
   test("search by insurer network then state", async ({ page }) => {
-    await signIn(page, "staff.a@demo.claimix.invalid");
+    // Browsing insurers is part of the insurance side, so this is an administrator's view now.
+    await signIn(page, "admin@demo.claimix.invalid");
     await page.goto("/hospitals");
     await page.getByLabel("Insurer network").selectOption({ label: "Aarogya Shield General Insurance (DEMO DATA)" });
     await page.getByRole("button", { name: "Apply" }).click();

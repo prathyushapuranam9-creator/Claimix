@@ -3,6 +3,7 @@ import { getCurrentUser, requestMeta } from "@/lib/auth/session";
 import { AppError } from "@/lib/errors";
 import { ageOn, formatDate, formatDateTime, formatINR } from "@/lib/india";
 import { logger } from "@/lib/logging/logger";
+import { can } from "@/lib/permissions/principal";
 import { HospitalService } from "@/modules/hospitals/hospitals.service";
 import { CoverageService } from "@/modules/patients/coverage.service";
 import { RELATIONSHIP_LABEL } from "@/modules/patients/coverage.validation";
@@ -20,7 +21,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   try {
     const ctx = { db: getDb(), principal: user.principal, meta: await requestMeta() };
     const { patient: p, hospitalName } = await PatientService.get(ctx, id);
-    const coverage = await CoverageService.forPatient(ctx, p.id);
+    // Coverage belongs to the insurance side; the front desk's sheet simply omits that section.
+    const coverage = can(ctx.principal, "policy:read") ? await CoverageService.forPatient(ctx, p.id) : [];
     // Letterhead: the registering hospital's address and contact details (where the caller may read them).
     const hospital = await HospitalService.get(ctx, p.hospitalId).catch(() => null);
     // Contact details are shown to the registering hospital and the patient only (as on the patient page).

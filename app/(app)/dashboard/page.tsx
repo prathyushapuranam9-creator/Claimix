@@ -6,7 +6,7 @@ import { authService, sessionToken } from "@/lib/auth/session";
 import { ContextSwitcher } from "@/components/insurance/ContextSwitcher";
 import { CompanyPolicyService } from "@/modules/policies/company-policies.service";
 import { exitContextAction, switchContextAction } from "../context/actions";
-import { formatDateTime, formatINR } from "@/lib/india";
+import { formatDate, formatDateTime, formatINR } from "@/lib/india";
 import { hasDashboard, landingPath } from "@/lib/navigation";
 import { can } from "@/lib/permissions/principal";
 import { CLAIM_STATUS_LABEL, CLAIM_STATUS_TONE, type ClaimStatus } from "@/modules/claims/claims.workflow";
@@ -20,6 +20,9 @@ import { ActionLink, BarMetric, Card as GlassCard, Col, Donut, HospitalPage, Ico
 import { Disclaimer } from "@/components/ui/Disclaimer";
 import { ButtonLink } from "@/components/ui/Button";
 import { Badge, Card, EmptyState, PageHeader, Stack, Stat } from "@/components/ui/Surface";
+import { departmentLabel } from "@/modules/patients/patients.validation";
+import { VISIT_TYPE_LABEL, type VisitType } from "@/modules/scheduling/scheduling.validation";
+import fd from "@/components/dashboard/FrontDesk.module.css";
 
 export const metadata: Metadata = { title: "Dashboard · Claimix" };
 
@@ -104,6 +107,93 @@ async function DashboardContent({ switcher }: { switcher?: React.ReactNode }) {
 
   const ps = d.preauthStatus as Counts;
   const cs = d.claimStatus as Counts;
+
+  if (d.variant === "front_desk" && d.frontDesk) {
+    const f = d.frontDesk;
+    return (
+      <>
+        {header}
+        {switcher}
+        <Stack>
+          <Card title="Register a patient">
+            <p>Find or register the patient, choose the doctor and slot, then take payment and confirm.</p>
+            <p>
+              <ButtonLink href="/patients/new">Register patient</ButtonLink> <ButtonLink href="/patients" variant="secondary">Find a patient</ButtonLink>
+            </p>
+          </Card>
+          <SectionHeader id="front-desk-figures" title="Today at the front desk" caption={`As of ${formatDateTime(new Date())}`} />
+          {/* Each figure opens the list it counts. */}
+          <CardGrid columns={4} labelledBy="front-desk-figures">
+            <WorkflowCard
+              label="Registered today"
+              value={f.booked}
+              caption={formatDate(f.slotDate)}
+              dot="blue"
+              action={{ href: `/appointments?date=${f.slotDate}`, text: "Day sheet" }}
+            />
+            <WorkflowCard
+              label="Payments to collect"
+              value={f.toCollect}
+              caption="Still to be taken at the desk"
+              accent={f.toCollect > 0 ? "warning" : undefined}
+              dot={f.toCollect > 0 ? "warning" : "success"}
+              action={f.toCollect > 0 ? { href: `/appointments?date=${f.slotDate}&payment=pending`, text: "Collect" } : { state: "All collected" }}
+            />
+            <WorkflowCard
+              label="Collected today"
+              value={formatINR(f.collected)}
+              caption="Cash, UPI and card"
+              dot="success"
+              action={{ href: `/appointments?date=${f.slotDate}&payment=paid`, text: "View" }}
+            />
+            <WorkflowCard
+              label="In hospital now"
+              value={f.inHospital}
+              caption="Admitted inpatients"
+              dot={f.inHospital > 0 ? "blue" : "muted"}
+              action={f.inHospital > 0 ? { href: "/appointments?view=admitted", text: "View" } : { state: "None admitted" }}
+            />
+          </CardGrid>
+          <Card
+            title="Today's appointments"
+            padded={false}
+            actions={<ButtonLink size="sm" variant="secondary" href={`/appointments?date=${f.slotDate}`}>Open day sheet</ButtonLink>}
+          >
+            {f.upcoming.length === 0 ? (
+              <EmptyState title="Nothing registered for today yet">
+                {`${f.freeSlots} free slot${f.freeSlots === 1 ? "" : "s"} today. Register a patient to fill the day sheet.`}
+              </EmptyState>
+            ) : (
+              <ul className={fd.rows}>
+                {f.upcoming.map((a) => (
+                  <li key={a.id} className={fd.row}>
+                    <span className={fd.time}>{a.startsAt.slice(0, 5)}</span>
+                    <span className={fd.cell}>
+                      <Link href={`/patients/${a.patientId}`} className={fd.name}>{a.patientName}</Link>
+                      <span className={fd.sub}>
+                        {a.patientNo} · {VISIT_TYPE_LABEL[a.visitType as VisitType] ?? a.visitType}
+                      </span>
+                    </span>
+                    <span className={fd.cell}>
+                      <span className={fd.name}>{a.doctorName}</span>
+                      <span className={fd.sub}>{departmentLabel(a.department)}</span>
+                    </span>
+                    <span className={fd.status}>
+                      {a.paymentState === "pending" ? <Badge tone="warning">To collect</Badge> : <Badge tone="success">Paid</Badge>}
+                    </span>
+                    <span className={fd.action}>
+                      <ButtonLink size="sm" variant="ghost" href={`/patients/${a.patientId}`}>Open</ButtonLink>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+          <Disclaimer />
+        </Stack>
+      </>
+    );
+  }
 
   if (d.variant === "hospital") {
     const queries = (ps.query ?? 0) + (cs.query ?? 0);

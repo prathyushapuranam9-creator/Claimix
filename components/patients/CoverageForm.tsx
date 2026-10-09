@@ -79,6 +79,8 @@ export function CoverageForm({ action, policies, defaults, startOpen, toggleLabe
           </optgroup>
         </SelectField>
         <TextField label="Member / beneficiary ID" required hint="Exactly as on the card or scheme record." error={e.memberId?.message} {...register("memberId")} />
+        <TextField label="Policy number" hint="If the document shows one separately from the member ID." error={e.policyNumber?.message} {...register("policyNumber")} />
+        <TextField label="Policyholder" hint="Leave blank when the patient is the policyholder." error={e.policyholderName?.message} {...register("policyholderName")} />
         <SelectField label="Relationship to policyholder" required error={e.relationship?.message} {...register("relationship")}>
           {RELATIONSHIPS.map((r) => <option key={r} value={r}>{RELATIONSHIP_LABEL[r]}</option>)}
         </SelectField>

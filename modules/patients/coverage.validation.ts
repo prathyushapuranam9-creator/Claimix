@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { zDate, zOptionalDate, zOptionalMoney, zOptionalUuid, zUuid } from "@/lib/validation";
+import { zDate, zOptionalDate, zOptionalMoney, zOptionalText, zOptionalUuid, zUuid } from "@/lib/validation";
 
 export const RELATIONSHIPS = ["self", "spouse", "child", "parent", "parent_in_law", "sibling", "other"] as const;
 
@@ -30,6 +30,10 @@ export const coverageInputSchema = z
   .object({
     policyId: zUuid,
     memberId: z.string().trim().min(3, "Enter the member / beneficiary ID.").max(80).regex(/^[A-Za-z0-9/_-]+$/, "Use letters, numbers, - / _ only."),
+    /** Printed on most policy documents alongside, and often differently from, the member ID. */
+    policyNumber: zOptionalText(80).refine((v) => v === undefined || /^[A-Za-z0-9/_. -]+$/.test(v), "Use letters, numbers, spaces and - / _ . only."),
+    /** Who the policy is held by, when that is not the patient. */
+    policyholderName: zOptionalText(200),
     relationship: z.enum(RELATIONSHIPS, { message: "Select the relationship." }),
     coverStart: zDate,
     coverEnd: zDate,

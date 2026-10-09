@@ -1,0 +1,135 @@
+/* Front-desk registration: search, slot picker and payment choices, on the existing form styles. */
+.search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-3);
+  align-items: end;
+}
+
+@media (min-width: 640px) {
+  .search { grid-template-columns: minmax(0, 1fr) auto; }
+}
+
+.resultsTitle {
+  margin: 0 0 var(--sp-2);
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 650;
+}
+
+.results {
+  display: grid;
+  gap: var(--sp-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.results > li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+}
+
+.results > li.picked {
+  border-color: var(--c-info);
+  box-shadow: 0 0 0 2px var(--c-info-bg);
+}
+
+.meta {
+  display: block;
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+.gate {
+  margin: 0;
+  color: var(--c-text-muted);
+  font-size: var(--fs-sm);
+}
+
+/* Slots: a wrapping grid of times. Booked ones are visibly unavailable and not clickable. */
+.slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7.5rem, 1fr));
+  gap: var(--sp-2);
+}
+
+.slot {
+  display: grid;
+  gap: 2px;
+  min-height: var(--tap);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-weight: 650;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  text-align: center;
+}
+
+.slot[data-state="picked"] {
+  border-color: var(--c-info);
+  background: var(--c-info-bg);
+  color: var(--c-info);
+}
+
+.slot[data-state="taken"] {
+  border-style: dashed;
+  background: transparent;
+  color: var(--c-text-muted);
+  cursor: not-allowed;
+}
+
+.slotState {
+  font-weight: 500;
+  font-size: var(--fs-xs);
+  color: var(--c-text-muted);
+}
+
+.slot[data-state="picked"] .slotState { color: inherit; }
+
+.methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.method {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-height: var(--tap);
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.method[data-picked="true"] {
+  border-color: var(--c-info);
+  background: var(--c-info-bg);
+  color: var(--c-info);
+}
+
+.method:has(input:disabled) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.consent {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+}

@@ -79,10 +79,9 @@ describe("organization isolation", () => {
     expect(await visiblePatientIds(who.staffB!)).not.toContain(DEMO.patient.a1);
   });
 
-  it("Hospital A → Hospital B claims = DENIED", async () => {
-    const ids = await visibleClaimIds(who.staffA!);
-    expect(ids).toContain(F.claimA1);
-    expect(ids).not.toContain(F.claimB1);
+  it("hospital staff see no claims at all: the role is front-desk registration only", async () => {
+    await expect(visibleClaimIds(who.staffA!)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(visibleClaimIds(who.staffB!)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("Insurer A → Insurer B claims = DENIED", async () => {

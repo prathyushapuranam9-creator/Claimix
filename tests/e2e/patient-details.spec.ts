@@ -1,15 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { alphaId, signIn } from "./helpers";
+import { alphaId, registerPatient, signIn } from "./helpers";
 
 test("after registering, Details shows the patient number and the details can be downloaded", async ({ page, browser }) => {
   await signIn(page, "staff.a@demo.claimix.invalid");
   const name = `Download Test ${alphaId()}`;
-  await page.goto("/patients/new");
-  await page.getByLabel("Full name").fill(name);
-  await page.getByLabel("Date of birth").fill("1990-03-04");
-  await page.getByRole("button", { name: "Register patient" }).click();
-  await page.waitForURL(/\/patients\/[0-9a-f-]{36}(\?.*)?$/);
-  const id = new URL(page.url()).pathname.split("/").pop()!;
+  const id = (await registerPatient(page, { name, dob: "1990-03-04" })).split("/").pop()!;
 
   const number = (await page.getByRole("heading", { name }).locator("..").locator(".mono").first().innerText()).trim();
   expect(number).toMatch(/^PT-/);
@@ -24,7 +19,9 @@ test("after registering, Details shows the patient number and the details can be
   // The standard-font text in the PDF is stored as hex, so look for what the sheet must contain.
   const hex = pdf.toString("latin1");
   const has = (text: string) => hex.includes(Buffer.from(text, "latin1").toString("hex").toUpperCase());
-  for (const text of ["Sunrise Multispeciality Hospital", "Patient Details", number, name, "Patient number", "Insurance & scheme coverage"]) expect(has(text), text).toBe(true);
+  for (const text of ["Sunrise Multispeciality Hospital", "Patient Details", number, name, "Patient number"]) expect(has(text), text).toBe(true);
+  // Coverage is part of the insurance side, so the front desk's sheet omits that section entirely.
+  expect(has("Insurance & scheme coverage")).toBe(false);
 
   // Another hospital cannot download it.
   const other = await browser.newContext();

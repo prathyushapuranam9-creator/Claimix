@@ -28,7 +28,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: SP 
         actions={canWrite && <ButtonLink href="/patients/new">Register patient</ButtonLink>}
       />
       <Card padded={false}>
-        <FilterBar basePath="/patients" q={q.q} searchLabel="Search by name or patient number" />
+        <FilterBar basePath="/patients" q={q.q} searchLabel="Search by name, patient number or mobile" />
         <DataTable
           caption="Patients"
           rows={data.rows}

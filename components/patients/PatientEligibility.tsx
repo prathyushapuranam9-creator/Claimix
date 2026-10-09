@@ -307,12 +307,26 @@ function ResultDetails({ r, stale }: { r: PatientEligibilityResult; stale: boole
 function NextSteps({ r, next }: { r: PatientEligibilityResult; next: EligibilityNextSteps }) {
   const editHref = next.coverageEditBase ? `${next.coverageEditBase}/${r.beneficiaryId}/edit` : null;
   if (r.canStartRequest) {
+    // The policy's rules decide which treatment workflow leads: a planned cashless admission that needs
+    // pre-authorization, or a claim where the rules don't require one.
+    const preauthFirst = r.preauthRequired !== false;
+    const preauth = next.preauth && (
+      <ButtonLink key="pa" size="sm" variant={preauthFirst ? "primary" : "secondary"} href={`/pre-authorizations/new?beneficiary=${r.beneficiaryId}`}>
+        New Pre-Authorization
+      </ButtonLink>
+    );
+    const claim = next.claim && (
+      <ButtonLink key="cl" size="sm" variant={preauthFirst ? "secondary" : "primary"} href={`/claims/new?beneficiary=${r.beneficiaryId}`}>
+        New Claim
+      </ButtonLink>
+    );
     return (
       <div className={styles.next}>
         <p className={styles.notesTitle}>Coverage is active. Next step:</p>
+        {r.preauthRequired === true && <p>This policy requires a pre-authorization before admission.</p>}
+        {r.preauthRequired === false && <p>This policy&apos;s rules don&apos;t require a pre-authorization for this case.</p>}
         <div className={styles.actions}>
-          {next.preauth && <ButtonLink size="sm" href={`/pre-authorizations/new?beneficiary=${r.beneficiaryId}`}>New Pre-Authorization</ButtonLink>}
-          {next.claim && <ButtonLink size="sm" variant="secondary" href={`/claims/new?beneficiary=${r.beneficiaryId}`}>New Claim</ButtonLink>}
+          {preauthFirst ? [preauth, claim] : [claim, preauth]}
           {!next.preauth && !next.claim && <span>Pre-authorizations and claims are raised by the treating hospital&apos;s staff.</span>}
         </div>
       </div>

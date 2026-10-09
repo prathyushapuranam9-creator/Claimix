@@ -34,6 +34,11 @@ export interface PatientEligibilityResult {
    * started while the cover period is in force. Computed here so the page cannot offer more.
    */
   canStartRequest: boolean;
+  /**
+   * Whether the policy's own rules require a pre-authorization for this case, so the next step can
+   * lead with the right one. null = the rules do not say, and both remain available.
+   */
+  preauthRequired: boolean | null;
   outcome: Outcome;
   /** Facts the rules needed but the record doesn't hold. */
   missingInformation: string[];
@@ -104,6 +109,7 @@ export const PatientEligibilityService = {
       // An expired cover is reported as such rather than a generic "not eligible".
       status: coverageStatus === "expired" && overall !== "PASS" ? "expired" : STATUS[overall],
       canStartRequest: coverageStatus === "in_force" && overall !== "FAIL",
+      preauthRequired: out.evaluation.preauthRequired,
       outcome: overall,
       missingInformation: out.evaluation.missingInformation,
       reasons: failureReasons(out.evaluation.results),

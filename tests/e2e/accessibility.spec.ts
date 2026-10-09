@@ -27,7 +27,8 @@ test.describe("accessibility (axe, WCAG 2.1 AA)", () => {
     test(`hospital staff workspace (${scheme})`, async ({ page }) => {
       await page.emulateMedia({ colorScheme: scheme });
       await signIn(page, "staff.a@demo.claimix.invalid");
-      await auditAll(page, ["/dashboard", "/patients", `/patients/${IDS.patientA1}`, "/eligibility", "/pre-authorizations", "/claims", "/documents", "/assistant", "/notifications", "/reports", "/hospitals"]);
+      // Front-desk registration only: the insurance pages are no longer reachable for this role.
+      await auditAll(page, ["/dashboard", "/patients", "/patients/new", `/patients/${IDS.patientA1}`, "/notifications", "/hospitals"]);
     });
   }
 

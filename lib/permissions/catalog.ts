@@ -60,25 +60,20 @@ export const ROLES: RoleDef[] = [
     key: "hospital_staff",
     name: "Hospital Staff",
     orgType: "hospital",
-    description: "Registers patients, checks eligibility, raises pre-auths and claims for their own hospital.",
+    description: "Registers patients for OPD consultations and IP admissions at their own hospital.",
+    /**
+     * Front-desk registration only. The insurance side of Claimix (coverage, eligibility,
+     * pre-authorizations, claims, their documents, the Insurance Assistant and the case reports) was
+     * deliberately taken away from this role; `seedRbac` revokes those grants from existing databases.
+     * Nothing else holds them on the hospital side, so pre-authorizations and claims cannot currently
+     * be raised at all — see README "Hospital Staff".
+     */
     grants: {
       "dashboard:view": "organization",
       "patient:read": "organization",
       "patient:write": "organization",
       "hospital:read": "all",
-      "insurer:read": "all",
-      "policy:read": "all",
-      "eligibility:check": "organization",
-      "preauth:read": "organization",
-      "preauth:create": "organization",
-      "claim:read": "organization",
-      "claim:create": "organization",
-      "document:read": "organization",
-      "document:upload": "organization",
       "notification:read": "own",
-      "assistant:use": "organization",
-      "assistant:review": "organization",
-      "report:view": "organization",
     },
   },
   {
@@ -136,6 +131,26 @@ export const ROLES: RoleDef[] = [
       "notification:read": "own",
     },
   },
+];
+
+/**
+ * Grants Hospital Staff used to hold, before the role became front-desk registration only. Listed so
+ * `seedRbac` can revoke them from databases seeded under the old matrix (runtime authorization comes
+ * from the database, so removing them from the matrix above is not enough on its own).
+ */
+export const WITHDRAWN_HOSPITAL_STAFF_PERMISSIONS: PermissionKey[] = [
+  "insurer:read",
+  "policy:read",
+  "eligibility:check",
+  "preauth:read",
+  "preauth:create",
+  "claim:read",
+  "claim:create",
+  "document:read",
+  "document:upload",
+  "assistant:use",
+  "assistant:review",
+  "report:view",
 ];
 
 /** Legacy role keys that were merged into `payer_reviewer`; setup moves their users across. */

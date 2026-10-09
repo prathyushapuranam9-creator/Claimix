@@ -33,27 +33,27 @@ const bill = (over: Record<string, unknown> = {}) => ({ admissionDate: "2026-09-
 /** A cashless claim ready to submit: documents uploaded, checks run, manual items confirmed. */
 async function readyClaim(amount = 90000) {
   const { preauth, coverage } = await approvedPreauth(ctx.db, who, c, 100000);
-  const claim = await ClaimService.createCashless(as("staffA"), { preAuthId: preauth.id, ...bill({ claimedAmount: amount }) });
-  for (const t of CLAIM_DOCS) await DocumentService.upload(as("staffA"), { subjectType: "claim", subjectId: claim.id, docType: t, file: file() });
-  await ClaimService.runChecks(as("staffA"), claim.id);
-  for (const key of MANUAL) await ClaimService.confirmItem(as("staffA"), claim.id, { key, confirmed: true });
+  const claim = await ClaimService.createCashless(as("deskA"), { preAuthId: preauth.id, ...bill({ claimedAmount: amount }) });
+  for (const t of CLAIM_DOCS) await DocumentService.upload(as("deskA"), { subjectType: "claim", subjectId: claim.id, docType: t, file: file() });
+  await ClaimService.runChecks(as("deskA"), claim.id);
+  for (const key of MANUAL) await ClaimService.confirmItem(as("deskA"), claim.id, { key, confirmed: true });
   return { claim, preauth, coverage };
 }
 
 describe("creating claims", () => {
   it("cashless claim from an approved pre-auth copies patient, policy and payer; one live claim per pre-auth", async () => {
     const { preauth } = await approvedPreauth(ctx.db, who, c);
-    const claim = await ClaimService.createCashless(as("staffA"), { preAuthId: preauth.id, ...bill() });
+    const claim = await ClaimService.createCashless(as("deskA"), { preAuthId: preauth.id, ...bill() });
     expect(claim).toMatchObject({ status: "draft", claimType: "cashless", preAuthId: preauth.id, insurerId: DEMO.org.insurerA, tpaId: DEMO.org.tpaA, diagnosisId: c.dx.K35 });
-    await expect(ClaimService.createCashless(as("staffA"), { preAuthId: preauth.id, ...bill() })).rejects.toBeInstanceOf(ConflictError);
+    await expect(ClaimService.createCashless(as("deskA"), { preAuthId: preauth.id, ...bill() })).rejects.toBeInstanceOf(ConflictError);
   });
 
   it("refuses cashless claims without an approved pre-auth, and from other hospitals or payers", async () => {
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
-    const draft = await PreauthService.create(as("staffA"), { beneficiaryId: coverage.id, claimType: "cashless" });
-    await expect(ClaimService.createCashless(as("staffA"), { preAuthId: draft.id, ...bill() })).rejects.toBeInstanceOf(ValidationError);
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
+    const draft = await PreauthService.create(as("deskA"), { beneficiaryId: coverage.id, claimType: "cashless" });
+    await expect(ClaimService.createCashless(as("deskA"), { preAuthId: draft.id, ...bill() })).rejects.toBeInstanceOf(ValidationError);
     const { preauth } = await approvedPreauth(ctx.db, who, c);
-    await expect(ClaimService.createCashless(as("staffB"), { preAuthId: preauth.id, ...bill() })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(ClaimService.createCashless(as("deskB"), { preAuthId: preauth.id, ...bill() })).rejects.toBeInstanceOf(NotFoundError);
     for (const k of ["insurerA", "patientA1", "admin"] as const) {
       await expect(ClaimService.createCashless(as(k), { preAuthId: preauth.id, ...bill() })).rejects.toBeInstanceOf(ForbiddenError);
     }
@@ -61,14 +61,14 @@ describe("creating claims", () => {
 
   it("validates dates and amounts", async () => {
     const { preauth } = await approvedPreauth(ctx.db, who, c);
-    await expect(ClaimService.createCashless(as("staffA"), { preAuthId: preauth.id, ...bill({ dischargeDate: "2026-09-10" }) })).rejects.toBeInstanceOf(ValidationError);
-    await expect(ClaimService.createCashless(as("staffA"), { preAuthId: preauth.id, ...bill({ claimedAmount: -5 }) })).rejects.toBeInstanceOf(ValidationError);
-    await expect(ClaimService.createCashless(as("staffA"), { preAuthId: preauth.id, ...bill({ dischargeDate: "2099-01-01" }) })).rejects.toBeInstanceOf(ValidationError);
+    await expect(ClaimService.createCashless(as("deskA"), { preAuthId: preauth.id, ...bill({ dischargeDate: "2026-09-10" }) })).rejects.toBeInstanceOf(ValidationError);
+    await expect(ClaimService.createCashless(as("deskA"), { preAuthId: preauth.id, ...bill({ claimedAmount: -5 }) })).rejects.toBeInstanceOf(ValidationError);
+    await expect(ClaimService.createCashless(as("deskA"), { preAuthId: preauth.id, ...bill({ dischargeDate: "2099-01-01" }) })).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("reimbursement claims need no pre-auth", async () => {
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
-    const claim = await ClaimService.createReimbursement(as("staffA"), { beneficiaryId: coverage.id, diagnosisId: c.dx.K35, procedureId: c.px.APPENDECTOMY, ...bill() });
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
+    const claim = await ClaimService.createReimbursement(as("deskA"), { beneficiaryId: coverage.id, diagnosisId: c.dx.K35, procedureId: c.px.APPENDECTOMY, ...bill() });
     expect(claim).toMatchObject({ claimType: "reimbursement", preAuthId: null });
   });
 });
@@ -76,16 +76,16 @@ describe("creating claims", () => {
 describe("claim lifecycle", () => {
   it("submission is enforced server-side: missing claim documents block it", async () => {
     const { preauth } = await approvedPreauth(ctx.db, who, c);
-    const claim = await ClaimService.createCashless(as("staffA"), { preAuthId: preauth.id, ...bill() });
-    for (const key of MANUAL) await ClaimService.confirmItem(as("staffA"), claim.id, { key, confirmed: true });
-    const err = await ClaimService.submit(as("staffA"), claim.id, {}).catch((e) => e);
+    const claim = await ClaimService.createCashless(as("deskA"), { preAuthId: preauth.id, ...bill() });
+    for (const key of MANUAL) await ClaimService.confirmItem(as("deskA"), claim.id, { key, confirmed: true });
+    const err = await ClaimService.submit(as("deskA"), claim.id, {}).catch((e) => e);
     expect(err).toBeInstanceOf(ValidationError);
     expect((err as Error).message).toMatch(/Final claim documents uploaded/);
   });
 
   it("submit → partial approval → settlement: patient share, pre-auth sync, balance reduced", async () => {
     const { claim, preauth, coverage } = await readyClaim(90000);
-    await ClaimService.submit(as("staffA"), claim.id, {});
+    await ClaimService.submit(as("deskA"), claim.id, {});
     // Drafts and other payers
     await expect(ClaimService.workspace(as("insurerB"), claim.id)).rejects.toBeInstanceOf(NotFoundError);
 
@@ -117,29 +117,29 @@ describe("claim lifecycle", () => {
 
   it("query → respond → approve in full; approval can't exceed the available balance", async () => {
     const { claim } = await readyClaim(90000);
-    await ClaimService.submit(as("staffA"), claim.id, {});
+    await ClaimService.submit(as("deskA"), claim.id, {});
     await ClaimService.decide(as("insurerA"), claim.id, { to: "query", reasonId: c.reason.non_medical_expenses, message: "Please send an itemised pharmacy bill.", requiredDocuments: ["pharmacy_bills"] });
-    await expect(ClaimService.submit(as("staffA"), claim.id, {})).rejects.toBeInstanceOf(InvalidTransitionError);
-    await ClaimService.respondToQuery(as("staffA"), claim.id, { message: "Itemised pharmacy bill uploaded." });
+    await expect(ClaimService.submit(as("deskA"), claim.id, {})).rejects.toBeInstanceOf(InvalidTransitionError);
+    await ClaimService.respondToQuery(as("deskA"), claim.id, { message: "Itemised pharmacy bill uploaded." });
     const r = await ClaimService.decide(as("insurerA"), claim.id, { to: "approved", amount: 90000 });
     expect(r).toMatchObject({ status: "approved", patientAmount: "0.00" });
   });
 
   it("rejection needs a reason and records the payer response", async () => {
     const { claim } = await readyClaim();
-    await ClaimService.submit(as("staffA"), claim.id, {});
+    await ClaimService.submit(as("deskA"), claim.id, {});
     await expect(ClaimService.decide(as("insurerA"), claim.id, { to: "rejected", message: "Not payable." })).rejects.toBeInstanceOf(ValidationError);
     await ClaimService.decide(as("insurerA"), claim.id, { to: "rejected", reasonId: c.reason.treatment_mismatch, message: "Treatment differs from what was authorized." });
-    const w = await ClaimService.workspace(as("staffA"), claim.id);
+    const w = await ClaimService.workspace(as("deskA"), claim.id);
     expect(w.payerResponses[0]).toMatchObject({ decision: "rejected", reasonTitle: "Treatment mismatch" });
     expect(w.payerResponses[0]!.reasonAction).toBeTruthy();
   });
 
   it("hospitals can't record decisions on private-insurer claims", async () => {
     const { claim } = await readyClaim();
-    await ClaimService.submit(as("staffA"), claim.id, {});
-    await expect(ClaimService.decide(as("staffA"), claim.id, { to: "approved", amount: 90000, payerReference: "X" })).rejects.toBeInstanceOf(ForbiddenError);
-    await expect(ClaimService.settle(as("staffA"), claim.id, { amount: 1, utr: "UTR000001", settledAt: "2026-09-29" })).rejects.toBeInstanceOf(ForbiddenError);
+    await ClaimService.submit(as("deskA"), claim.id, {});
+    await expect(ClaimService.decide(as("deskA"), claim.id, { to: "approved", amount: 90000, payerReference: "X" })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(ClaimService.settle(as("deskA"), claim.id, { amount: 1, utr: "UTR000001", settledAt: "2026-09-29" })).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
 
@@ -165,8 +165,8 @@ describe("database invariants (defence in depth)", () => {
 describe("claim visibility, export and documents", () => {
   it("patients see only their own claims; other hospitals nothing", async () => {
     const { claim } = await readyClaim();
-    await ClaimService.submit(as("staffA"), claim.id, {});
-    for (const k of ["patientA1", "patientA2", "staffB", "insurerB"] as const) await expect(ClaimService.workspace(as(k), claim.id)).rejects.toBeInstanceOf(NotFoundError);
+    await ClaimService.submit(as("deskA"), claim.id, {});
+    for (const k of ["patientA1", "patientA2", "deskB", "insurerB"] as const) await expect(ClaimService.workspace(as(k), claim.id)).rejects.toBeInstanceOf(NotFoundError);
     const list = await ClaimService.list(as("patientA1"), { page: 1, pageSize: 100 }, {});
     expect(list.rows.every((r) => r.patientName === "Demo Patient Anil")).toBe(true);
   });
@@ -177,8 +177,8 @@ describe("claim visibility, export and documents", () => {
     const idsA = new Set(a.rows.map((r) => r.id));
     expect(b.rows.some((r) => idsA.has(r.id))).toBe(false);
     expect(a.rows.every((r) => r.insurerName?.startsWith("Aarogya"))).toBe(true);
-    const staffB = await ClaimService.exportRows(as("staffB"), {}, {});
-    expect(staffB.rows.every((r) => r.hospitalName?.startsWith("Lakeview"))).toBe(true);
+    const deskB = await ClaimService.exportRows(as("deskB"), {}, {});
+    expect(deskB.rows.every((r) => r.hospitalName?.startsWith("Lakeview"))).toBe(true);
     await expect(ClaimService.exportRows(as("readOnly"), {}, {})).rejects.toBeInstanceOf(ForbiddenError);
     const logged = await ctx.db.select().from(auditLogs).where(and(eq(auditLogs.action, "claim.exported"), eq(auditLogs.actorUserId, who.insurerA.userId)));
     expect(logged.length).toBeGreaterThan(0);
@@ -186,9 +186,9 @@ describe("claim visibility, export and documents", () => {
 
   it("claim documents follow the claim's scope", async () => {
     const { claim } = await readyClaim();
-    const [doc] = (await ClaimService.workspace(as("staffA"), claim.id)).documents;
+    const [doc] = (await ClaimService.workspace(as("deskA"), claim.id)).documents;
     await expect(DocumentService.download(as("insurerA"), doc!.id)).rejects.toBeInstanceOf(NotFoundError); // draft
-    await ClaimService.submit(as("staffA"), claim.id, {});
+    await ClaimService.submit(as("deskA"), claim.id, {});
     await expect(DocumentService.download(as("insurerA"), doc!.id)).resolves.toBeTruthy();
     await expect(DocumentService.download(as("insurerB"), doc!.id)).rejects.toBeInstanceOf(NotFoundError);
   });

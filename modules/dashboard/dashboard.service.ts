@@ -4,6 +4,7 @@ import { ForbiddenError } from "@/lib/errors";
 import { hasDashboard } from "@/lib/navigation";
 import { can, requirePermission, scopeFor } from "@/lib/permissions/principal";
 import { ReportRepository } from "@/modules/reports/reports.repository";
+import { RegistrationService } from "@/modules/scheduling/scheduling.service";
 import { DashboardRepository } from "./dashboard.repository";
 
 const PAYER_WAITING = ["submitted", "pending"];
@@ -32,6 +33,19 @@ export const DashboardService = {
     const preauthScope = scopeFor(p, "preauth:read");
     const claimScope = scopeFor(p, "claim:read");
 
+    // The hospital front desk registers patients and holds no case permissions: it gets its own
+    // dashboard rather than an insurance one with every figure at zero.
+    if (!preauthScope && !claimScope) {
+      const frontDesk = await RegistrationService.dayOverview(ctx);
+      if (!frontDesk) throw new ForbiddenError();
+      return {
+        variant: "front_desk" as const,
+        frontDesk,
+        preauthStatus: {}, claimStatus: {}, financials: [], preauthTat: null, claimTat: null,
+        actionPreauths: [], actionClaims: [], openReviews: null, admin: null, awaitingTrend: [],
+      };
+    }
+
     const waiting = p.orgType === "hospital" ? HOSPITAL_ACTION : PAYER_WAITING;
     const [preauthStatus, claimStatus, financials, preauthTat, claimTat, actionPreauths, actionClaims, openReviews] = await Promise.all([
       preauthScope ? ReportRepository.statusCounts(ctx.db, "preauth", p, preauthScope) : {},
@@ -47,7 +61,7 @@ export const DashboardService = {
     const awaitingTrend = p.orgType === "hospital" ? await DashboardService.awaitingTrend(ctx, preauthScope, claimScope) : [];
     const admin = can(p, "user:manage", "all") ? await DashboardRepository.adminCounts(ctx.db) : null;
     const variant = p.orgType === "platform" ? ("admin" as const) : p.orgType === "hospital" ? ("hospital" as const) : ("payer" as const);
-    return { variant, preauthStatus, claimStatus, financials, preauthTat, claimTat, actionPreauths, actionClaims, openReviews, admin, awaitingTrend };
+    return { variant, frontDesk: null, preauthStatus, claimStatus, financials, preauthTat, claimTat, actionPreauths, actionClaims, openReviews, admin, awaitingTrend };
   },
 };
 

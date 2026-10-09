@@ -76,6 +76,8 @@ describe("reading an insurance card", () => {
     const { details, read: fields } = read(AAROGYA_CARD);
     expect(details).toMatchObject({
       memberId: "AAR-FF-778901",
+      policyNumber: "POL/AAR/2026/5512",
+      policyHolderName: "Test Card Patient",
       policyName: "Aarogya Family Floater Plus",
       insurerName: "Aarogya Shield General Insurance",
       relationship: "self",
@@ -88,6 +90,13 @@ describe("reading an insurance card", () => {
     // The label each value came from is kept, so staff can check it against the document.
     expect(fields.find((f) => f.field === "memberId")?.label).toBe("Member / beneficiary ID");
     expect(fields.every((f) => f.raw.length > 0)).toBe(true);
+  });
+
+  it("keeps the member ID and the policy number apart when the card prints both", () => {
+    const { details } = read(AAROGYA_CARD);
+    expect(details.memberId).toBe("AAR-FF-778901");
+    expect(details.policyNumber).toBe("POL/AAR/2026/5512");
+    expect(details.policyNumber).not.toBe(details.memberId);
   });
 
   it("keeps the available balance and the sum insured apart", () => {

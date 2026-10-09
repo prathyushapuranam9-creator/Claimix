@@ -36,14 +36,18 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/knowledge", label: "Knowledge Center", icon: "✎", permission: "dashboard:view", section: "Reference" },
   { href: "/profile", label: "Profile Settings", icon: "☺", permission: "dashboard:view", section: "Workspace", hidden: true },
   { href: "/admin/users", label: "Users", icon: "⚙", permission: "user:manage", section: "Administration" },
+  { href: "/admin/doctors", label: "Doctors & slots", icon: "⚕", permission: "hospital:manage", section: "Administration" },
   { href: "/admin/medical-codes", label: "Medical codes", icon: "⚕", permission: "policy:manage", section: "Administration" },
   { href: "/admin/access-requests", label: "Access requests", icon: "✉", permission: "user:manage", section: "Administration" },
   { href: "/audit", label: "Audit log", icon: "☰", permission: "audit:read", section: "Administration" },
 ];
 
-/** Admins, hospital staff and payers have a dashboard; patient and read-only users do not. */
+/**
+ * Admins, payers and the hospital front desk have a dashboard; patient and read-only users do not.
+ * Front-desk staff qualify through `patient:write` — they register patients and hold no case permissions.
+ */
 export function hasDashboard(p: Principal): boolean {
-  return !p.patientId && (can(p, "preauth:read") || can(p, "claim:read"));
+  return !p.patientId && (can(p, "preauth:read") || can(p, "claim:read") || can(p, "patient:write"));
 }
 
 /** Where users without a dashboard land after signing in. */

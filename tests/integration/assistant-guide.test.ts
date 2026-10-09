@@ -41,10 +41,10 @@ beforeAll(async () => {
   vi.stubEnv("LLM_ASSISTANT_ENABLED", "true");
 
   const c = await codes(ctx.db);
-  const { patient, coverage } = await freshFloaterPatient(ctx.db, who.staffA);
+  const { patient, coverage } = await freshFloaterPatient(ctx.db, who.deskA);
   patientNo = patient.patientNo;
   patientName = patient.fullName;
-  const p = await PreauthService.create(as("staffA"), {
+  const p = await PreauthService.create(as("deskA"), {
     beneficiaryId: coverage.id, claimType: "cashless", diagnosisId: c.dx.K35, procedureId: c.px.APPENDECTOMY, admissionDate: "2026-10-20",
     isAccident: "no", pedDeclared: "no", pedRelated: "unknown", estimatedCost: 90000, expectedInsuranceAmount: 90000, roomRentPerDay: 4000,
   });
@@ -75,7 +75,7 @@ describe("identifiers", () => {
 
 describe("authorized lookup", () => {
   it("hospital staff find their own patient number and pre-authorization reference", async () => {
-    const r = await lookupIdentifiers(svc(ctx.db, who.staffA), `${patientNo} and ${reference}`);
+    const r = await lookupIdentifiers(svc(ctx.db, who.deskA), `${patientNo} and ${reference}`);
     expect(r.found.map((f) => f.kind).sort()).toEqual(["patient", "preauth"]);
     expect(r.missing).toEqual([]);
     const pa = r.found.find((f) => f.kind === "preauth")!;
@@ -85,7 +85,7 @@ describe("authorized lookup", () => {
   });
 
   it("another hospital, an unrelated insurer and a not-yet-submitted request are all 'not found'", async () => {
-    for (const k of ["staffB", "insurerA", "insurerB"] as const) {
+    for (const k of ["deskB", "insurerA", "insurerB"] as const) {
       const r = await lookupIdentifiers(svc(ctx.db, who[k]), `${patientNo} ${reference}`);
       expect(r.found, k).toEqual([]);
       expect(r.missing.length, k).toBe(2);
@@ -93,12 +93,12 @@ describe("authorized lookup", () => {
   });
 
   it("a record id is checked the same way", async () => {
-    expect((await lookupIdentifiers(as("staffA"), preauthId)).found[0]?.identifier).toBe(reference);
-    expect((await lookupIdentifiers(as("staffB"), preauthId)).found).toEqual([]);
+    expect((await lookupIdentifiers(as("deskA"), preauthId)).found[0]?.identifier).toBe(reference);
+    expect((await lookupIdentifiers(as("deskB"), preauthId)).found).toEqual([]);
   });
 
   it("a nonexistent reference is reported as not found", async () => {
-    const r = await lookupIdentifiers(as("staffA"), "PT-ZZZZ9999");
+    const r = await lookupIdentifiers(as("deskA"), "PT-ZZZZ9999");
     expect(r).toMatchObject({ found: [], missing: [{ identifier: "PT-ZZZZ9999", kind: "patient" }] });
   });
 });
@@ -106,7 +106,7 @@ describe("authorized lookup", () => {
 describe("assistant conversation with the model", () => {
   it("sends the model the role context, recent requests and the found record, never personal details or other hospitals' data", async () => {
     respond = ok("That is a pre-authorization reference. It is a Draft.");
-    const reply = await guideChat(as("staffA"), `${reference} what does this mean?`, []);
+    const reply = await guideChat(as("deskA"), `${reference} what does this mean?`, []);
     expect(reply.source).toBe("model");
     expect(reply.markdown).toContain("pre-authorization reference");
     expect(reply.links.some((l) => l.href === `/pre-authorizations/${preauthId}`)).toBe(true);
@@ -128,7 +128,7 @@ describe("assistant conversation with the model", () => {
 
   it("an identifier the user cannot access is described to the model only as NOT FOUND", async () => {
     respond = ok("I could not find that.");
-    const reply = await guideChat(as("staffB"), `${reference}`, []);
+    const reply = await guideChat(as("deskB"), `${reference}`, []);
     const sys = requests[0]!.body.messages[0]!.content;
     expect(sys).toContain("NOT FOUND");
     expect(sys).not.toContain("RECORDS FOUND (visible");
@@ -138,9 +138,9 @@ describe("assistant conversation with the model", () => {
 
   it("keeps the conversation: history and the focused record are carried into the next turn", async () => {
     respond = ok("Open the Documents card on that request.");
-    const first = await guideChat(as("staffA"), `${reference}`, []);
+    const first = await guideChat(as("deskA"), `${reference}`, []);
     respond = ok("Upload the documents in the Documents card.");
-    await guideChat(as("staffA"), "Where do I upload the required documents?", [{ role: "user", content: reference }, { role: "assistant", content: first.markdown }], { id: first.focus!.id });
+    await guideChat(as("deskA"), "Where do I upload the required documents?", [{ role: "user", content: reference }, { role: "assistant", content: first.markdown }], { id: first.focus!.id });
     const sent = requests.at(-1)!.body.messages;
     expect(sent[0]!.content).toContain(`${reference} [pre-authorization reference]`); // re-resolved for this user
     expect(sent.some((m) => m.role === "user" && m.content === reference)).toBe(true);
@@ -149,20 +149,20 @@ describe("assistant conversation with the model", () => {
 
   it("a focus id belonging to someone else's record gives the model nothing", async () => {
     respond = ok("Which request do you mean?");
-    await guideChat(as("staffB"), "What should I do next?", [], { id: preauthId });
+    await guideChat(as("deskB"), "What should I do next?", [], { id: preauthId });
     expect(requests[0]!.body.messages[0]!.content).not.toContain("Status: Draft");
   });
 
   it("unrelated questions never reach the model", async () => {
     respond = ok("Mumbai Indians");
-    const r = await guideChat(as("staffA"), "Who won the cricket match?", []);
+    const r = await guideChat(as("deskA"), "Who won the cricket match?", []);
     expect(r.markdown).toBe("I can help only with the Claimix application, its workflows, navigation, statuses, records, and available actions.");
     expect(requests).toHaveLength(0);
   });
 
   it("the model's own out-of-scope verdict becomes the short Claimix-only reply", async () => {
     respond = ok("OUT_OF_SCOPE");
-    const r = await guideChat(as("staffA"), "Tell me about the Roman empire", []);
+    const r = await guideChat(as("deskA"), "Tell me about the Roman empire", []);
     expect(r.source).toBe("scope");
   });
 });
@@ -170,7 +170,7 @@ describe("assistant conversation with the model", () => {
 describe("when the AI service fails", () => {
   it.each([[401, /rejected the configured API key/], [429, /rate limit/], [404, /unavailable/], [500, /returned an error/]])("HTTP %i gives a clear notice, and a found record is still explained from the application", async (code, notice) => {
     respond = status(code);
-    const r = await guideChat(as("staffA"), `${reference} what is this?`, []);
+    const r = await guideChat(as("deskA"), `${reference} what is this?`, []);
     expect(r.notice).toMatch(notice);
     expect(r.markdown).toContain(`**${reference}** is a pre-authorization reference`);
     expect(r.markdown).toContain("Status: Draft");
@@ -179,7 +179,7 @@ describe("when the AI service fails", () => {
 
   it("a missing key is reported as a configuration problem", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "");
-    const r = await guideChat(as("staffA"), "Where can I find claims?", []);
+    const r = await guideChat(as("deskA"), "Where can I find claims?", []);
     expect(r.notice).toMatch(/missing OpenRouter API key/);
     expect(r.markdown).toContain("Dashboard\n→ Claims needing action"); // still answered from the application's own navigation
     vi.stubEnv("OPENROUTER_API_KEY", "sk-or-test-key");
@@ -187,7 +187,7 @@ describe("when the AI service fails", () => {
 
   it("an unreachable service is a network notice", async () => {
     vi.stubEnv("OPENROUTER_BASE_URL", "http://127.0.0.1:1");
-    const r = await guideChat(as("staffA"), "Where can I find claims?", []);
+    const r = await guideChat(as("deskA"), "Where can I find claims?", []);
     expect(r.notice).toMatch(/Could not reach the AI service/);
     vi.stubEnv("OPENROUTER_BASE_URL", `http://127.0.0.1:${(server.address() as AddressInfo).port}`);
   });

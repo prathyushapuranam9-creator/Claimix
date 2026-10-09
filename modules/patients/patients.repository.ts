@@ -47,12 +47,22 @@ const listColumns = {
 
 export type PatientListRow = { [K in keyof typeof listColumns]: (typeof listColumns)[K]["_"]["data"] };
 
+/**
+ * Matches a search term against the mobile number by digits alone, so a number typed without the
+ * country code or spacing still finds "+91 98765 43210". A term with no digits never matches.
+ */
+function phoneMatches(term: string) {
+  const digits = term.replace(/\D/g, "");
+  if (digits.length < 4) return undefined;
+  return sql`regexp_replace(coalesce(${patients.phone}, ''), '[^0-9]', '', 'g') like ${`%${digits}%`}`;
+}
+
 export const PatientRepository = {
   async list(db: DbOrTx, principal: Principal, scope: Scope, q: ListQuery): Promise<Paged<PatientListRow>> {
     const where = andAll(
       isNull(patients.deletedAt),
       scopePredicate(principal, scope, PATIENT_SCOPE),
-      q.q ? or(ilike(patients.fullName, likeContains(q.q)), ilike(patients.patientNo, likeContains(q.q))) : undefined,
+      q.q ? or(ilike(patients.fullName, likeContains(q.q)), ilike(patients.patientNo, likeContains(q.q)), phoneMatches(q.q)) : undefined,
     );
     const [rows, [total]] = await Promise.all([
       db

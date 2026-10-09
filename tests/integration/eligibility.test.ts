@@ -37,7 +37,7 @@ const result = (e: Awaited<ReturnType<typeof EligibilityService.check>>, kind: s
 
 describe("eligibility checker (spec scenarios)", () => {
   it("active policy, complete information → Eligible, and the check is recorded", async () => {
-    const e = await EligibilityService.check(as("staffA"), good());
+    const e = await EligibilityService.check(as("deskA"), good());
     expect(e.evaluation.results.filter((r) => r.outcome !== "PASS")).toEqual([]);
     expect(e.evaluation.overall).toBe("PASS");
     expect(e.evaluation.preauthRequired).toBe(true);
@@ -46,18 +46,18 @@ describe("eligibility checker (spec scenarios)", () => {
   });
 
   it("expired policy → Not eligible", async () => {
-    const e = await EligibilityService.check(as("staffB"), { ...good(), beneficiaryId: DEMO.beneficiary.b1Senior, procedureId: px["CATARACT-PHACO"], diagnosisId: dx.H25 });
+    const e = await EligibilityService.check(as("deskB"), { ...good(), beneficiaryId: DEMO.beneficiary.b1Senior, procedureId: px["CATARACT-PHACO"], diagnosisId: dx.H25 });
     expect(result(e, "cover_active").outcome).toBe("FAIL");
     expect(e.evaluation.overall).toBe("FAIL");
   });
 
   it("waiting period → Not eligible (new policy, not an accident)", async () => {
-    const e = await EligibilityService.check(as("staffA"), good({ beneficiaryId: DEMO.beneficiary.a2Individual, admissionDate: "2026-10-01", claimType: "reimbursement" }));
+    const e = await EligibilityService.check(as("deskA"), good({ beneficiaryId: DEMO.beneficiary.a2Individual, admissionDate: "2026-10-01", claimType: "reimbursement" }));
     expect(result(e, "initial_waiting").outcome).toBe("FAIL");
   });
 
   it("PED within its waiting period → Not eligible", async () => {
-    const e = await EligibilityService.check(as("staffA"), {
+    const e = await EligibilityService.check(as("deskA"), {
       policyId: DEMO.policy.aarogyaFloater, dob: "1980-05-05", relationship: "self", coverStart: "2026-01-01", coverEnd: "2026-12-31", inceptionDate: "2025-01-01",
       sumInsured: 500000, availableBalance: 500000, ...good({ beneficiaryId: undefined, pedDeclared: "yes", pedRelated: "yes" }),
     });
@@ -65,13 +65,13 @@ describe("eligibility checker (spec scenarios)", () => {
   });
 
   it("exclusion → Not eligible", async () => {
-    const e = await EligibilityService.check(as("staffA"), good({ diagnosisId: dx["Z41.1"] }));
+    const e = await EligibilityService.check(as("deskA"), good({ diagnosisId: dx["Z41.1"] }));
     expect(e.evaluation.results.find((r) => r.kind === "excluded_diagnoses" && r.outcome === "FAIL")).toBeTruthy();
     expect(e.evaluation.overall).toBe("FAIL");
   });
 
   it("insufficient coverage → sum insured check fails with the shortfall", async () => {
-    const e = await EligibilityService.check(as("staffA"), good({ estimatedCost: 600000 }));
+    const e = await EligibilityService.check(as("deskA"), good({ estimatedCost: 600000 }));
     const r = result(e, "sum_insured");
     expect(r.outcome).toBe("FAIL");
     expect(r.data?.shortfall).toBe(150000);
@@ -79,12 +79,12 @@ describe("eligibility checker (spec scenarios)", () => {
 
   it("hospital not in network → cashless not eligible", async () => {
     // Patient A2's insurer (B) is non-network at hospital A.
-    const e = await EligibilityService.check(as("staffA"), good({ beneficiaryId: DEMO.beneficiary.a2Individual }));
+    const e = await EligibilityService.check(as("deskA"), good({ beneficiaryId: DEMO.beneficiary.a2Individual }));
     expect(result(e, "hospital_network").outcome).toBe("FAIL");
   });
 
   it("government scheme at an empanelled hospital is checked with the scheme's own rules", async () => {
-    const e = await EligibilityService.check(as("staffB"), good({ beneficiaryId: DEMO.beneficiary.b1Cghs, procedureId: px["CATARACT-PHACO"], diagnosisId: dx.H25, estimatedCost: 20000, roomRentPerDay: undefined }));
+    const e = await EligibilityService.check(as("deskB"), good({ beneficiaryId: DEMO.beneficiary.b1Cghs, procedureId: px["CATARACT-PHACO"], diagnosisId: dx.H25, estimatedCost: 20000, roomRentPerDay: undefined }));
     expect(e.policy.category).toBe("government");
     expect(result(e, "hospital_network").outcome).toBe("PASS");
     // Scheme rules have no cataract waiting period (private-policy rules are never applied).
@@ -92,20 +92,20 @@ describe("eligibility checker (spec scenarios)", () => {
   });
 
   it("insufficient information → Needs verification, never Eligible", async () => {
-    const e = await EligibilityService.check(as("staffA"), { beneficiaryId: DEMO.beneficiary.a1Floater, claimType: "cashless" });
+    const e = await EligibilityService.check(as("deskA"), { beneficiaryId: DEMO.beneficiary.a1Floater, claimType: "cashless" });
     expect(e.evaluation.overall).toBe("NEEDS_VERIFICATION");
     expect(e.evaluation.missingInformation).toEqual(expect.arrayContaining(["Expected admission date", "Treatment / procedure", "Diagnosis (ICD code)", "Estimated treatment cost"]));
   });
 
   it("manual entry with nothing but a policy is never Eligible", async () => {
-    const e = await EligibilityService.check(as("staffA"), { policyId: DEMO.policy.surakshaIndividual, claimType: "cashless" });
+    const e = await EligibilityService.check(as("deskA"), { policyId: DEMO.policy.surakshaIndividual, claimType: "cashless" });
     expect(e.evaluation.overall).not.toBe("PASS");
   });
 });
 
 describe("eligibility access control", () => {
   it("another hospital can't check a patient's recorded coverage", async () => {
-    await expect(EligibilityService.check(as("staffB"), good())).rejects.toBeInstanceOf(NotFoundError);
+    await expect(EligibilityService.check(as("deskB"), good())).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it("insurers, patients and read-only users can't run hospital eligibility checks", async () => {
@@ -115,7 +115,7 @@ describe("eligibility access control", () => {
   });
 
   it("the check always uses the caller's own hospital (a sent hospitalId is ignored)", async () => {
-    const e = await EligibilityService.check(as("staffA"), good({ hospitalId: DEMO.org.hospitalC }));
+    const e = await EligibilityService.check(as("deskA"), good({ hospitalId: DEMO.org.hospitalC }));
     expect(e.hospital.id).toBe(DEMO.org.hospitalA);
     const [row] = await ctx.db.select().from(ruleEvaluations).where(and(eq(ruleEvaluations.id, e.evaluationId!)));
     expect(row!.organizationId).toBe(DEMO.org.hospitalA);

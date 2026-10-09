@@ -138,12 +138,10 @@ describe("policy visibility and validation", () => {
     await expect(PolicyService.get(as("patientA1"), DEMO.policy.surakshaIndividual)).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it("hospital staff and read-only users can browse all products", async () => {
-    for (const k of ["staffA", "readOnly"] as const) {
-      // Search the seeded demo products (test runs add many more policies).
-      const r = await PolicyService.list(as(k), { ...Q, q: "DEMO DATA" }, {});
-      expect(r.rows.map((x) => x.id)).toEqual(expect.arrayContaining([DEMO.policy.aarogyaFloater, DEMO.policy.surakshaIndividual, DEMO.policy.pmjayScheme]));
-    }
+  it("read-only users can browse all products", async () => {
+    // Search the seeded demo products (test runs add many more policies).
+    const r = await PolicyService.list(as("readOnly"), { ...Q, q: "DEMO DATA" }, {});
+    expect(r.rows.map((x) => x.id)).toEqual(expect.arrayContaining([DEMO.policy.aarogyaFloater, DEMO.policy.surakshaIndividual, DEMO.policy.pmjayScheme]));
   });
 
   it("private insurance and government schemes can't be mixed", async () => {

@@ -70,7 +70,7 @@ describe("access requests (public registration)", () => {
     const email = uniqueEmail();
     await AccessRequestService.submit(ctx.db, request(email), freshIp(), SECRET);
     const [row] = await ctx.db.select().from(accessRequests).where(eq(accessRequests.email, email));
-    for (const k of ["staffA", "insurerA", "readOnly", "patientA1"] as const) {
+    for (const k of ["deskA", "insurerA", "readOnly", "patientA1"] as const) {
       await expect(AccessRequestService.list(as(k), { page: 1, pageSize: 20 })).rejects.toBeInstanceOf(ForbiddenError);
       await expect(AccessRequestService.decide(as(k), row!.id, { decision: "approved" })).rejects.toBeInstanceOf(ForbiddenError);
     }
@@ -117,8 +117,8 @@ describe("reports and dashboards are tenant-scoped", () => {
   beforeAll(async () => {
     // At least one submitted+decided case, and one draft that payers must never count.
     await approvedPreauth(ctx.db, who, c);
-    const { coverage } = await freshFloaterPatient(ctx.db, who.staffA);
-    await PreauthService.create(as("staffA"), {
+    const { coverage } = await freshFloaterPatient(ctx.db, who.deskA);
+    await PreauthService.create(as("deskA"), {
       beneficiaryId: coverage.id, claimType: "cashless", diagnosisId: c.dx.K35, procedureId: c.px.APPENDECTOMY, admissionDate: "2026-09-20",
       isAccident: "no", pedDeclared: "no", pedRelated: "unknown", estimatedCost: 1000, expectedInsuranceAmount: 1000, roomRentPerDay: 1000,
     });
@@ -127,7 +127,7 @@ describe("reports and dashboards are tenant-scoped", () => {
   const total = (x: Record<string, number> | null) => Object.values(x ?? {}).reduce((a, b) => a + b, 0);
 
   it("hospital staff see exactly their hospital's cases", async () => {
-    const r = await ReportService.overview(as("staffA"), {});
+    const r = await ReportService.overview(as("deskA"), {});
     const [pa] = await ctx.db.select({ n: count() }).from(preAuthorizations).where(eq(preAuthorizations.hospitalId, DEMO.org.hospitalA));
     const [cl] = await ctx.db.select({ n: count() }).from(claims).where(eq(claims.hospitalId, DEMO.org.hospitalA));
     expect(total(r.preauthStatus)).toBe(pa!.n);
@@ -164,14 +164,14 @@ describe("reports and dashboards are tenant-scoped", () => {
   });
 
   it("a date range narrows the report", async () => {
-    const r = await ReportService.overview(as("staffA"), { from: "1990-01-01", to: "1990-12-31" });
+    const r = await ReportService.overview(as("deskA"), { from: "1990-01-01", to: "1990-12-31" });
     expect(total(r.preauthStatus)).toBe(0);
     expect(r.financials).toEqual([]);
   });
 
   it("each role gets its own dashboard variant with scoped data", async () => {
     expect((await DashboardService.forCaller(as("admin"))).variant).toBe("admin");
-    expect((await DashboardService.forCaller(as("staffA"))).variant).toBe("hospital");
+    expect((await DashboardService.forCaller(as("deskA"))).variant).toBe("hospital");
     expect((await DashboardService.forCaller(as("insurerA"))).variant).toBe("payer");
     expect((await DashboardService.forCaller(as("tpaA"))).variant).toBe("payer");
 
@@ -179,7 +179,7 @@ describe("reports and dashboards are tenant-scoped", () => {
     await expect(DashboardService.forCaller(as("readOnly"))).rejects.toThrow();
     await expect(DashboardService.forCaller(as("patientA1"))).rejects.toThrow();
 
-    const staff = await DashboardService.forCaller(as("staffB"));
+    const staff = await DashboardService.forCaller(as("deskB"));
     if (staff.variant !== "hospital") throw new Error("expected hospital");
     const ids = [...staff.actionPreauths, ...staff.actionClaims].map((x) => x.id);
     if (ids.length) {
